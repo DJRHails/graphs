@@ -1,0 +1,197 @@
+"""Direct line labelling — replaces legends for line charts."""
+
+from __future__ import annotations
+
+import warnings
+from collections import defaultdict
+
+import matplotlib.patheffects as pe
+
+from graphs._palette import C_BG
+
+
+def label_lines(
+    ax,
+    labels: list[str] | None = None,
+    *,
+    x_offset: int = 6,
+    fontsize: int = 9,
+    stroke: bool = True,
+    min_sep_pct: float = 5.0,
+    tick_pad_pct: float = 4.5,
+    edge_pull_pct: float = 1.5,
+):
+    """Label each line at its rightmost point instead of using a legend.
+
+    Visible y-tick rows are treated as fixed dividers. Each label is placed
+    in the band between two consecutive ticks (with `tick_pad_pct` padding off
+    each tick) so labels can never obscure axis tick text. Within a band,
+    labels are spread evenly with at least `min_sep_pct` separation; if the
+    band is too narrow for the labels in it, separation shrinks to fit
+    without spilling onto the tick rows.
+
+    Args:
+        labels: Override list of strings (defaults to line labels).
+        x_offset: Horizontal pixel offset from the last data point.
+        fontsize: Label font size.
+        stroke: White halo behind text to avoid clashing with gridlines.
+        min_sep_pct: Minimum label separation as % of y-axis range.
+        tick_pad_pct: Minimum gap between any label and a y-tick row,
+            as % of y-axis range. Set to 0 to disable tick-avoidance.
+        edge_pull_pct: When a line ends exactly at y_lo or y_hi (so its
+            label would otherwise sit on top of the 0% / 100% tick text),
+            pull the label this many % of the y-range *into* the chart.
+            Set to 0 to disable.
+    """
+    lines = [line for line in ax.get_lines() if not line.get_label().startswith("_")]
+    if not lines:
+        return
+
+    y_lo, y_hi = ax.get_ylim()
+    span = y_hi - y_lo
+    min_sep = span * min_sep_pct / 100
+    tick_pad = span * tick_pad_pct / 100
+    edge_pull = span * edge_pull_pct / 100
+
+    # Visible ticks define band boundaries. The axis limits cap the outer bands.
+    yticks = sorted(t for t in ax.get_yticks() if y_lo <= t <= y_hi)
+    tick_set = set(yticks)
+    edges = [y_lo] + yticks + [y_hi]
+    bands: list[tuple[float, float]] = []
+    for i in range(len(edges) - 1):
+        lo = edges[i] + (tick_pad if edges[i] in tick_set else 0)
+        hi = edges[i + 1] - (tick_pad if edges[i + 1] in tick_set else 0)
+        if hi > lo:
+            bands.append((lo, hi))
+    if not bands:  # degenerate: no usable band, fall back to full axis
+        bands = [(y_lo, y_hi)]
+
+    chart_center = (y_lo + y_hi) / 2
+
+    def assign_band(y: float) -> tuple[float, float]:
+        """Pick the band for a label at `y`.
+
+        Strict containment wins. Otherwise pick the band whose nearest edge
+        is closest to `y`; on ties (label sits exactly on a tick boundary),
+        pick the band whose centre is closer to the chart centre — so labels
+        for lines that end at the axis extremes land *interior* to the chart
+        rather than spilling outside the spine.
+        """
+        for lo, hi in bands:
+            if lo <= y <= hi:
+                return (lo, hi)
+
+        def edge_dist(b):
+            lo, hi = b
+            return min(abs(lo - y), abs(hi - y))
+
+        d_min = min(edge_dist(b) for b in bands)
+        candidates = [b for b in bands if edge_dist(b) == d_min]
+        if len(candidates) == 1:
+            return candidates[0]
+        return min(candidates, key=lambda b: abs((b[0] + b[1]) / 2 - chart_center))
+
+    items: list[list] = []
+    for i, line in enumerate(lines):
+        lbl = labels[i] if labels and i < len(labels) else line.get_label()
+        y = float(line.get_ydata()[-1])
+        # Pull labels that hug the axis extremes into the chart so they don't
+        # collide with the 0% / 100% tick text.
+        if edge_pull > 0:
+            if abs(y - y_hi) < tick_pad:
+                y = y_hi - edge_pull - tick_pad
+            elif abs(y - y_lo) < tick_pad:
+                y = y_lo + edge_pull + tick_pad
+        items.append([y, lbl, line, assign_band(y)])
+
+    # Distribute each band's labels evenly inside it, anchored near their mean y.
+    by_band: dict[tuple[float, float], list[list]] = defaultdict(list)
+    for it in items:
+        by_band[it[3]].append(it)
+
+    for (band_lo, band_hi), group in by_band.items():
+        group.sort(key=lambda it: it[0])
+        n = len(group)
+        if n == 1:
+            group[0][0] = max(band_lo, min(band_hi, group[0][0]))
+            continue
+        avail = band_hi - band_lo
+        sep = min(min_sep, avail / (n - 1))
+        total = (n - 1) * sep
+        mean_y = sum(it[0] for it in group) / n
+        center = max(band_lo + total / 2, min(band_hi - total / 2, mean_y))
+        start = center - total / 2
+        for i, it in enumerate(group):
+            it[0] = start + i * sep
+
+    path_fx = [pe.withStroke(linewidth=3, foreground=C_BG)] if stroke else []
+    annotations = []
+    for nudged_y, lbl, line, _ in items:
+        ann = ax.annotate(
+            lbl,
+            xy=(line.get_xdata()[-1], nudged_y),
+            xytext=(x_offset, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=fontsize,
+            color=line.get_color(),
+            path_effects=path_fx,
+            clip_on=False,
+            annotation_clip=False,
+        )
+        annotations.append(ann)
+
+    # Render-pass: detect residual overlaps between labels in pixel space and
+    # spread them in y. Necessary because the band-distribution pass works in
+    # data coords and can leave labels touching when the band is very thin or
+    # when two lines end within a few pixels of each other.
+    fig = ax.get_figure()
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        return
+
+    def _bbox(a):
+        return a.get_window_extent(renderer=renderer)
+
+    for _ in range(8):
+        bboxes = [(_bbox(a), a) for a in annotations]
+        bboxes.sort(key=lambda b: b[0].y0)
+        moved = False
+        for i in range(1, len(bboxes)):
+            prev_bb, _ = bboxes[i - 1]
+            cur_bb, cur_ann = bboxes[i]
+            overlap = prev_bb.y1 - cur_bb.y0
+            if overlap > 0:
+                # nudge current annotation up by `overlap + 1px`
+                shift_px = overlap + 1
+                inv = ax.transData.inverted()
+                _, y0 = inv.transform((0, 0))
+                _, y1 = inv.transform((0, shift_px))
+                dy = y1 - y0
+                xy = cur_ann.xy
+                cur_ann.xy = (xy[0], xy[1] + dy)
+                moved = True
+        if not moved:
+            break
+
+    # Final warning if any label still overlaps a y-tick label in pixel space.
+    tick_bboxes = []
+    for tl in ax.get_yticklabels():
+        if tl.get_text():
+            try:
+                tick_bboxes.append(tl.get_window_extent(renderer=renderer))
+            except Exception:
+                pass
+    for ann in annotations:
+        bb = _bbox(ann)
+        for tb in tick_bboxes:
+            if bb.overlaps(tb):
+                warnings.warn(
+                    f"graphs.label_lines: label {ann.get_text()!r} overlaps "
+                    "a y-tick label. Consider increasing tick_pad_pct or "
+                    "tightening y-limits.",
+                    stacklevel=2,
+                )
+                break
