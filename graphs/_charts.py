@@ -10,6 +10,7 @@ from graphs._palette import (
     C_GRID,
     C_LABEL,
     C_LABEL_MUTED,
+    C_OTHER,
     C_RED,
     C_SPINE,
     PALETTE,
@@ -41,7 +42,9 @@ def ci_fill(ax, x, y_lower, y_upper, *, color: str | None = None, alpha: float =
     if color is None:
         ax.fill_between(x, y_lower, y_upper, color=C_CI, linewidth=0, zorder=1)
     else:
-        ax.fill_between(x, y_lower, y_upper, color=color, alpha=alpha, linewidth=0, zorder=1)
+        ax.fill_between(
+            x, y_lower, y_upper, color=color, alpha=alpha, linewidth=0, zorder=1
+        )
 
 
 def bar_h(
@@ -333,18 +336,31 @@ def smoothed_line(
 
     band_half = band_sigma * std
     ax.fill_between(
-        x_arr, mean - band_half, mean + band_half,
-        color=color, alpha=band_alpha, linewidth=0, zorder=1,
+        x_arr,
+        mean - band_half,
+        mean + band_half,
+        color=color,
+        alpha=band_alpha,
+        linewidth=0,
+        zorder=1,
     )
     ax.scatter(
-        x_arr, y_arr,
-        s=scatter_size, color=color, alpha=scatter_alpha,
-        linewidths=0, zorder=2,
+        x_arr,
+        y_arr,
+        s=scatter_size,
+        color=color,
+        alpha=scatter_alpha,
+        linewidths=0,
+        zorder=2,
     )
     (line,) = ax.plot(
-        x_arr, mean,
-        color=color, linewidth=line_width, label=label,
-        solid_capstyle="round", zorder=3,
+        x_arr,
+        mean,
+        color=color,
+        linewidth=line_width,
+        label=label,
+        solid_capstyle="round",
+        zorder=3,
     )
     return line
 
@@ -431,7 +447,7 @@ def bump_chart(
     smoothing: float = 0.3,
     dot_size: float = 30.0,
     faded_alpha: float = 0.15,
-    faded_color: str = "#D9D9D9",
+    faded_color: str = C_OTHER,
     x_labels: Sequence[str] | None = None,
     x_labels_top: bool = False,
     right_labels: bool = False,
@@ -533,8 +549,12 @@ def bump_chart(
             continue
         interp = PchipInterpolator(x_grid, np.asarray(series, dtype=float))
         ax.plot(
-            xs_dense, interp(xs_dense),
-            color=faded_color, linewidth=1.2, alpha=faded_alpha, zorder=2,
+            xs_dense,
+            interp(xs_dense),
+            color=faded_color,
+            linewidth=2,
+            alpha=faded_alpha,
+            zorder=2,
             solid_capstyle="round",
         )
 
@@ -558,7 +578,10 @@ def bump_chart(
 
         interp = PchipInterpolator(x_grid, np.asarray(series, dtype=float))
         line_kwargs = dict(
-            color=col, linewidth=2.0, alpha=0.95, zorder=4,
+            color=col,
+            linewidth=2.0,
+            alpha=0.95,
+            zorder=4,
             solid_capstyle="round",
         )
         if highlight_halo:
@@ -570,8 +593,12 @@ def bump_chart(
             ]
         ax.plot(xs_dense, interp(xs_dense), **line_kwargs)
         ax.scatter(
-            [n_cols - 1], [series[-1]],
-            s=dot_size, color=col, zorder=5, linewidths=0,
+            [n_cols - 1],
+            [series[-1]],
+            s=dot_size,
+            color=col,
+            zorder=5,
+            linewidths=0,
         )
 
     # Axis cosmetics — emphasise the lines, not the numeric ranks.
@@ -596,7 +623,9 @@ def bump_chart(
         sec = ax.secondary_xaxis("top")
         sec.set_xticks(x_grid)
         sec.set_xticklabels(list(x_labels))
-        sec.tick_params(axis="x", labelsize=9, length=3.5, direction="out", color=C_SPINE)
+        sec.tick_params(
+            axis="x", labelsize=9, length=3.5, direction="out", color=C_SPINE
+        )
         sec.spines["top"].set_visible(False)
     for side in ("top", "left", "right", "bottom"):
         ax.spines[side].set_visible(False)
@@ -619,7 +648,11 @@ def bump_chart(
                 # Inherit the line colour, but bump muted slates to C_SPINE
                 # so labels read sharply (lines can stay slate without the
                 # text reading as washed-out grey).
-                label_col = C_SPINE if line_col in {C_LABEL, C_LABEL_MUTED, PALETTE["grey"]} else line_col
+                label_col = (
+                    C_SPINE
+                    if line_col in {C_LABEL, C_LABEL_MUTED, PALETTE["grey"]}
+                    else line_col
+                )
             text = right_label_format.format(rank=series[-1], name=name)
             ann = ax.annotate(
                 text,
@@ -712,7 +745,8 @@ def threshold_lollipop(
     ax.xaxis.set_label_position("top")
     ax.xaxis.set_tick_params(labelsize=9, length=3.5, direction="out")
     ax.spines[["top", "left", "right", "bottom"]].set_visible(False)
-    ax.grid(axis="x", color=C_GRID, linewidth=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    ax.grid(axis="x", which="major", color=C_GRID, linewidth=0.6, zorder=0)
     ax.grid(axis="y", visible=False)
     ax.set_ylim(len(categories) - 0.5, -0.5)
     return ax

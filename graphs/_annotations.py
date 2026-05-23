@@ -187,7 +187,9 @@ def _detect_y_label_side(ax) -> str:
     pos = ax.yaxis.get_ticks_position()
     if pos in ("right", "left"):
         return pos
-    right_has = any(t.get_text() for t in ax.get_yticklabels(which="major", minor=False))
+    right_has = any(
+        t.get_text() for t in ax.get_yticklabels(which="major", minor=False)
+    )
     # ``get_yticklabels`` returns one side; check both via tick objects.
     right_visible = any(
         tick.label2.get_visible() and tick.label2.get_text()
@@ -268,7 +270,9 @@ def broken_axis(
                 x_lim = ax.get_xlim()
                 x_data = x_lim[1] if resolved == "right" else x_lim[0]
             else:
-                resolved = "left"  # explicit x: assume left-anchored unless caller picks right
+                resolved = (
+                    "left"  # explicit x: assume left-anchored unless caller picks right
+                )
                 x_data = x
             x_disp = ax.transData.transform((x_data, ax.get_ylim()[0]))[0]
             x_fig = x_disp / fig_w_px
@@ -288,7 +292,12 @@ def broken_axis(
                 amp_x = (3.0 / 72.0) * fig.dpi / fig_w_px
                 half_y = (size / 2) / fig_h_px
                 y_mid = y_lo + half_y + (2.0 / 72.0) * fig.dpi / fig_h_px
-                ys = [y_mid - half_y, y_mid - half_y / 3, y_mid + half_y / 3, y_mid + half_y]
+                ys = [
+                    y_mid - half_y,
+                    y_mid - half_y / 3,
+                    y_mid + half_y / 3,
+                    y_mid + half_y,
+                ]
                 xs = [x_fig - amp_x, x_fig + amp_x, x_fig - amp_x, x_fig + amp_x]
             else:
                 # Legacy horizontal zig-zag on the bottom spine.
@@ -331,7 +340,12 @@ def broken_axis(
             # amp in y direction; convert points to figure-y fraction
             amp_y = (3.0 / 72.0) * fig.dpi / fig_h_px
             y_mid_x = y_lo
-            xs2 = [x_fig_x - half_x, x_fig_x - half_x / 3, x_fig_x + half_x / 3, x_fig_x + half_x]
+            xs2 = [
+                x_fig_x - half_x,
+                x_fig_x - half_x / 3,
+                x_fig_x + half_x / 3,
+                x_fig_x + half_x,
+            ]
             ys2 = [y_mid_x - amp_y, y_mid_x + amp_y, y_mid_x - amp_y, y_mid_x + amp_y]
             line2 = state["x_line"]
             if line2 is None:
@@ -413,6 +427,7 @@ def threshold_arrows(
 
     arrow_fontsize = fontsize + 1.0 if bold else fontsize
     arrow_weight = "bold" if bold else "normal"
+    text_weight = "bold" if bold else "normal"
 
     if axis == "x":
         x_disp = ax.transData.transform((threshold, 0))[0]
@@ -421,64 +436,100 @@ def threshold_arrows(
         # Render arrow glyph separately so it can be bolder than the label
         # while still aligning to the same baseline.
         arrow_left = fig.text(
-            anchor - gap, baseline,
+            anchor - gap,
+            baseline,
             "←",
-            color=left_c, fontsize=arrow_fontsize, fontweight=arrow_weight,
-            va="bottom", ha="right",
+            color=left_c,
+            fontsize=arrow_fontsize,
+            fontweight=arrow_weight,
+            va="bottom",
+            ha="right",
         )
         arrow_left_bb = arrow_left.get_window_extent(
             renderer=fig.canvas.get_renderer()
         ).transformed(fig.transFigure.inverted())
         fig.text(
-            arrow_left_bb.x0 - gap, baseline,
+            arrow_left_bb.x0 - gap,
+            baseline,
             left_text,
-            color=left_c, fontsize=fontsize, va="bottom", ha="right",
+            color=left_c,
+            fontsize=fontsize,
+            fontweight=text_weight,
+            va="bottom",
+            ha="right",
         )
         arrow_right = fig.text(
-            anchor + gap, baseline,
+            anchor + gap,
+            baseline,
             "→",
-            color=right_c, fontsize=arrow_fontsize, fontweight=arrow_weight,
-            va="bottom", ha="left",
+            color=right_c,
+            fontsize=arrow_fontsize,
+            fontweight=arrow_weight,
+            va="bottom",
+            ha="left",
         )
         arrow_right_bb = arrow_right.get_window_extent(
             renderer=fig.canvas.get_renderer()
         ).transformed(fig.transFigure.inverted())
         fig.text(
-            arrow_right_bb.x1 + gap, baseline,
+            arrow_right_bb.x1 + gap,
+            baseline,
             right_text,
-            color=right_c, fontsize=fontsize, va="bottom", ha="left",
+            color=right_c,
+            fontsize=fontsize,
+            fontweight=text_weight,
+            va="bottom",
+            ha="left",
         )
     else:
         y_disp = ax.transData.transform((0, threshold))[1]
         anchor = fig.transFigure.inverted().transform((0, y_disp))[1]
         baseline = bbox.x1 + pad if y is None else y
         arrow_down = fig.text(
-            baseline, anchor - gap,
+            baseline,
+            anchor - gap,
             "↓",
-            color=left_c, fontsize=arrow_fontsize, fontweight=arrow_weight,
-            va="top", ha="left",
+            color=left_c,
+            fontsize=arrow_fontsize,
+            fontweight=arrow_weight,
+            va="top",
+            ha="left",
         )
         arrow_down_bb = arrow_down.get_window_extent(
             renderer=fig.canvas.get_renderer()
         ).transformed(fig.transFigure.inverted())
         fig.text(
-            arrow_down_bb.x1 + gap, anchor - gap,
+            arrow_down_bb.x1 + gap,
+            anchor - gap,
             left_text,
-            color=left_c, fontsize=fontsize, va="top", ha="left",
+            color=left_c,
+            fontsize=fontsize,
+            fontweight=text_weight,
+            va="top",
+            ha="left",
         )
         arrow_up = fig.text(
-            baseline, anchor + gap,
+            baseline,
+            anchor + gap,
             "↑",
-            color=right_c, fontsize=arrow_fontsize, fontweight=arrow_weight,
-            va="bottom", ha="left",
+            color=right_c,
+            fontsize=arrow_fontsize,
+            fontweight=arrow_weight,
+            va="bottom",
+            ha="left",
         )
         arrow_up_bb = arrow_up.get_window_extent(
             renderer=fig.canvas.get_renderer()
         ).transformed(fig.transFigure.inverted())
         fig.text(
-            arrow_up_bb.x1 + gap, anchor + gap,
+            arrow_up_bb.x1 + gap,
+            anchor + gap,
             right_text,
-            color=right_c, fontsize=fontsize, va="bottom", ha="left",
+            color=right_c,
+            fontsize=fontsize,
+            fontweight=text_weight,
+            va="bottom",
+            ha="left",
         )
 
 

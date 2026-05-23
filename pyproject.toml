@@ -12,6 +12,9 @@ dynamic = ["dependencies", "readme"]
 "Homepage" = "https://github.com/DJRHails/graphs"
 "Bug Tracker" = "https://github.com/DJRHails/graphs/issues"
 
+[project.scripts]
+graphs-watch = "graphs.cli.watch:main"
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"

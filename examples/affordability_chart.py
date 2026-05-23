@@ -64,7 +64,6 @@ categories = [name for name, _ in CITY_VALUES]
 values = [v for _, v in CITY_VALUES]
 
 fig, ax = plt.subplots(figsize=(6.6, 8.4))
-fig.subplots_adjust(top=0.84, bottom=0.10, left=0.18, right=0.95)
 
 threshold_lollipop(ax, categories, values, threshold=1.0)
 

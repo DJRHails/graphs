@@ -72,6 +72,14 @@ font manager, no download occurs. Otherwise TTFs are fetched from
 
 Fallback chain: IBM Plex Sans → Verdana → Arial → DejaVu Sans.
 
+## Development
+
+Hot reload:
+
+    uv run graphs-watch
+
+Watches graphs/ and examples/ for .py changes and re-renders the affected examples + comparisons.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).

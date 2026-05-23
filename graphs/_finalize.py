@@ -5,10 +5,13 @@ import warnings
 
 import matplotlib.dates as mdates
 import matplotlib.font_manager as fm
+import matplotlib.patches as mpatches
+import matplotlib.path as mpath
 import matplotlib.pyplot as plt
 
 from graphs._fonts import _get_font, _get_font_condensed
 from graphs._palette import C_LABEL_MUTED, C_RED, C_SOURCE, C_SPINE, C_TEXT
+from graphs._superscript import render_text_with_superscripts
 
 
 def _check_x_monotonic(ax) -> None:
@@ -71,6 +74,120 @@ def _autoscale_y(ax, *, headroom: float = 0.10, floor_frac: float = 0.40) -> Non
     ax.set_ylim(new_lo, new_hi)
 
 
+def _draw_rule(fig, tx: float, y_cursor: float) -> None:
+    """Draw the short red rule above the title (legacy marker)."""
+    rule_w = 80 / (fig.get_figwidth() * fig.dpi)
+    fig.add_artist(
+        plt.Line2D(
+            [tx, tx + rule_w],
+            [y_cursor, y_cursor],
+            transform=fig.transFigure,
+            color=C_RED,
+            linewidth=3.5,
+            solid_capstyle="butt",
+            clip_on=False,
+        )
+    )
+
+
+# Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
+# inner hollow cut-out. Both triangles are concentric (same centroid). Outer
+# base spans (0,0)-(1,0) with apex at (0.5, _TRI_H). True equilateral height
+# is √3/2 ≈ 0.866; the favicon shape is slightly taller than equilateral, so
+# we scale by _TRI_SKEW (>1 = isoceles taller, =1 = perfect equilateral).
+_TRI_SKEW = 1.05  # 1.0 = equilateral, 1.05 ≈ 5% taller (favicon-like)
+_TRI_H = (3**0.5 / 2) * _TRI_SKEW
+_TRI_OUTER = (
+    (0.5, _TRI_H),  # top apex
+    (0.0, 0.0),  # bottom-left
+    (1.0, 0.0),  # bottom-right
+)
+_INNER_SCALE = 0.35
+_INNER_LIFT = _TRI_H * (1 - _INNER_SCALE) / 3  # centroids coincide
+_TRI_INNER = (
+    (0.5, _INNER_LIFT + _INNER_SCALE * _TRI_H),  # top apex
+    (0.5 - _INNER_SCALE / 2, _INNER_LIFT),  # bottom-left
+    (0.5 + _INNER_SCALE / 2, _INNER_LIFT),  # bottom-right
+)
+
+
+def _draw_logo_triangle(
+    fig,
+    tx: float,
+    y_cursor: float,
+    *,
+    color: str = C_RED,
+    size_pt: float = 13.0,
+) -> None:
+    """Draw the hails.info favicon triangle as a vector hollow marker.
+
+    The triangle is anchored with its bottom-left at ``(tx, y_cursor)`` in
+    figure coordinates so it aligns the same way as the legacy Δ glyph or
+    short rule (both bottom-anchored). ``size_pt`` controls the visual
+    height in typographic points so the marker scales consistently with
+    the surrounding title typography.
+
+    Renders as a single ``PathPatch`` with two sub-paths and even-odd fill
+    rule — the outer triangle is filled with ``color`` and the inner
+    triangle punches a transparent hole through it. Stays vector at
+    savefig time.
+    """
+    fig_w_in = fig.get_figwidth()
+    fig_h_in = fig.get_figheight()
+    # Convert size from points → figure-relative units on each axis. The
+    # vertex table is bbox-normalised so vy=1 equals the full triangle
+    # height; size_pt therefore equals the visual height in typographic
+    # points. Width is scaled by the favicon's bbox aspect ratio so the
+    # rendered triangle keeps its near-equilateral proportions regardless
+    # of figure aspect.
+    size_h = size_pt / 72.0 / fig_h_in
+    size_w = size_h * (fig_h_in / fig_w_in)
+
+    def _to_fig(verts):
+        return [(tx + vx * size_w, y_cursor + vy * size_h) for vx, vy in verts]
+
+    Path = mpath.Path
+    outer = _to_fig(_TRI_OUTER)
+    # Reverse the inner triangle's winding so matplotlib's default non-zero
+    # winding fill rule treats it as a hole (the two sub-paths have opposite
+    # orientations, so they cancel where they overlap).
+    inner = _to_fig(tuple(reversed(_TRI_INNER)))
+    verts = [
+        outer[0],
+        outer[1],
+        outer[2],
+        outer[0],
+        inner[0],
+        inner[1],
+        inner[2],
+        inner[0],
+    ]
+    codes = [
+        Path.MOVETO,
+        Path.LINETO,
+        Path.LINETO,
+        Path.CLOSEPOLY,
+        Path.MOVETO,
+        Path.LINETO,
+        Path.LINETO,
+        Path.CLOSEPOLY,
+    ]
+    patch = mpatches.PathPatch(
+        Path(verts, codes),
+        transform=fig.transFigure,
+        facecolor=color,
+        edgecolor="none",
+        linewidth=0,
+        clip_on=False,
+    )
+    fig.add_artist(patch)
+
+
+def _draw_delta(fig, tx: float, y_cursor: float) -> None:
+    """Draw the hails.info hollow red triangle above the title (default marker)."""
+    _draw_logo_triangle(fig, tx, y_cursor)
+
+
 def finalize(
     ax,
     title: str = "",
@@ -81,12 +198,13 @@ def finalize(
     title_x: float | None = None,
     y_start: float = 0.010,
     autoscale_y: bool = True,
+    marker: str = "delta",
 ):
     """Add Economist finishing touches to an axes object.
 
     Title stack (top to bottom)::
 
-        ────        short red rule
+        Δ           red delta glyph (or short red rule when marker="rule")
         Title       IBM Plex Sans Bold
         Descriptor  IBM Plex Sans Regular
 
@@ -103,7 +221,12 @@ def finalize(
         autoscale_y: If True (default), auto-tighten y-limits when the data
             fills less than 40% of the current axis range. Disable for charts
             that need a pinned 0–100% canvas regardless of data.
+        marker: Top-of-stack anchor. ``"delta"`` (default) renders a red Δ
+            glyph; ``"rule"`` draws the legacy short red horizontal line;
+            ``"none"`` skips the marker entirely.
     """
+    if marker not in ("delta", "rule", "none"):
+        raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
     fig = ax.get_figure()
 
     _check_x_monotonic(ax)
@@ -119,7 +242,9 @@ def finalize(
     # Preserve any larger pad set by chart helpers (e.g. bar_h sizes pad
     # to clear the widest left-edge label). Only fall back to the 4pt
     # default when the existing pad is smaller.
-    current_pad = ax.yaxis.get_major_ticks()[0].get_pad() if ax.yaxis.get_major_ticks() else 0
+    current_pad = (
+        ax.yaxis.get_major_ticks()[0].get_pad() if ax.yaxis.get_major_ticks() else 0
+    )
     ax.yaxis.set_tick_params(pad=max(current_pad, 4), labelsize=9)
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
@@ -137,7 +262,7 @@ def finalize(
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in  # 1 typographic point in figure-y coords
     line_gap = 3.5 * pt2fig
-    rule_gap = 6.0 * pt2fig
+    rule_gap = 2.0 * pt2fig
     y_cursor = bbox.y1 + y_start
 
     # If x-tick labels render above the axes top (e.g. bar_h puts them on top,
@@ -167,11 +292,11 @@ def finalize(
     if descriptor:
         n_desc_lines = descriptor.count("\n") + 1
         fp_desc = fm.FontProperties(family=_get_font_condensed(), weight="normal")
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             tx,
             y_cursor,
             descriptor,
-            transform=fig.transFigure,
             fontsize=9.5,
             fontproperties=fp_desc,
             color=C_SPINE,
@@ -185,34 +310,54 @@ def finalize(
     if title:
         n_title_lines = title.count("\n") + 1
         fp = fm.FontProperties(family=_get_font(), weight=700)
-        fig.text(
-            tx,
-            y_cursor,
-            title,
-            transform=fig.transFigure,
-            fontsize=12,
-            fontproperties=fp,
-            color=C_SPINE,
-            va="bottom",
-            ha="left",
-            linespacing=1.15,
-        )
-        # 12pt bold title line box ≈ 14pt; account for explicit \n wraps.
-        y_cursor += 14.0 * pt2fig * n_title_lines + rule_gap
+        title_size_pt = 12.0
 
-    # Short red rule at the top (~80 px wide)
-    rule_w = 80 / (fig.get_figwidth() * fig.dpi)
-    fig.add_artist(
-        plt.Line2D(
-            [tx, tx + rule_w],
-            [y_cursor, y_cursor],
-            transform=fig.transFigure,
-            color=C_RED,
-            linewidth=3.5,
-            solid_capstyle="butt",
-            clip_on=False,
-        )
-    )
+        if marker == "delta":
+            # Inline layout: triangle's height matches the title's cap-height
+            # (apex at cap-top, bottom edge at baseline). IBM Plex Sans Bold
+            # cap-height ≈ 0.72 × em size. A small upward nudge compensates
+            # for matplotlib's baseline placement so the bottom of the
+            # triangle visually lines up with the bottom of "B".
+            marker_size_pt = title_size_pt * 0.80
+            marker_w_fig = marker_size_pt / 72.0 / fig.get_figwidth()
+            marker_gap_fig = (4.0 * pt2fig) * (fig.get_figheight() / fig.get_figwidth())
+            title_x_inline = tx + marker_w_fig + marker_gap_fig
+            _draw_logo_triangle(fig, tx, y_cursor, size_pt=marker_size_pt)
+            render_text_with_superscripts(
+                fig,
+                title_x_inline,
+                y_cursor,
+                title,
+                fontsize=title_size_pt,
+                fontproperties=fp,
+                color=C_SPINE,
+                va="baseline",
+                ha="left",
+                linespacing=1.15,
+            )
+            y_cursor += 14.0 * pt2fig * n_title_lines
+        else:
+            # Standard above-title layout: title at y_cursor, rule (if any)
+            # rendered above with a small gap.
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor,
+                title,
+                fontsize=title_size_pt,
+                fontproperties=fp,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=1.15,
+            )
+            y_cursor += 14.0 * pt2fig * n_title_lines + rule_gap
+            if marker == "rule":
+                _draw_rule(fig, tx, y_cursor)
+    elif marker == "delta":
+        _draw_delta(fig, tx, y_cursor)
+    elif marker == "rule":
+        _draw_rule(fig, tx, y_cursor)
 
     if source:
         # Place source below the lowest of: xlabel, x-tick labels.
@@ -241,11 +386,11 @@ def finalize(
         except Exception:
             pass
         fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             tx,
             source_y,
             source,
-            transform=fig.transFigure,
             fontsize=7.5,
             fontproperties=fp_src,
             color=C_SOURCE,
@@ -353,11 +498,11 @@ def y_axis_label(
     if unit:
         y_text += line_h  # leave room below for the unit line
 
-    fig.text(
+    render_text_with_superscripts(
+        fig,
         x,
         y_text,
         wrapped,
-        transform=fig.transFigure,
         fontsize=fontsize,
         fontproperties=fp,
         color=color if color is not None else C_SPINE,
@@ -369,11 +514,11 @@ def y_axis_label(
     if unit:
         # Anchor the unit line directly under the wrapped text block.
         y_unit = y_text - line_h * n_text_lines
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             x,
             y_unit,
             unit,
-            transform=fig.transFigure,
             fontsize=fontsize,
             fontproperties=fp,
             color=unit_color if unit_color is not None else C_LABEL_MUTED,
@@ -501,11 +646,11 @@ def footnotes(
         if not notes_str:
             return
         y_pos = y if y is not None else base_y0 - 0.045
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             x,
             y_pos,
             notes_str,
-            transform=fig.transFigure,
             fontsize=7,
             fontproperties=fp_notes,
             color=C_SOURCE,
@@ -534,18 +679,17 @@ def footnotes(
     # minus a small visual gap.
     gap = 0.02
     src_right = x + src_w
-    notes_fits = (
-        notes_str
-        and (src_right + gap + notes_w) <= min(right_x, max_width_frac)
+    notes_fits = notes_str and (src_right + gap + notes_w) <= min(
+        right_x, max_width_frac
     )
 
     # Always draw the source line.
     if source:
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             x,
             source_y,
             source,
-            transform=fig.transFigure,
             fontsize=7.5,
             fontproperties=fp_src,
             color=C_SOURCE,
@@ -558,11 +702,11 @@ def footnotes(
 
     if notes_fits:
         # Same row, right-aligned to the rightmost axes edge.
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             right_x,
             source_y,
             notes_str,
-            transform=fig.transFigure,
             fontsize=7,
             fontproperties=fp_notes,
             color=C_SOURCE,
@@ -571,11 +715,11 @@ def footnotes(
         )
     else:
         # Wrap above the source line.
-        fig.text(
+        render_text_with_superscripts(
+            fig,
             x,
             source_y + 0.022,
             notes_str,
-            transform=fig.transFigure,
             fontsize=7,
             fontproperties=fp_notes,
             color=C_SOURCE,

@@ -59,7 +59,7 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
             "axes.grid": True,
             "axes.grid.axis": "y",
             "axes.axisbelow": True,
-            "axes.labelcolor": C_LABEL_MUTED,
+            "axes.labelcolor": C_SPINE,
             "axes.labelsize": 9,
             "axes.labelpad": 4,
             "axes.prop_cycle": plt.cycler("color", colors),
