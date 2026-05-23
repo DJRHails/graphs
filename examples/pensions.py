@@ -100,7 +100,7 @@ finalize(
     ax,
     title="Brazil's golden oldie blowout",
     descriptor="Latest available",
-    source="Sources: OECD; World Bank; Previdência Social",
+    source="Sources: [OECD](https://www.oecd.org/); [World Bank](https://www.worldbank.org/); [Previdência Social](https://www.gov.br/previdencia/)",
     autoscale_y=False,
     y_start=0.050,
 )

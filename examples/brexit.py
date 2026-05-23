@@ -105,7 +105,7 @@ finalize(
     ax,
     title="Bremorse",
     descriptor='"In hindsight, do you think Britain was right or wrong to vote to leave the EU?"\n% responding',
-    source="Source: NatCen Social Research",
+    source="Source: [NatCen Social Research](https://natcen.ac.uk/)",
     autoscale_y=False,
 )
 

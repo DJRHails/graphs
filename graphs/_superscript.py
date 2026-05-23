@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import matplotlib.font_manager as fm
 
+from graphs._links import apply_url_to_artists
+
 # Longest first so ``**`` matches before ``*``.
 _FOOTNOTE_MARKERS: tuple[str, ...] = (
     "**",
@@ -69,6 +71,53 @@ def _has_marker(text: str) -> bool:
     return any(m in text for m in _FOOTNOTE_MARKERS)
 
 
+def _subdivide_at_url_boundaries(
+    chunks: list[tuple[str, bool]],
+    line_offset: int,
+    url_spans: list[tuple[int, int, str]],
+) -> list[tuple[str, bool]]:
+    """Further split marker-aware ``chunks`` at URL span start/end positions.
+
+    ``chunks`` are the output of ``_split_for_superscript`` for a single line.
+    ``line_offset`` is the line's start index in the original full string —
+    needed because ``url_spans`` are indexed against that full string. Splits
+    each chunk so URL boundaries always land on chunk boundaries; the
+    downstream URL-tagging step can then mark whole chunks as belonging to a
+    link without partial-coverage warnings.
+
+    Returns a new list of chunks (no mutation). Preserves the
+    ``is_superscript`` flag of the chunk being subdivided.
+    """
+    if not url_spans:
+        return chunks
+
+    # Collect breakpoints (relative to line start) where chunks must split.
+    line_breaks: set[int] = set()
+    for s_start, s_end, _ in url_spans:
+        rel_start = s_start - line_offset
+        rel_end = s_end - line_offset
+        line_breaks.add(rel_start)
+        line_breaks.add(rel_end)
+
+    out: list[tuple[str, bool]] = []
+    cursor = 0
+    for chunk, is_sup in chunks:
+        chunk_start = cursor
+        chunk_end = cursor + len(chunk)
+        # Find break points strictly inside this chunk.
+        inner = sorted(b for b in line_breaks if chunk_start < b < chunk_end)
+        if not inner:
+            out.append((chunk, is_sup))
+        else:
+            last = chunk_start
+            for b in inner:
+                out.append((chunk[last - chunk_start : b - chunk_start], is_sup))
+                last = b
+            out.append((chunk[last - chunk_start :], is_sup))
+        cursor = chunk_end
+    return out
+
+
 def render_text_with_superscripts(
     fig,
     x: float,
@@ -82,6 +131,7 @@ def render_text_with_superscripts(
     ha: str = "left",
     linespacing: float = 1.2,
     transform=None,
+    url_spans: list[tuple[int, int, str]] | None = None,
 ):
     """Render ``text`` as a sequence of ``Text`` artists with superscripts.
 
@@ -118,7 +168,7 @@ def render_text_with_superscripts(
     if transform is None:
         transform = fig.transFigure
 
-    if not _has_marker(text):
+    if not _has_marker(text) and not url_spans:
         return fig.text(
             x,
             y,
@@ -168,8 +218,22 @@ def render_text_with_superscripts(
 
     first_artist = None
 
+    # Collect (chunk, artist) pairs across all lines so we can apply URL
+    # spans after rendering. Spans are indexed against the full ``text``
+    # (including newlines), so we track a global character offset.
+    all_chunks: list[tuple[str, bool]] = []
+    all_artists: list = []
+    global_offset = 0
+
     for line_idx, line in enumerate(lines):
+        if line_idx > 0:
+            # Account for the newline character separating logical lines.
+            all_chunks.append(("\n", False))
+            all_artists.append(None)
+            global_offset += 1
         chunks = _split_for_superscript(line)
+        if url_spans:
+            chunks = _subdivide_at_url_boundaries(chunks, global_offset, url_spans)
         if va == "bottom":
             line_va = "bottom"
         elif va == "top":
@@ -225,5 +289,11 @@ def render_text_with_superscripts(
                 first_artist = artist
             bb = artist.get_window_extent(renderer=renderer)
             cursor_px += bb.width
+            all_chunks.append((chunk, is_sup))
+            all_artists.append(artist)
+            global_offset += len(chunk)
+
+    if url_spans:
+        apply_url_to_artists(all_artists, all_chunks, url_spans)
 
     return first_artist

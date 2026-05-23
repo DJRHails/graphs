@@ -44,7 +44,8 @@ finalize(
 footnotes(
     fig,
     "*All-items consumer price index",
-    source="Sources: BLS; Eurostat",
+    source="Sources: [US Bureau of Labor Statistics](https://www.bls.gov/); "
+           "[Eurostat](https://ec.europa.eu/eurostat)",
 )
 
 plt.savefig("inflation.png", bbox_inches="tight", dpi=150)
@@ -177,6 +178,21 @@ title/descriptor. Three common categories:
   - `"Source: synthetic data, scatter_chart.py"`
 - Pass via `finalize(source=...)` for simple cases, or
   `footnotes(..., source=...)` when packing alongside footnote markers.
+
+**Hyperlinks in source / footnote text.** Use markdown link syntax:
+
+```python
+footnotes(
+    fig,
+    source="Source: [US Bureau of Labor Statistics](https://www.bls.gov/)",
+)
+```
+
+SVG and PDF outputs preserve the link as an `<a href>` wrapper. PNG strips
+URLs silently. The library only recognises `http://` and `https://` schemes.
+Avoid placing a footnote marker (`*`, `†`) inside the `[display]` text — the
+URL is dropped with a `UserWarning` because the marker splits the rendered
+text into chunks the URL can't span.
 
 ### Before / after
 

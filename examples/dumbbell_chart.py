@@ -46,7 +46,7 @@ finalize(
     ax,
     title="The great divergence",
     descriptor="GDP in current US dollars, selected economies",
-    source="Source: World Bank",
+    source="Source: [World Bank](https://www.worldbank.org/)",
     y_axis_right=False,
     title_x=0.02,
 )

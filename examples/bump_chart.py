@@ -117,7 +117,7 @@ finalize(
     ax,
     title="World happiness rankings",
     descriptor="",
-    source="Source: World Happiness Report 2025",
+    source="Source: [World Happiness Report 2025](https://worldhappiness.report/)",
     y_axis_right=False,
     title_x=0.04,
     auto_layout=False,

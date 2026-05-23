@@ -55,7 +55,7 @@ finalize(
     ax,
     title="Left-click",
     descriptor="Average number of likes per Facebook post\n2016, '000",
-    source="Source: Facebook",
+    source="Source: [Facebook](https://www.facebook.com/)",
     y_axis_right=False,
     title_x=0.02,
     autoscale_y=False,

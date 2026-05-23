@@ -10,6 +10,7 @@ import matplotlib.path as mpath
 import matplotlib.pyplot as plt
 
 from graphs._fonts import _get_font, _get_font_condensed
+from graphs._links import strip_links
 from graphs._palette import C_LABEL_MUTED, C_RED, C_SOURCE, C_SPINE, C_TEXT
 from graphs._superscript import _has_marker, render_text_with_superscripts
 
@@ -605,16 +606,18 @@ def finalize(
         except Exception:
             pass
         fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
+        source_clean, source_urls = strip_links(source)
         render_text_with_superscripts(
             fig,
             tx,
             source_y,
-            source,
+            source_clean,
             fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_src,
             color=C_SOURCE,
             va="top",
             ha="left",
+            url_spans=source_urls,
         )
 
     # Post-process axis labels so footnote markers in ``set_xlabel`` /
@@ -889,6 +892,9 @@ def footnotes(
     fp_notes = fm.FontProperties(family=_get_font_condensed(), weight="light")
     fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
 
+    notes_clean, notes_urls = strip_links(notes_str) if notes_str else ("", [])
+    source_clean, source_urls = strip_links(source) if source else ("", [])
+
     if source is None:
         # Legacy mode — render notes only at the historical position.
         if not notes_str:
@@ -898,12 +904,13 @@ def footnotes(
             fig,
             x,
             y_pos,
-            notes_str,
+            notes_clean,
             fontsize=FOOTNOTE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",
             ha="left",
+            url_spans=notes_urls,
         )
         return
 
@@ -920,14 +927,16 @@ def footnotes(
         t.remove()
         return bb.width / (fig.get_figwidth() * fig.dpi)
 
-    src_w = _text_width_frac(source, fp_src, SOURCE_MEASURE_SIZE_PT)
-    notes_w = _text_width_frac(notes_str, fp_notes, FOOTNOTE_SIZE_PT) if notes_str else 0.0
+    src_w = _text_width_frac(source_clean, fp_src, SOURCE_MEASURE_SIZE_PT)
+    notes_w = (
+        _text_width_frac(notes_clean, fp_notes, FOOTNOTE_SIZE_PT) if notes_clean else 0.0
+    )
 
     # Available room between source's right edge and the chart's right edge,
     # minus a small visual gap.
     gap = FOOTNOTES_PACK_GAP
     src_right = x + src_w
-    notes_fits = notes_str and (src_right + gap + notes_w) <= min(
+    notes_fits = notes_clean and (src_right + gap + notes_w) <= min(
         right_x, max_width_frac
     )
 
@@ -937,15 +946,16 @@ def footnotes(
             fig,
             x,
             source_y,
-            source,
+            source_clean,
             fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_src,
             color=C_SOURCE,
             va="top",
             ha="left",
+            url_spans=source_urls,
         )
 
-    if not notes_str:
+    if not notes_clean:
         return
 
     if notes_fits:
@@ -954,12 +964,13 @@ def footnotes(
             fig,
             right_x,
             source_y,
-            notes_str,
+            notes_clean,
             fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",
             ha="right",
+            url_spans=notes_urls,
         )
     else:
         # Wrap above the source line.
@@ -967,10 +978,11 @@ def footnotes(
             fig,
             x,
             source_y + FOOTNOTES_STACK_GAP,
-            notes_str,
+            notes_clean,
             fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",
             ha="left",
+            url_spans=notes_urls,
         )

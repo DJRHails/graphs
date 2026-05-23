@@ -26,7 +26,7 @@ finalize(
     ax,
     title="Eastern promise",
     descriptor="GDP growth rate, %, 2023",
-    source="Source: Eurostat",
+    source="Source: [Eurostat](https://ec.europa.eu/eurostat)",
     y_axis_right=False,
     title_x=0.02,
 )

@@ -80,7 +80,7 @@ finalize(
     ax,
     title="Average wage* relative to renters' wage†",
     descriptor="Selected European cities, 2025, log scale",
-    source="Sources: Eurostat; ERI Economic Research Institute; The Economist",
+    source="Sources: [Eurostat](https://ec.europa.eu/eurostat); [ERI Economic Research Institute](https://www.erieri.com/); [The Economist](https://www.economist.com/)",
     y_axis_right=False,
     title_x=0.02,
     autoscale_y=False,

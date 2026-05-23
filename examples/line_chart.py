@@ -176,8 +176,14 @@ footnotes(
     "*Meta-estimate based on trends in war intensity, territory shifts "
     "and credible open-source and intelligence assessments of losses",
     source=(
-        "Sources: DMSP Nighttime Lights; ESA; EUMETSAT; Institute for the Study of War; "
-        "AEI's Critical Threats Project; NASA; WorldPop; The Economist"
+        "Sources: [DMSP Nighttime Lights](https://eogdata.mines.edu/products/dmsp/); "
+        "[European Space Agency](https://www.esa.int/); "
+        "[EUMETSAT](https://www.eumetsat.int/); "
+        "[Institute for the Study of War](https://www.understandingwar.org/); "
+        "[AEI's Critical Threats Project](https://www.criticalthreats.org/); "
+        "[NASA](https://www.nasa.gov/); "
+        "[WorldPop](https://www.worldpop.org/); "
+        "[The Economist](https://www.economist.com/)"
     ),
 )
 

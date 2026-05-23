@@ -65,7 +65,7 @@ finalize(
     autoscale_y=False,
     auto_layout=False,  # stacked panels need explicit hspace
 )
-footnotes(fig, source="Sources: US Census Bureau; BLS")
+footnotes(fig, source="Sources: [US Census Bureau](https://www.census.gov/); [US Bureau of Labor Statistics](https://www.bls.gov/)")
 
 out = Path(__file__).resolve().parent / "us_trade.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

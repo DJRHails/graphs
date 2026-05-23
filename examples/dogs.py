@@ -138,7 +138,7 @@ footnotes(
     fig,
     "*Where at least 50 are registered per year",
     "†Where at least 100 are registered per year",
-    source="Sources: Kennel Club; The Economist",
+    source="Sources: [Kennel Club](https://www.thekennelclub.org.uk/); [The Economist](https://www.economist.com/)",
 )
 
 out = Path(__file__).resolve().parent / "dogs.png"

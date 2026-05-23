@@ -228,7 +228,7 @@ finalize(
     ax,
     title="Closing the gap",
     descriptor="Average age gap of married couples*, by income of wife, years",
-    source="Sources: US Census Bureau; The Economist",
+    source="Sources: [US Census Bureau](https://www.census.gov/); [The Economist](https://www.economist.com/)",
     y_axis_right=True,
     autoscale_y=False,
     footnote_lines=2,  # right-anchored footnote sits below source + xlabel

@@ -57,7 +57,7 @@ finalize(
     ax,
     title="The US pulls ahead",
     descriptor="Real GDP, index, 2015 = 100",
-    source="Source: IMF; World Bank",
+    source="Sources: [IMF](https://www.imf.org/); [World Bank](https://www.worldbank.org/)",
 )
 
 out = Path(__file__).resolve().parent / "index_chart.png"

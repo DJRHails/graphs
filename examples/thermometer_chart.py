@@ -73,7 +73,7 @@ finalize(
     ax,
     title="The horrible science",
     descriptor='Use of "Horrible" per million words\nin student reviews on RateMyProfessors.com*',
-    source="Source: Ben Schmidt, Northeastern University",
+    source="Source: [Ben Schmidt](https://benschmidt.org/), Northeastern University",
     y_axis_right=False,
     title_x=0.02,
     y_start=0.22,
