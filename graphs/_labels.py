@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import warnings
 from collections import defaultdict
+from typing import Iterable
 
+import matplotlib.font_manager as fm
 import matplotlib.patheffects as pe
 
-from graphs._palette import C_BG
+from graphs._fonts import _get_font
+
+# Halo colour for label strokes. C_BG is "none" (transparent) under the new
+# theme, which would render no halo at all — use white explicitly so labels
+# stay readable when they cross gridlines.
+_HALO = "#FFFFFF"
 
 
 def label_lines(
@@ -124,7 +131,7 @@ def label_lines(
         for i, it in enumerate(group):
             it[0] = start + i * sep
 
-    path_fx = [pe.withStroke(linewidth=3, foreground=C_BG)] if stroke else []
+    path_fx = [pe.withStroke(linewidth=3, foreground=_HALO)] if stroke else []
     annotations = []
     for nudged_y, lbl, line, _ in items:
         ann = ax.annotate(
@@ -195,3 +202,95 @@ def label_lines(
                     stacklevel=2,
                 )
                 break
+
+
+def inset_tick_labels(ax, *, axis: str = "x") -> None:
+    """Inset the first and last tick labels so they stay within the chart bounds.
+
+    Standard Economist convention: end labels align to the inside edge of the
+    plot area rather than centring on the tick (which would overflow). The
+    first label gets ``ha="left"`` so its left edge sits on the first tick;
+    the last gets ``ha="right"`` so its right edge sits on the last tick.
+    Middle labels stay centred.
+
+    Args:
+        ax: Axes whose tick labels should be inset.
+        axis: ``"x"`` (default) or ``"y"``.
+    """
+    if axis not in ("x", "y"):
+        raise ValueError(f"axis must be 'x' or 'y', got {axis!r}")
+
+    getter = ax.get_xticklabels if axis == "x" else ax.get_yticklabels
+    labels = list(getter())
+    if not labels:
+        return
+    labels[0].set_ha("left")
+    labels[-1].set_ha("right")
+
+
+def italicize_labels(
+    ax,
+    labels: Iterable[str],
+    *,
+    axis: str = "y",
+    fontsize: float = 9,
+) -> None:
+    """Render the given tick labels in italic IBM Plex Sans.
+
+    Useful when a category axis mixes individuals (upright) with
+    organisations/parties (italic), per the Economist convention.
+
+    Args:
+        ax: Axes whose tick labels should be restyled.
+        labels: Iterable of label strings to italicise. Any tick whose
+            text matches one of these strings is restyled; others are
+            left alone.
+        axis: ``"y"`` (default) or ``"x"``.
+        fontsize: Font size in points.
+    """
+    style_labels(ax, italic=labels, axis=axis, fontsize=fontsize)
+
+
+def style_labels(
+    ax,
+    *,
+    italic: Iterable[str] = (),
+    bold: Iterable[str] = (),
+    axis: str = "y",
+    fontsize: float = 9,
+) -> None:
+    """Restyle individual tick labels with italic / bold weight.
+
+    ``set_fontproperties`` replaces the entire font spec, which clobbers
+    the colour back to its default. This helper re-applies the tick's
+    existing colour after the font swap so labels stay visually uniform.
+
+    Args:
+        ax: Axes whose tick labels should be restyled.
+        italic: Tick texts to render in italic IBM Plex Sans.
+        bold: Tick texts to render in bold weight.
+        axis: ``"y"`` (default) or ``"x"``.
+        fontsize: Font size in points.
+    """
+    if axis not in ("x", "y"):
+        raise ValueError(f"axis must be 'x' or 'y', got {axis!r}")
+
+    italic_set = set(italic)
+    bold_set = set(bold)
+    ticks = ax.get_yticklabels() if axis == "y" else ax.get_xticklabels()
+    family = _get_font()
+    for tick in ticks:
+        text = tick.get_text()
+        is_italic = text in italic_set
+        is_bold = text in bold_set
+        if not (is_italic or is_bold):
+            continue
+        original_color = tick.get_color()
+        fp = fm.FontProperties(
+            family=family,
+            style="italic" if is_italic else "normal",
+            weight="bold" if is_bold else "normal",
+            size=fontsize,
+        )
+        tick.set_fontproperties(fp)
+        tick.set_color(original_color)

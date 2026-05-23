@@ -32,7 +32,7 @@ finalize(
     title_x=0.02,
 )
 
-out = Path(__file__).resolve().parent / "economist_bar.png"
+out = Path(__file__).resolve().parent / "bar_chart.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)
 plt.close()
 print("Saved bar chart")

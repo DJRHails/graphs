@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-from graphs import dumbbell, finalize, set_theme
+from graphs import dumbbell, finalize, set_theme, top_legend
 
 set_theme()
 
@@ -53,20 +53,17 @@ finalize(
 )
 
 bbox = ax.get_position()
-fig.legend(
-    handles=ax._dumbbell_handles,
-    labels=["2000", "2020"],
-    loc="upper right",
-    bbox_to_anchor=(bbox.x1, bbox.y1 + 0.005),
-    bbox_transform=fig.transFigure,
-    frameon=False,
+top_legend(
+    fig,
+    ax._dumbbell_handles,
+    ["2000", "2020"],
+    x=bbox.x1,
+    align="right",
     fontsize=8.5,
     ncol=2,
-    handletextpad=0.4,
-    columnspacing=1.0,
 )
 
-out = Path(__file__).resolve().parent / "economist_dumbbell.png"
+out = Path(__file__).resolve().parent / "dumbbell_chart.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)
 plt.close()
 print("Saved dumbbell chart")

@@ -14,13 +14,13 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 from graphs import (
-    C_BG,
     C_LABEL,
     C_RED,
     C_SPINE,
     ci_fill,
     finalize,
     panel_label,
+    right_axis,
     set_theme,
 )
 
@@ -48,12 +48,7 @@ for ax, (panel_name, y) in zip(axes, panels.items()):
     ax.axhline(0, color=C_SPINE, linewidth=0.8, zorder=3)
     ax.scatter([0], [0], color=C_SPINE, s=40, zorder=5)
 
-    ax.yaxis.set_label_position("right")
-    ax.yaxis.tick_right()
-    ax.spines["right"].set_visible(True)
-    ax.spines["right"].set_color(C_BG)
-    ax.spines["bottom"].set_color(C_SPINE)
-    ax.spines[["top", "left"]].set_visible(False)
+    right_axis(ax)
     ax.yaxis.set_tick_params(pad=-2, labelsize=8.5)
     ax.set_ylim(-0.22, 0.22)
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
@@ -80,7 +75,7 @@ finalize(
     y_start=0.075,
 )
 
-out = Path(__file__).resolve().parent / "economist_facet.png"
+out = Path(__file__).resolve().parent / "faceted_chart.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)
 plt.close()
 print("Saved facet chart")

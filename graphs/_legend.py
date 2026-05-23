@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import warnings
+from typing import Sequence
 
-from graphs._palette import C_BG, C_SPINE
+from graphs._palette import C_SPINE
+
+# Legend frame fill — white, not C_BG (which is "none" under the transparent
+# theme and would defeat the point of the frame).
+_FRAME_FILL = "#FFFFFF"
 
 
 _CORNERS = {
@@ -21,7 +26,7 @@ def smart_legend(
     pad: float = 0.02,
     prefer: tuple[str, ...] = ("upper right", "upper left", "lower right", "lower left"),
     fontsize: int = 9,
-    frame: bool = True,
+    frame: bool = False,
     **legend_kwargs,
 ):
     """Place a legend in the emptiest corner of the axes.
@@ -34,8 +39,8 @@ def smart_legend(
         pad: Fractional inset from the axes edge (data area).
         prefer: Tie-break order among equally-empty corners.
         fontsize: Legend text size.
-        frame: Draw a thin frame matching the spine colour. Set False for
-            frameless legends.
+        frame: Opt-in boxed legend. Default False (frameless). Boxed legends
+            are discouraged — prefer frameless or direct labels.
         **legend_kwargs: Forwarded to ax.legend (e.g. title, ncol).
 
     Returns:
@@ -140,6 +145,75 @@ def smart_legend(
         frame_obj = leg.get_frame()
         frame_obj.set_edgecolor(C_SPINE)
         frame_obj.set_linewidth(0.5)
-        frame_obj.set_facecolor(C_BG)
+        frame_obj.set_facecolor(_FRAME_FILL)
         frame_obj.set_alpha(0.92)
     return leg
+
+
+def top_legend(
+    fig,
+    handles: Sequence,
+    labels: Sequence[str],
+    *,
+    x: float = 0.02,
+    y: float | None = None,
+    align: str = "left",
+    ncol: int | None = None,
+    fontsize: float = 7.5,
+    handlelength: float = 1.2,
+    handletextpad: float = 0.4,
+    columnspacing: float = 1.0,
+    anchor_to: object | None = None,
+    above_axes: float = 0.005,
+):
+    """Compact frameless legend anchored under the title stack.
+
+    Standard Economist treatment for stacked-bar / thermometer / dumbbell
+    charts that share a colour key across panels: a single horizontal row
+    of label swatches sitting just below the descriptor block, aligned to
+    the ``title_x`` of the chart.
+
+    Args:
+        fig: Figure to attach the legend to.
+        handles: Legend handles (artists).
+        labels: Legend labels matching ``handles``.
+        x: Anchor in figure coordinates. With ``align="left"`` this is the
+            legend's left edge (match ``finalize(title_x=…)``); with
+            ``align="right"`` it is the right edge (use ``bbox.x1`` to flush
+            against the chart's right edge).
+        y: Top anchor in figure coordinates. When ``None`` (default), the
+            legend is placed ``above_axes`` above the top of ``anchor_to``
+            (or the first axes in the figure when ``anchor_to`` is None).
+        align: ``"left"`` (default) or ``"right"``.
+        ncol: Number of columns. Defaults to ``len(handles)`` so each entry
+            sits on the same row.
+        anchor_to: Axes whose top edge is used for automatic ``y``. Useful
+            for chart_top alignment in multi-panel layouts where ``axes[0]``
+            isn't the right reference.
+        above_axes: Gap (figure coords) between the axes' top and the
+            legend's top when ``y`` is auto-computed.
+    """
+    if align not in ("left", "right"):
+        raise ValueError(f"align must be 'left' or 'right', got {align!r}")
+    if y is None:
+        ref = anchor_to if anchor_to is not None else (fig.axes[0] if fig.axes else None)
+        if ref is None:
+            y = 0.82
+        else:
+            fig.canvas.draw()
+            y = ref.get_position().y1 + above_axes
+    if ncol is None:
+        ncol = max(1, len(handles))
+    loc = "upper left" if align == "left" else "upper right"
+    return fig.legend(
+        handles,
+        labels,
+        loc=loc,
+        bbox_to_anchor=(x, y),
+        ncol=ncol,
+        frameon=False,
+        fontsize=fontsize,
+        handlelength=handlelength,
+        handletextpad=handletextpad,
+        columnspacing=columnspacing,
+    )

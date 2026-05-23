@@ -5,3 +5,9 @@ build/
 *.egg-info/
 .venv/
 graphs/_fonts_cache/
+
+# Comparison images pull in third-party (Medium-hosted) PNGs — not ours to redistribute.
+examples/comparisons/
+
+# CSV cache for the example scripts.
+examples/.data/
