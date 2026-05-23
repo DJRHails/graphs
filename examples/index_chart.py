@@ -33,7 +33,6 @@ us = np.array(
 eu = np.array([90, 92, 94, 96, 98, 100, 101, 103, 104, 105, 92, 99, 103, 105, 107, 109])
 
 fig, ax = plt.subplots(figsize=(7.2, 4.6))
-fig.subplots_adjust(top=0.66, bottom=0.14, left=0.06, right=0.88)
 
 # Pandemic shock band — main message of the chart, but the styleguide
 # reserves red emphasis; for web use the subtle tint instead.

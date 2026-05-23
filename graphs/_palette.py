@@ -20,13 +20,13 @@ C_BG_TRANSPARENT = "none"
 C_BG_TINT = "#E9EDF0"  # styleguide "BOXES/NAV" tint — opt-in
 
 # Spine and grid greys — same as before, slightly desaturated for transparency.
-C_SPINE = "#1A1A1A"       # zero-baseline + bottom spine
-C_GRID = "#D9D9D9"        # horizontal gridlines
-C_LABEL = "#3F5661"       # dark slate — primary text (was #1A1A1A near-black)
-C_TEXT = "#3F5661"        # body text (subtitle, source, ticks)
+C_SPINE = "#1A1A1A"  # zero-baseline + bottom spine
+C_GRID = "#D9D9D9"  # horizontal gridlines
+C_LABEL = "#404040"  # dark slate — primary text (was #1A1A1A near-black)
+C_TEXT = "#3F5661"  # body text (subtitle, source, ticks)
 C_LABEL_MUTED = "#758D99"  # secondary text (FORECAST / ESTIMATE / "Other")
-C_SOURCE = "#404040"      # source/footnote text — 75% black per Economist styleguide
-C_BOX_FILL = "#E9EDF0"    # callout boxes, highlight panels (styleguide c22.5 k15)
+C_SOURCE = "#404040"  # source/footnote text — 75% black per Economist styleguide
+C_BOX_FILL = "#E9EDF0"  # callout boxes, highlight panels (styleguide c22.5 k15)
 
 # ----------------------------------------------------------------------------
 # Accent red — single source of truth
@@ -34,8 +34,8 @@ C_BOX_FILL = "#E9EDF0"    # callout boxes, highlight panels (styleguide c22.5 k1
 # Styleguide separates brand red (#E3120B, masthead) from data red (#DB444B).
 # We use one accent for both roles. Keep #bf352b unless explicitly overridden.
 C_RED = "#bf352b"
-C_RED_BRAND = "#E3120B"   # styleguide masthead red — opt-in only
-C_RED_DATA = "#DB444B"    # styleguide data red — opt-in only
+C_RED_BRAND = "#E3120B"  # styleguide masthead red — opt-in only
+C_RED_DATA = "#DB444B"  # styleguide data red — opt-in only
 
 # Salmon CI band — kept from previous version, complements our red.
 C_CI = "#f5c5b8"
@@ -47,15 +47,15 @@ C_CI = "#f5c5b8"
 # by index. The default `colors` cycle leads with our red so single-series
 # charts pick it up automatically.
 PALETTE = {
-    "red":    "#bf352b",  # our accent (replaces #DB444B from the styleguide)
-    "blue":   "#006BA2",
-    "cyan":   "#3EBCD2",
-    "green":  "#379A8B",
+    "red": "#bf352b",  # our accent (replaces #DB444B from the styleguide)
+    "blue": "#006BA2",
+    "cyan": "#3EBCD2",
+    "green": "#379A8B",
     "yellow": "#EBB434",
-    "olive":  "#B4BA39",
+    "olive": "#B4BA39",
     "purple": "#9A607F",
-    "gold":   "#D1B07C",
-    "grey":   "#758D99",
+    "gold": "#D1B07C",
+    "grey": "#758D99",
 }
 
 # Default cycle — red first so unmarked single-series charts get the accent.
@@ -77,12 +77,12 @@ colors = [
 # Use `cycle_for(chart_type)` to get the recommended order. Pass the result
 # to `ax.set_prop_cycle(color=...)` before plotting.
 _CYCLES = {
-    "bar":           ["blue", "cyan", "yellow", "green", "red", "purple"],
-    "bar_stacked":   ["blue", "cyan", "yellow", "green", "red", "blue"],
-    "line":          ["cyan", "red", "yellow", "blue", "green", "purple"],
-    "scatter":       ["cyan", "red", "yellow", "blue", "green", "purple"],
-    "bubble":        ["cyan", "red", "yellow", "blue", "green", "purple"],
-    "thermometer":   ["cyan", "red", "yellow", "blue", "green", "purple"],
+    "bar": ["blue", "cyan", "yellow", "green", "red", "purple"],
+    "bar_stacked": ["blue", "cyan", "yellow", "green", "red", "blue"],
+    "line": ["cyan", "red", "yellow", "blue", "green", "purple"],
+    "scatter": ["cyan", "red", "yellow", "blue", "green", "purple"],
+    "bubble": ["cyan", "red", "yellow", "blue", "green", "purple"],
+    "thermometer": ["cyan", "red", "yellow", "blue", "green", "purple"],
 }
 
 
@@ -102,9 +102,9 @@ def cycle_for(chart_type: str) -> list[str]:
 # ----------------------------------------------------------------------------
 # Special-purpose colours
 # ----------------------------------------------------------------------------
-C_OTHER = PALETTE["grey"]              # "Other" / "Don't know" buckets
-C_HIGHLIGHT_PANEL = "#E9EDF0"          # subtle event-period band (web)
-C_HIGHLIGHT_PANEL_RED = "#f5c5b8"      # red-tinted event band (rare emphasis)
+C_OTHER = PALETTE["grey"]  # "Other" / "Don't know" buckets
+C_HIGHLIGHT_PANEL = "#E9EDF0"  # subtle event-period band (web)
+C_HIGHLIGHT_PANEL_RED = "#f5c5b8"  # red-tinted event band (rare emphasis)
 
 
 # ----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def snapshot_palette(n: int, *, accent: str | None = None) -> list[str]:
 
     # Old end: dark slate. Penultimate: light tint of the accent (≈25% accent).
     # Inter-stops: 0 → dark slate, mid → light grey, then → light accent → accent.
-    dark = C_LABEL          # "#3F5661"
+    dark = C_LABEL  # "#3F5661"
     light_grey = "#B7C6CF"  # bridge tone between slate and the accent tint
     light_accent = _mix("#FFFFFF", end, 0.35)  # pale tint of the accent
 

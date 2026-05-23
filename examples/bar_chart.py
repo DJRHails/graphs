@@ -19,7 +19,6 @@ categories = ["Germany", "France", "Italy", "Spain", "Poland", "Sweden"]
 values = [3.7, 2.4, 1.8, 2.1, 4.2, 3.1]
 
 fig, ax = plt.subplots(figsize=(7, 4))
-fig.subplots_adjust(top=0.62, bottom=0.10, left=0.14, right=0.90)
 
 bar_h(ax, categories, values)
 

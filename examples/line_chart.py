@@ -66,7 +66,6 @@ y_deaths = deaths_trend + np.random.normal(0, 0.025, n_points)
 y_deaths = np.clip(y_deaths, 0, None)
 
 fig, ax = plt.subplots(figsize=(8, 4.8))
-fig.subplots_adjust(top=0.66, bottom=0.22, left=0.06, right=0.96)
 
 smoothed_line(
     ax, xs, y_casualties,
@@ -170,6 +169,7 @@ finalize(
     y_axis_right=True,
     autoscale_y=False,
     title_x=0.02,
+    footnote_lines=4,  # meta-estimate note wraps + multi-line source
 )
 footnotes(
     fig,

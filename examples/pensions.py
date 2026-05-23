@@ -48,7 +48,6 @@ oecd_x = statistics.mean(r[1] for r in rows)
 oecd_y = statistics.mean(r[2] for r in rows)
 
 fig, ax = plt.subplots(figsize=(7, 4.8))
-fig.subplots_adjust(top=0.66, bottom=0.12, left=0.06, right=0.92)
 
 # Background: all dots same colour, faded.
 faded_x = [r[1] for r in rows if r[0] not in LABELLED]

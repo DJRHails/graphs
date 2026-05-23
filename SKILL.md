@@ -2,10 +2,7 @@
 name: graph-design
 description: >
   Economist-style chart theme for matplotlib/seaborn. Provides a global theme,
-  title-stack finaliser, direct line labels, CI bands, horizontal bars,
-  thermometers, scatter dot variants, annotation/highlight helpers, and a
-  per-chart-type colour palette. Uses IBM Plex Sans + IBM Plex Sans Condensed
-  typography and a curated 9-colour palette with transparent backgrounds.
+  and a variety of chart types. Use when generating graphs with matplotlib and seaborn. 
 ---
 
 # graph-design
@@ -17,42 +14,68 @@ Economist-style data-visualisation system for matplotlib and seaborn.
 > `pip install djrhails-graphs` (or `pip install
 > git+https://github.com/DJRHails/graphs.git`). Import as `graphs`.
 
-## Project overrides vs. the Economist styleguide
-
-Three deliberate deviations — documented because they're not surprises:
-
-1. **White backgrounds.** `C_BG = "#FFFFFF"`. Styleguide uses `#E9EDF0`.
-   `set_theme(bg=C_BG_TINT)` for the styleguide tint;
-   `set_theme(bg=C_BG_TRANSPARENT, transparent=True)` for transparent PNGs.
-2. **Single accent red.** `C_RED = "#bf352b"` covers both the styleguide's
-   masthead red (`#E3120B`) and data red (`#DB444B`). Both originals are
-   exposed as `C_RED_BRAND` / `C_RED_DATA`.
-3. **IBM Plex Sans + IBM Plex Sans Condensed** instead of Econ Sans / Cnd.
-
-Everything else follows the styleguide and is applied automatically by
-`set_theme()` and `finalize()` — fonts, tick colours, spine handling, source
-placement, y-axis-right, font auto-download, etc.
-
 ## Quick start
 
+A two-series line chart with direct labels, a footnote marker, and a packed
+footnote-plus-source row — the conventions the library is built for.
+
 ```python
-from graphs import set_theme, finalize, label_lines
+import matplotlib.pyplot as plt
+import numpy as np
+
+from graphs import set_theme, finalize, footnotes, label_lines
 
 set_theme()
 
-fig, ax = plt.subplots()
-fig.subplots_adjust(top=0.68, bottom=0.14, left=0.06, right=0.88)
-ax.plot(x, y, label="Series A")
+months = np.arange(24)
+us = 2.0 + 4.0 * np.exp(-months / 9) + np.random.default_rng(0).normal(0, 0.25, 24)
+eu = 1.8 + 4.5 * np.exp(-months / 11) + np.random.default_rng(7).normal(0, 0.30, 24)
+
+fig, ax = plt.subplots(figsize=(7, 4.4))
+ax.plot(months, us, label="United States")
+ax.plot(months, eu, label="Euro area")
 label_lines(ax)
+
 finalize(
     ax,
-    title="Inflation eases as energy costs fall",
-    descriptor="United States, CPI, % year on year",
-    source="Source: BLS",
+    title="Cooling off",
+    descriptor="Headline CPI*, % change on a year earlier, monthly",
 )
+footnotes(
+    fig,
+    "*All-items consumer price index",
+    source="Sources: BLS; Eurostat",
+)
+
+plt.savefig("inflation.png", bbox_inches="tight", dpi=150)
 ```
 
-For faceted charts: bump `top` to ~0.72 and pass `y_start=0.075` to `finalize`.
+Save to `quick.py` and run; the output sits next to it. `finalize()`
+auto-sizes margins, and `footnotes()` packs the note and source onto one
+row when they fit, wrapping when they don't — leave `source=` off
+`finalize()` so they belong to the same line.
+
+### Default visual conventions
+
+Behaviour that's automatic unless you override it:
+
+- **Title marker is the favicon triangle** (`marker="delta"`). The hollow
+  red triangle is drawn inline at the title baseline, sized to the cap
+  height. Pass `marker="rule"` for the legacy short red rule above the
+  title, or `marker="none"` to suppress entirely.
+- **Footnote markers auto-superscript.** `*, †, ‡, §, **, ††, ‡‡, §§`
+  render as superscripts anywhere they appear in titles, descriptors,
+  source lines, or footnote bodies — write plain text, the renderer
+  handles the typography.
+- **Frameless legends are default** for both `smart_legend()` and
+  `top_legend()`. Boxed legends are opt-in.
+- **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
+  75% black) — slightly darker than `C_LABEL` so attribution reads as
+  metadata, not as data.
+- **`finalize(auto_layout=True)` (default)** sizes `subplots_adjust`
+  margins to fit the title-stack and source line. Set `auto_layout=False`
+  on faceted charts that need explicit `hspace`/`wspace` control.
+
 
 ## Core design principles
 
@@ -91,83 +114,220 @@ Rules the helpers were built to enforce. When in doubt, satisfy the most.
 - **The chart is responsible to the reader, not to the data.** Misleading,
   confusing, pointless — three failure modes every chart has to pass.
 
+## Headline conventions
+
+The three strings passed to `finalize(title=, descriptor=, source=)` carry
+distinct jobs. Get them wrong and a technically correct chart still reads
+as a draft.
+
+### Title — state the finding, ideally with a wink
+
+- **Says what the data says**, not what it is. "Eastern promise", not
+  "GDP growth, 2010–2024".
+- **≤ 50 characters.** Has to fit one line at 12pt bold across a 7-inch
+  figure.
+- **Punchy, often a play on words.** Examples from our replicas:
+  "Eastern promise" (`corbyn.py`), "Mind un-stretched" (`dogs.py`),
+  "Bremorse" (`brexit.py`), "A bit left-field" (`us_trade.py`),
+  "Closing the gap" (`affordability_chart.py`), "Free markets and free
+  workers" (`pensions.py`).
+- **No units, no dates, no geography.** That's the descriptor's job.
+
+### Descriptor — the meat, in one breath
+
+State exactly what's plotted. Include:
+
+- **Subject** (what's measured)
+- **Geography or scope** (where / which subset)
+- **Period or year** (when)
+- **Units** (%, $bn, log scale, m)
+
+Wrapping is automatic; you can also force a break with `\n`. Examples:
+
+- `"Selected European cities, 2025, log scale"`
+- `"Russia-Ukraine war, February 24th 2022 to May 14th 2026, m"`
+- `"Average age gap of married couples*, by income of wife, years"`
+- `"United States, CPI, % year on year"`
+
+Footnote markers (`*`, `†`, `‡`, `§`) auto-superscript anywhere in the
+title or descriptor — write plain text.
+
+### Footnotes — clarify specific words, not the whole chart
+
+Attach via `footnotes(fig, "*Cohabiting", "†Employed with an income",
+source=...)`. The leading character pairs to the marker in the
+title/descriptor. Three common categories:
+
+- **Method clarifications** — `"*Cohabiting"`,
+  `"*Based on location of workplace, not residence"`
+- **Threshold definitions** — `"†30% of which is enough to pay rent on
+  an average one-bedroom flat"`
+- **Inclusion criteria** — `"*Where at least 50 are registered per year"`
+
+### Source — always cite, label by entity or by file
+
+- **External data** — name the source(s) by entity. Use `Source:` for one,
+  `Sources:` for many.
+  - `"Source: World Happiness Report 2026"`
+  - `"Sources: DMSP Nighttime Lights; ESA; EUMETSAT; Institute for the
+    Study of War; AEI's Critical Threats Project; NASA; WorldPop; The
+    Economist"`
+- **Internal / synthetic / experimental** — label by Python file name.
+  - `"Source: bump_chart.py"`
+  - `"Source: synthetic data, scatter_chart.py"`
+- Pass via `finalize(source=...)` for simple cases, or
+  `footnotes(..., source=...)` when packing alongside footnote markers.
+
+### Before / after
+
+| | Title | Descriptor | Source |
+|---|---|---|---|
+| Bad  | `"GDP growth rate, 2010–2024"` | `"Eastern Europe"` | `"BLS"` |
+| Good | `"Eastern promise"` | `"Eastern European economies, real GDP growth, 2010–2024, % year on year"` | `"Source: World Bank"` |
+
+The "bad" version puts the descriptor in the title slot and leaves the
+finding unsaid. The "good" version makes the chart's point in the title,
+moves units / geography / period to the descriptor, and names the source
+by entity.
+
 ## Palette
 
 Nine main colours in `PALETTE`: red, blue, cyan, green, yellow, olive,
 purple, gold, grey. Default cycle leads with red. Pull a chart-type-specific
 order with `cycle_for("bar" | "bar_stacked" | "line" | "scatter" | "bubble"
-| "thermometer")`.
+| "thermometer")`. `snapshot_palette(n, *, accent=None)` returns a
+chronological slate→accent ramp for the "snapshots of the same series over
+time" pattern.
 
 Structural greys (all automatic in the theme): `C_SPINE` (zero-baseline
-only), `C_GRID`, `C_LABEL`, `C_LABEL_MUTED`, `C_CI`, `C_BOX_FILL`, `C_BG`,
-`C_BG_TINT`.
+only), `C_GRID`, `C_LABEL`, `C_LABEL_MUTED`, `C_SOURCE` (75% black —
+source + footnotes), `C_CI`, `C_BOX_FILL`, `C_BG`, `C_BG_TINT`,
+`C_BG_TRANSPARENT`, `C_HIGHLIGHT_PANEL`, `C_HIGHLIGHT_PANEL_RED`.
 
 Style overrides to apply on top:
 
 - **Chronological categories** → light-to-dark tints of one colour, not the
-  cycle.
+  cycle. Use `snapshot_palette()`.
 - **"Other" / "Don't know"** → `C_OTHER` (slate grey).
 - **Positive vs. negative** → only differentiate by colour for *meaningful*
   pairs (imports/exports, gain/loss).
 
 ## API
 
+### Theme, finalisation, layout
+
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=True)`                              | Apply theme globally. Call once.                       |
-| `finalize(ax, title, descriptor, source, …)`                        | Title stack, red rule, source line, y-axis right.      |
+| `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, …)` | Title stack, optional marker, source line, y-axis right. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
+| `footnotes(fig, *notes, source=None)`                               | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. |
+| `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
+| `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
+
+### Chart helpers
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
 | `cycle_for(chart_type) → list[str]`                                 | Recommended colour order for a chart type.             |
+| `snapshot_palette(n, *, accent=None)`                               | Chronological slate→accent ramp for snapshot lines.    |
 | `bar_h(ax, categories, values, *, highlight_max=True)`              | Horizontal bars; max in `C_RED` by default.            |
 | `dumbbell(ax, categories, start, end, *, label_start, label_end)`   | Before/after dot-and-line. Defaults red→blue.          |
 | `thermometer(ax, categories, values, *, series_labels, dot=True)`   | Tick-and-dot ranked categories. Warns above 4 series.  |
+| `threshold_lollipop(ax, categories, values, *, threshold=1.0)`      | Horizontal lollipop with fixed centre + leader lines.  |
+| `bump_chart(ax, ranks, *, highlight, aspect=…)`                     | Rank-over-time PCHIP-smoothed lines with white halo at crossings. |
 | `scatter_standard(ax, x, y)`                                        | General-trend scatter, 50% opacity, no stroke.         |
 | `scatter_highlight(ax, x, y)`                                       | Outlier / labelled scatter, 100% opacity.              |
 | `scatter_category(ax, x, y)`                                        | Bubble dot, 50% fill + 0.3px stroke for overlap.       |
 | `trend_line(ax, x, y)`                                              | Dashed 1px trend line.                                 |
+| `smoothed_line(ax, x, y, *, color)`                                 | Three-layer scatter + CI band + smoothed line.         |
 | `ci_fill(ax, x, lo, hi, *, color=None)`                             | CI band. Salmon by default; pass colour to match line. |
+
+### Annotations
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
 | `callout(ax, xy, text, *, xytext, arrow=True)`                      | Pale-fill text callout with optional arrow.            |
 | `highlight_panel(ax, x_start, x_end, *, label=None)`                | Vertical event-period band.                            |
 | `highlight_label(ax, xy, text, *, role="primary")`                  | Single-point label. `"secondary"` = grey/caps/light.   |
 | `index_marker(ax, x, *, y=100)`                                     | Red rule + black dot for index charts.                 |
-| `broken_axis(ax, *, x=0)`                                           | Non-zero-baseline squiggle. Line/scatter/thermometer.  |
+| `broken_axis(ax, *, axis="y", side="left")`                         | Non-zero-baseline squiggle. Line/scatter/thermometer.  |
 | `number_box(ax, xy, n)`                                             | Numbered cross-reference box.                          |
+| `threshold_arrows(ax, threshold, *, left_text, right_text)`         | Directional label pair straddling a threshold.         |
+
+### Labels, axes, legends
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
 | `label_lines(ax, *, stroke=False)`                                  | Direct labels at line ends with collision avoidance.   |
-| `smart_legend(ax)`                                                  | Legend in the emptiest corner by data-ink overlap.     |
+| `inset_tick_labels(ax, *, axis="x")`                                | First tick label `ha="left"`, last `ha="right"`.       |
+| `italicize_labels(ax, labels)`                                      | Italicise specific tick labels in place.               |
+| `style_labels(ax, *, italic=(), bold=())`                           | Per-label italic/bold preserving tick colour.          |
+| `color_axis(ax, side, color, *, spine=True, ticks=True)`            | Colour a spine + ticks + labels to match a series.     |
+| `right_axis(ax)`                                                    | Apply right-axis convention to a panel.                |
+| `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
+| `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack.   |
 
 ## Workflow
 
 1. `set_theme()`.
-2. `fig.subplots_adjust()` for title/source headroom.
-3. (If not the default cycle) `ax.set_prop_cycle(color=cycle_for("…"))`.
-4. Plot — `ci_fill` and `highlight_panel` first so they sit behind the data.
-5. Annotate — `callout`, `highlight_label`, `index_marker`, `broken_axis`.
-6. Direct label — `label_lines(ax)` over `smart_legend(ax)` for line charts.
-7. `finalize(ax, title, descriptor, source)` last.
-8. Faceted: `panel_label()` per axes; `finalize()` on the first axes with
-   `title_x` pinned and `y_start=0.075`.
+2. (If not the default cycle) `ax.set_prop_cycle(color=cycle_for("…"))`.
+3. Plot — `ci_fill` and `highlight_panel` first so they sit behind the data.
+4. Annotate — `callout`, `highlight_label`, `index_marker`, `broken_axis`.
+5. Direct label — `label_lines(ax)` over `smart_legend(ax)` for line charts.
+6. `finalize(ax, title, descriptor, source)` last — auto-sizes margins.
+7. Faceted: `panel_label()` per axes; call `fig.subplots_adjust(...,
+   hspace=…, wspace=…)` first, then `finalize()` on the first axes with
+   `title_x` pinned, `y_start=0.075`, and `auto_layout=False`.
+
+## Development
+
+Hot reload during chart iteration:
+
+    uv run graphs-watch
+
+Watches `graphs/` and `examples/` for `.py` changes and re-renders the
+affected examples + the comparison strip in parallel. The watcher routes
+by path:
+
+- `graphs/**/*.py` or `examples/_data.py` → regen all examples + comparisons
+- `examples/build_comparisons.py` → comparisons only
+- `examples/<name>.py` → that one example + comparisons
+
+### Comparison harness
+
+`examples/build_comparisons.py` composes side-by-side images for visual
+review:
+
+- `url`-kind entries download a Medium-hosted PNG and stack it above our
+  replica (used for the "Mistakes, we've drawn a few" redesigns).
+- `local_ref`-kind entries use a local reference image (e.g. the styleguide
+  page for the thermometer chart).
+
+Generated comparisons land in `examples/comparisons/<name>.png` (gitignored —
+the reference images aren't ours to redistribute).
+
+CSVs fetched at runtime by example scripts are cached under
+`examples/.data/` via `examples/_data.py::load_csv_text(url)`.
 
 ## Examples
 
-Runnable scripts in `examples/`.
+Runnable scripts in `examples/`. Each one is the worked example for a
+specific helper or pattern combination.
 
-**Synthetic demos:**
-
-- [`line_chart.py`](./examples/line_chart.py) — multi-series + CI bands + `label_lines`
-- [`faceted_chart.py`](./examples/faceted_chart.py) — three panels + `panel_label`
-- [`bar_chart.py`](./examples/bar_chart.py) — `bar_h` with max highlight
-- [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — `dumbbell` before/after
-- [`thermometer_chart.py`](./examples/thermometer_chart.py) — ranked categories
-- [`scatter_chart.py`](./examples/scatter_chart.py) — standard + highlight + trend line
-- [`index_chart.py`](./examples/index_chart.py) — `index_marker`, `broken_axis`, `highlight_panel`, secondary `highlight_label`
-
-**Replications of "Mistakes, we've drawn a few"** (Sarah Leo, The Economist
-2019 — fixed versions of charts the author publicly critiqued). Raw CSVs
-in `examples/data/`:
-
-- [`corbyn.py`](./examples/corbyn.py) — Facebook likes, full-range bars (fixes truncated scale)
-- [`dogs.py`](./examples/dogs.py) — dog weight vs. neck size, proportionally-comparable double axis (fixes cherry-picked scales)
-- [`brexit.py`](./examples/brexit.py) — Brexit polls, scatter + smoothed trend + 33% baseline headroom (fixes jagged line on individual polls)
-- [`us_trade.py`](./examples/us_trade.py) — US trade vs. manufacturing, stacked panels (fixes forced double-axis with two baselines)
-- [`pensions.py`](./examples/pensions.py) — OECD pension spending, opacity-for-emphasis (fixes "50 shades of blue")
-- [`eu_balance.py`](./examples/eu_balance.py) — euro-area balances, four countries + Others (fixes 10-country rainbow stack)
+- [`bar_chart.py`](./examples/bar_chart.py) — `bar_h` synthetic demo with default `highlight_max=True`.
+- [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — `dumbbell` before/after + right-aligned `top_legend` via `ax._dumbbell_handles`.
+- [`faceted_chart.py`](./examples/faceted_chart.py) — three-panel layout: `panel_label` per axes, `right_axis`, `ci_fill`, `y_start=0.075` + `auto_layout=False`.
+- [`scatter_chart.py`](./examples/scatter_chart.py) — `scatter_standard` + `scatter_highlight` + `trend_line` + `callout` for the outliers.
+- [`thermometer_chart.py`](./examples/thermometer_chart.py) — `thermometer(dot=False)` 3-series variant, x-axis on top, frameless `top_legend`.
+- [`index_chart.py`](./examples/index_chart.py) — `index_marker` + `highlight_panel` (Pandemic band) + secondary `highlight_label` + `broken_axis` + `label_lines`.
+- [`line_chart.py`](./examples/line_chart.py) — `smoothed_line` (scatter + CI band + trend), custom `_LineBandHandler` legend, `year_axis(set_locator=False)`, `footnotes(source=)`.
+- [`bump_chart.py`](./examples/bump_chart.py) — `bump_chart` with `highlight=`, `colors=` override, `right_labels=True`, `x_labels_top=True`, `aspect=0.85`; real WHR data via `_data.py`.
+- [`corbyn.py`](./examples/corbyn.py) — `bar_h` + `style_labels(italic=, bold=)` for per-row emphasis; full-range scale fixes the original truncation.
+- [`dogs.py`](./examples/dogs.py) — twin y-axis with `color_axis(spine=False, ticks=False)`, manual series titles via `render_text_with_superscripts`, `footnotes(source=)` packing two notes alongside the source.
+- [`brexit.py`](./examples/brexit.py) — `scatter_standard` + Savitzky-Golay smoothed line, manual year ticks + `year_axis(set_locator=False)` + `inset_tick_labels` + `broken_axis(axis="both")`.
+- [`us_trade.py`](./examples/us_trade.py) — stacked two-panel `sharex=True` layout: `panel_label`, `right_axis`, `inset_tick_labels`, source delegated to `footnotes(source=…)`.
+- [`pensions.py`](./examples/pensions.py) — same-hue scatter with opacity-for-emphasis, italic OECD label via `FontProperties`, `y_axis_label(unit="% of GDP")`.
+- [`eu_balance.py`](./examples/eu_balance.py) — side-by-side panels of pos+neg stacked bars, shared `top_legend`, `right_axis`, `footnotes(source=)`.
+- [`affordability_chart.py`](./examples/affordability_chart.py) — `threshold_lollipop(threshold=1.0)` on a log x-axis + `threshold_arrows` straddling the threshold + two-note `footnotes`.
+- [`age_gap_chart.py`](./examples/age_gap_chart.py) — chronological snapshot lines via `snapshot_palette(4)`, in-chart series labels, `broken_axis(side="right")`, right-anchored `footnotes(y=, x=)`.

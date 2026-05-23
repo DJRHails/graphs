@@ -33,7 +33,6 @@ x_out = np.array([18, 82])
 y_out = np.array([72, 24])
 
 fig, ax = plt.subplots(figsize=(7, 4.4))
-fig.subplots_adjust(top=0.66, bottom=0.14, left=0.06, right=0.90)
 
 scatter_standard(ax, x, y)
 scatter_highlight(ax, x_out, y_out)

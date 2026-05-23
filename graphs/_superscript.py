@@ -26,8 +26,8 @@ _FOOTNOTE_MARKERS: tuple[str, ...] = (
 # Typographic ratios — superscript chunks render at ``_SUP_SCALE`` of the
 # base font size, with their baseline raised by ``_SUP_RISE`` of the base
 # font size (matches the OpenType "sups" feature ballpark).
-_SUP_SCALE: float = 0.65
-_SUP_RISE: float = 0.40
+_SUP_SCALE: float = 0.80
+_SUP_RISE: float = 0.1
 
 
 def _split_for_superscript(text: str) -> list[tuple[str, bool]]:

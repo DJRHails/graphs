@@ -84,6 +84,7 @@ finalize(
     y_axis_right=False,
     title_x=0.02,
     autoscale_y=False,
+    footnote_lines=2,
 )
 
 threshold_arrows(

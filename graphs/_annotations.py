@@ -367,6 +367,129 @@ def broken_axis(
     fig.canvas.mpl_connect("draw_event", _place)
 
 
+def _draw_arrow_label(
+    fig,
+    *,
+    arrow_xy: tuple[float, float],
+    arrow: str,
+    text: str,
+    color: str,
+    fontsize: float,
+    bold: bool,
+    placement: str,
+    gap: float,
+    va: str,
+    transform=None,
+) -> None:
+    """Render an arrow glyph + adjacent text label as a pair.
+
+    Shared primitive behind ``threshold_arrows`` and ``direction_label``.
+    The arrow is drawn at ``arrow_xy`` first; the label is then placed
+    just past the arrow's measured bounding box so the gap between them
+    is constant regardless of glyph width.
+
+    Args:
+        fig: Owning figure.
+        arrow_xy: Position of the arrow glyph in ``transform`` coords.
+        arrow: Glyph string (``"↑"``/``"↓"``/``"←"``/``"→"``).
+        text: Label rendered next to the arrow.
+        color: Colour for both arrow and label.
+        fontsize: Base label font size; the arrow renders at +1pt when bold.
+        bold: Render arrow + label bold (and arrow +1pt).
+        placement: ``"before"`` puts the arrow before the text in reading
+            order (left for ``↑``/``↓``/``→``, right for ``←``).
+            ``"after"`` reverses that.
+        gap: Spacing between arrow and label, in the transform's units.
+        va: Vertical alignment for both arrow and label.
+        transform: Coordinate transform. Defaults to ``fig.transFigure``.
+    """
+    if placement not in ("before", "after"):
+        raise ValueError(f"placement must be 'before' or 'after'; got {placement!r}")
+    tf = transform if transform is not None else fig.transFigure
+    arrow_fontsize = fontsize + 1.0 if bold else fontsize
+    weight = "bold" if bold else "normal"
+    # ``before`` means arrow precedes label in reading order, so the label
+    # sits to the right of the arrow (ha=left). ``after`` puts it to the
+    # left (ha=right). For left-pointing arrows the semantics flip so the
+    # arrow visually trails the text it modifies.
+    label_to_right = placement == "before"
+    arrow_ha = "left" if label_to_right else "right"
+    label_ha = "left" if label_to_right else "right"
+    arrow_artist = fig.text(
+        arrow_xy[0],
+        arrow_xy[1],
+        arrow,
+        color=color,
+        fontsize=arrow_fontsize,
+        fontweight=weight,
+        va=va,
+        ha=arrow_ha,
+        transform=tf,
+    )
+    bb = arrow_artist.get_window_extent(
+        renderer=fig.canvas.get_renderer()
+    ).transformed(tf.inverted())
+    if label_to_right:
+        label_x = bb.x1 + gap
+    else:
+        label_x = bb.x0 - gap
+    fig.text(
+        label_x,
+        arrow_xy[1],
+        text,
+        color=color,
+        fontsize=fontsize,
+        fontweight=weight,
+        va=va,
+        ha=label_ha,
+        transform=tf,
+    )
+
+
+def direction_label(
+    ax,
+    text: str,
+    xy: tuple[float, float],
+    *,
+    arrow: str = "↑",
+    color: str | None = None,
+    fontsize: float = 8.5,
+    bold: bool = True,
+    placement: str = "before",
+) -> None:
+    """Render a one-sided directional cue (e.g. "↑ Older husband").
+
+    Same typographic conventions as ``threshold_arrows``: bold arrow glyph at
+    +1pt, bold label, configurable colour. Position is axes-fraction so the
+    cue moves with the chart on resize.
+
+    Args:
+        ax: Axes hosting the cue.
+        text: Label rendered next to the arrow.
+        xy: Position in axes-fraction coords (0..1, 0..1).
+        arrow: Glyph — ``"↑"``, ``"↓"``, ``"←"``, or ``"→"``.
+        color: Defaults to ``C_LABEL_MUTED`` for neutral cues.
+        fontsize: Label font size; arrow renders at +1pt when bold.
+        bold: Render arrow + label bold.
+        placement: ``"before"`` puts the arrow before the text (default).
+    """
+    fig = ax.get_figure()
+    fig.canvas.draw()
+    _draw_arrow_label(
+        fig,
+        arrow_xy=xy,
+        arrow=arrow,
+        text=text,
+        color=color if color is not None else C_LABEL_MUTED,
+        fontsize=fontsize,
+        bold=bold,
+        placement=placement,
+        gap=0.005,
+        va="center",
+        transform=ax.transAxes,
+    )
+
+
 def threshold_arrows(
     ax,
     threshold: float,
@@ -425,111 +548,63 @@ def threshold_arrows(
     left_c = left_color if left_color is not None else PALETTE["red"]
     right_c = right_color if right_color is not None else C_LABEL_MUTED
 
-    arrow_fontsize = fontsize + 1.0 if bold else fontsize
-    arrow_weight = "bold" if bold else "normal"
-    text_weight = "bold" if bold else "normal"
-
     if axis == "x":
         x_disp = ax.transData.transform((threshold, 0))[0]
         anchor = fig.transFigure.inverted().transform((x_disp, 0))[0]
         baseline = bbox.y1 + pad if y is None else y
-        # Render arrow glyph separately so it can be bolder than the label
-        # while still aligning to the same baseline.
-        arrow_left = fig.text(
-            anchor - gap,
-            baseline,
-            "←",
-            color=left_c,
-            fontsize=arrow_fontsize,
-            fontweight=arrow_weight,
-            va="bottom",
-            ha="right",
-        )
-        arrow_left_bb = arrow_left.get_window_extent(
-            renderer=fig.canvas.get_renderer()
-        ).transformed(fig.transFigure.inverted())
-        fig.text(
-            arrow_left_bb.x0 - gap,
-            baseline,
-            left_text,
+        # Left side: "← left_text" reads right-to-left, so arrow comes after
+        # the label in DOM order (placement="after" with "←").
+        _draw_arrow_label(
+            fig,
+            arrow_xy=(anchor - gap, baseline),
+            arrow="←",
+            text=left_text,
             color=left_c,
             fontsize=fontsize,
-            fontweight=text_weight,
+            bold=bold,
+            placement="after",
+            gap=gap,
             va="bottom",
-            ha="right",
         )
-        arrow_right = fig.text(
-            anchor + gap,
-            baseline,
-            "→",
-            color=right_c,
-            fontsize=arrow_fontsize,
-            fontweight=arrow_weight,
-            va="bottom",
-            ha="left",
-        )
-        arrow_right_bb = arrow_right.get_window_extent(
-            renderer=fig.canvas.get_renderer()
-        ).transformed(fig.transFigure.inverted())
-        fig.text(
-            arrow_right_bb.x1 + gap,
-            baseline,
-            right_text,
+        _draw_arrow_label(
+            fig,
+            arrow_xy=(anchor + gap, baseline),
+            arrow="→",
+            text=right_text,
             color=right_c,
             fontsize=fontsize,
-            fontweight=text_weight,
+            bold=bold,
+            placement="before",
+            gap=gap,
             va="bottom",
-            ha="left",
         )
     else:
         y_disp = ax.transData.transform((0, threshold))[1]
         anchor = fig.transFigure.inverted().transform((0, y_disp))[1]
         baseline = bbox.x1 + pad if y is None else y
-        arrow_down = fig.text(
-            baseline,
-            anchor - gap,
-            "↓",
-            color=left_c,
-            fontsize=arrow_fontsize,
-            fontweight=arrow_weight,
-            va="top",
-            ha="left",
-        )
-        arrow_down_bb = arrow_down.get_window_extent(
-            renderer=fig.canvas.get_renderer()
-        ).transformed(fig.transFigure.inverted())
-        fig.text(
-            arrow_down_bb.x1 + gap,
-            anchor - gap,
-            left_text,
+        _draw_arrow_label(
+            fig,
+            arrow_xy=(baseline, anchor - gap),
+            arrow="↓",
+            text=left_text,
             color=left_c,
             fontsize=fontsize,
-            fontweight=text_weight,
+            bold=bold,
+            placement="before",
+            gap=gap,
             va="top",
-            ha="left",
         )
-        arrow_up = fig.text(
-            baseline,
-            anchor + gap,
-            "↑",
-            color=right_c,
-            fontsize=arrow_fontsize,
-            fontweight=arrow_weight,
-            va="bottom",
-            ha="left",
-        )
-        arrow_up_bb = arrow_up.get_window_extent(
-            renderer=fig.canvas.get_renderer()
-        ).transformed(fig.transFigure.inverted())
-        fig.text(
-            arrow_up_bb.x1 + gap,
-            anchor + gap,
-            right_text,
+        _draw_arrow_label(
+            fig,
+            arrow_xy=(baseline, anchor + gap),
+            arrow="↑",
+            text=right_text,
             color=right_c,
             fontsize=fontsize,
-            fontweight=text_weight,
+            bold=bold,
+            placement="before",
+            gap=gap,
             va="bottom",
-            ha="left",
         )
 
 

@@ -68,7 +68,6 @@ def smooth(xs: list[datetime], ys: list[float], n: int = 200) -> tuple[np.ndarra
 
 
 fig, ax = plt.subplots(figsize=(7, 4.4))
-fig.subplots_adjust(top=0.66, bottom=0.14, left=0.06, right=0.92)
 
 scatter_standard(ax, dates, right, color=PALETTE["blue"], size=12)
 scatter_standard(ax, dates, wrong, color=PALETTE["red"], size=12)

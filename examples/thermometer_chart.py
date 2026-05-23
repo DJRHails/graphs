@@ -50,6 +50,8 @@ values = [
 ]
 
 fig, ax = plt.subplots(figsize=(7, 5.0))
+# Custom layout: top-mounted x-ticks + a top_legend at y=0.72 sit between
+# the title-stack and the chart, so the standard auto_layout doesn't fit.
 fig.subplots_adjust(top=0.66, bottom=0.10, left=0.22, right=0.94)
 
 thermometer(
@@ -75,6 +77,7 @@ finalize(
     y_axis_right=False,
     title_x=0.02,
     y_start=0.22,
+    auto_layout=False,
 )
 
 # Single inline legend top-left, aligned with title-stack — same pattern as

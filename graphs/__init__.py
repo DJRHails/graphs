@@ -23,6 +23,7 @@ Project overrides versus the styleguide:
 from graphs._annotations import (
     broken_axis,
     callout,
+    direction_label,
     highlight_label,
     highlight_panel,
     index_marker,
@@ -44,7 +45,14 @@ from graphs._charts import (
     threshold_lollipop,
     trend_line,
 )
-from graphs._finalize import finalize, footnotes, panel_label, y_axis_label, year_axis
+from graphs._finalize import (
+    finalize,
+    footnotes,
+    panel_label,
+    x_axis_label,
+    y_axis_label,
+    year_axis,
+)
 from graphs._fonts import _get_font as get_font
 from graphs._fonts import _get_font_condensed as get_font_condensed
 from graphs._labels import (
@@ -87,6 +95,7 @@ __all__ = [
     "finalize",
     "footnotes",
     "panel_label",
+    "x_axis_label",
     "y_axis_label",
     "year_axis",
     # palette
@@ -127,6 +136,7 @@ __all__ = [
     "trend_line",
     # annotations
     "callout",
+    "direction_label",
     "highlight_panel",
     "highlight_label",
     "index_marker",

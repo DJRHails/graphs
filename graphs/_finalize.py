@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from graphs._fonts import _get_font, _get_font_condensed
 from graphs._palette import C_LABEL_MUTED, C_RED, C_SOURCE, C_SPINE, C_TEXT
-from graphs._superscript import render_text_with_superscripts
+from graphs._superscript import _has_marker, render_text_with_superscripts
 
 
 def _check_x_monotonic(ax) -> None:
@@ -76,18 +76,75 @@ def _autoscale_y(ax, *, headroom: float = 0.10, floor_frac: float = 0.40) -> Non
 
 def _draw_rule(fig, tx: float, y_cursor: float) -> None:
     """Draw the short red rule above the title (legacy marker)."""
-    rule_w = 80 / (fig.get_figwidth() * fig.dpi)
+    rule_w = RULE_WIDTH_PX / (fig.get_figwidth() * fig.dpi)
     fig.add_artist(
         plt.Line2D(
             [tx, tx + rule_w],
             [y_cursor, y_cursor],
             transform=fig.transFigure,
             color=C_RED,
-            linewidth=3.5,
+            linewidth=RULE_LINEWIDTH,
             solid_capstyle="butt",
             clip_on=False,
         )
     )
+
+
+# --- Typography (point sizes) ---
+TITLE_SIZE_PT = 12.0
+DESCRIPTOR_SIZE_PT = 9.5
+SOURCE_SIZE_PT = 9.0
+FOOTNOTE_SIZE_PT = SOURCE_SIZE_PT  # footnotes share the source line's size
+SOURCE_MEASURE_SIZE_PT = SOURCE_SIZE_PT  # measurement size for footnote packing
+PANEL_LABEL_SIZE_PT = 10
+Y_AXIS_LABEL_SIZE_PT = 8.5
+TICK_LABEL_SIZE_PT = 9
+
+# --- Line heights (line-box multipliers) ---
+TITLE_LINESPACING = 1.15
+DESCRIPTOR_LINESPACING = 1.20
+Y_AXIS_LABEL_LINESPACING = 1.2
+
+# --- Layout gaps (typographic points) ---
+DESCRIPTOR_LINE_BOX_PT = 11.4   # DESCRIPTOR_SIZE_PT × DESCRIPTOR_LINESPACING
+TITLE_LINE_BOX_PT = 14.0        # TITLE_SIZE_PT × TITLE_LINESPACING
+INTER_BLOCK_GAP_PT = 3.5        # gap between title and descriptor blocks
+RULE_GAP_PT = 2.0               # gap between title and red rule (marker="rule")
+TOP_TICK_CLEARANCE_PT = 6.0     # padding above top-axis tick labels
+
+# --- Marker (delta / favicon triangle) ---
+MARKER_SIZE_RATIO = 0.80        # marker_size / title_size
+MARKER_GAP_PT = 4.0             # horizontal gap between marker and inline title
+RULE_WIDTH_PX = 80              # short red rule width in device pixels
+RULE_LINEWIDTH = 3.5            # short red rule stroke width
+
+# --- Tick-pad fallback ---
+TICK_PAD_MIN = 4                # default y-tick pad (override if charts ask for more)
+
+# --- Font weights ---
+TITLE_WEIGHT = 700              # bold
+
+# --- Panel label ---
+PANEL_RULE_WIDTH_PX = 35        # short dark rule width above panel label
+PANEL_RULE_LINEWIDTH = 1.2
+PANEL_RULE_Y_OFFSET = 0.052     # rule offset above axes top (figure coords)
+PANEL_LABEL_Y_OFFSET = 0.010    # label offset above axes top (figure coords)
+
+# --- Source / footnotes vertical positions (figure coords) ---
+SOURCE_Y_OFFSET = 0.06          # source line offset below bbox.y0
+SOURCE_TICK_CLEARANCE = 0.015   # extra clearance below lowest tick label/xlabel
+Y_AXIS_LABEL_MARGIN = 0.005     # y-axis label offset above bbox.y1
+FOOTNOTES_LEGACY_Y_OFFSET = 0.045  # legacy notes-only position below base
+FOOTNOTES_STACK_GAP = 0.022     # gap when notes wrap above source line
+FOOTNOTES_PACK_GAP = 0.02       # horizontal gap between source and inline notes
+
+# --- Auto-layout (subplots_adjust) ---
+AUTO_LAYOUT_LEFT = 0.02         # default left margin for finalize(auto_layout=True)
+AUTO_LAYOUT_RIGHT = 0.96        # default right margin
+AUTO_LAYOUT_TOP_PAD_PT = 6.0    # breathing room above the title-stack
+AUTO_LAYOUT_BOTTOM_MARGIN = 0.020  # breathing room below the source baseline
+AUTO_LAYOUT_TICK_RESERVE_PT = 16.0  # reserve for a single row of x-tick labels
+AUTO_LAYOUT_MARKER_RESERVE_PT = 2.0  # marker overhang above title cap-height
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -188,6 +245,140 @@ def _draw_delta(fig, tx: float, y_cursor: float) -> None:
     _draw_logo_triangle(fig, tx, y_cursor)
 
 
+def _compute_auto_pads(
+    fig,
+    *,
+    title: str,
+    descriptor: str,
+    source: str,
+    marker: str,
+    y_start: float,
+    footnote_lines: int,
+) -> tuple[float, float]:
+    """Compute (top_pad, bottom_pad) for ``fig.subplots_adjust``.
+
+    Top pad reserves room for the title-stack drawn in figure coords
+    above ``bbox.y1`` (descriptor lines, gap, title lines, marker
+    overhang, ``y_start`` padding, plus a small breathing margin).
+
+    Bottom pad reserves room for one row of x-tick labels, the source
+    line at ``SOURCE_Y_OFFSET`` below ``bbox.y0``, and a breathing
+    margin below the source baseline.
+    """
+    fig_h_in = fig.get_figheight()
+    pt2fig = 1.0 / 72.0 / fig_h_in
+
+    title_block_pt = 0.0
+    if title:
+        n_title_lines = title.count("\n") + 1
+        title_block_pt += TITLE_LINE_BOX_PT * n_title_lines
+
+    desc_block_pt = 0.0
+    if descriptor:
+        n_desc_lines = descriptor.count("\n") + 1
+        desc_block_pt += DESCRIPTOR_LINE_BOX_PT * n_desc_lines
+
+    gap_pt = INTER_BLOCK_GAP_PT if (title and descriptor) else 0.0
+
+    marker_pt = 0.0
+    if marker == "delta" and not title:
+        # Standalone delta sits at y_cursor and rises one marker height.
+        marker_pt = TITLE_SIZE_PT * MARKER_SIZE_RATIO
+    elif marker == "rule":
+        # Rule sits above the title with a small gap.
+        marker_pt = RULE_GAP_PT + 2.0
+    elif marker == "delta" and title:
+        # Inline marker apex can extend slightly above title cap-height.
+        marker_pt = AUTO_LAYOUT_MARKER_RESERVE_PT
+
+    stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
+    top_pad = y_start + stack_pt * pt2fig + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
+
+    tick_reserve = AUTO_LAYOUT_TICK_RESERVE_PT * pt2fig
+    source_h_fig = SOURCE_SIZE_PT * pt2fig
+    has_source_band = bool(source) or footnote_lines > 0
+    if has_source_band:
+        bottom_pad = (
+            max(SOURCE_Y_OFFSET, tick_reserve) + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
+        )
+    else:
+        bottom_pad = tick_reserve + AUTO_LAYOUT_BOTTOM_MARGIN
+
+    # Each extra footnote line wraps above (or below) the source baseline at
+    # one ``FOOTNOTES_STACK_GAP`` + footnote line-box (~7pt × 1.2) per line.
+    if footnote_lines > 0:
+        extra_line = max(
+            FOOTNOTES_STACK_GAP,
+            FOOTNOTE_SIZE_PT * 1.2 * pt2fig,
+        )
+        bottom_pad += extra_line * footnote_lines
+
+    return top_pad, bottom_pad
+
+
+def _superscript_axis_label(ax, axis: str) -> None:
+    """Re-render an axis label through ``render_text_with_superscripts``.
+
+    Standard ``ax.set_xlabel`` / ``ax.set_ylabel`` calls produce a single
+    matplotlib ``Text`` artist that renders footnote markers (``*``, ``†``,
+    ``‡``, ``§``) inline at full size. This helper detects markers, hides
+    the original artist, and re-renders the same string at the same anchor
+    in figure coordinates so the markers come out as proper superscripts.
+
+    Only labels containing a marker are touched; plain labels keep their
+    original matplotlib artist (and any styling matplotlib applies via
+    rcParams or the user's ``set_xlabel(..., rotation=...)`` call).
+
+    Limitations:
+      * Rotation other than 0 is not preserved — the re-rendered text uses
+        the default horizontal orientation. Charts that rotate axis labels
+        AND use footnote markers will need to call
+        ``render_text_with_superscripts`` directly.
+      * Only the axes passed to ``finalize`` is processed. Faceted layouts
+        that share an xlabel on a single subplot are fine; charts that set
+        per-subplot xlabels with markers need one ``finalize`` call per
+        subplot.
+    """
+    label_artist = ax.xaxis.label if axis == "x" else ax.yaxis.label
+    text = label_artist.get_text()
+    if not text or not _has_marker(text):
+        return
+
+    fig = ax.get_figure()
+    fig.canvas.draw()
+
+    color = label_artist.get_color()
+    fontsize = label_artist.get_fontsize()
+    fp = label_artist.get_fontproperties()
+    ha = label_artist.get_ha()
+    va = label_artist.get_va()
+
+    # Capture the artist's anchor in figure coordinates before we wipe it.
+    # The label uses its own transform (typically blended axes/figure
+    # coords); converting through display space gives us a stable point we
+    # can re-render at via ``fig.transFigure``.
+    transform = label_artist.get_transform()
+    x_disp, y_disp = transform.transform(label_artist.get_position())
+    x_fig, y_fig = fig.transFigure.inverted().transform((x_disp, y_disp))
+
+    # Hide the original — leave the artist in place so matplotlib's layout
+    # bookkeeping (label padding, ``get_window_extent`` for the source-line
+    # placement code) doesn't get confused by a missing label.
+    label_artist.set_text("")
+
+    render_text_with_superscripts(
+        fig,
+        x_fig,
+        y_fig,
+        text,
+        fontsize=fontsize,
+        fontproperties=fp,
+        color=color,
+        va=va,
+        ha=ha,
+    )
+
+
 def finalize(
     ax,
     title: str = "",
@@ -199,6 +390,8 @@ def finalize(
     y_start: float = 0.010,
     autoscale_y: bool = True,
     marker: str = "delta",
+    auto_layout: bool = True,
+    footnote_lines: int = 0,
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -224,6 +417,15 @@ def finalize(
         marker: Top-of-stack anchor. ``"delta"`` (default) renders a red Δ
             glyph; ``"rule"`` draws the legacy short red horizontal line;
             ``"none"`` skips the marker entirely.
+        auto_layout: If True (default), call ``fig.subplots_adjust`` with
+            top/bottom/left/right margins sized to fit the title-stack and
+            source line. Set False when the caller has already configured
+            ``subplots_adjust`` (faceted charts that need explicit
+            ``hspace``/``wspace`` control).
+        footnote_lines: Extra lines of ``footnotes()`` text below the chart.
+            Auto-layout reserves an additional ~7pt-line per footnote row so
+            wrapped notes don't clip. Pass the count when calling
+            ``footnotes(fig, ...)`` after ``finalize`` with multi-line notes.
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
@@ -232,6 +434,23 @@ def finalize(
     _check_x_monotonic(ax)
     if autoscale_y:
         _autoscale_y(ax)
+
+    if auto_layout:
+        top_pad, bottom_pad = _compute_auto_pads(
+            fig,
+            title=title,
+            descriptor=descriptor,
+            source=source,
+            marker=marker,
+            y_start=y_start,
+            footnote_lines=footnote_lines,
+        )
+        fig.subplots_adjust(
+            top=1.0 - top_pad,
+            bottom=bottom_pad,
+            left=AUTO_LAYOUT_LEFT,
+            right=AUTO_LAYOUT_RIGHT,
+        )
 
     if y_axis_right:
         ax.yaxis.set_label_position("right")
@@ -245,7 +464,7 @@ def finalize(
     current_pad = (
         ax.yaxis.get_major_ticks()[0].get_pad() if ax.yaxis.get_major_ticks() else 0
     )
-    ax.yaxis.set_tick_params(pad=max(current_pad, 4), labelsize=9)
+    ax.yaxis.set_tick_params(pad=max(current_pad, TICK_PAD_MIN), labelsize=TICK_LABEL_SIZE_PT)
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
@@ -261,8 +480,8 @@ def finalize(
     # full range of figure heights (3.6"–5.5") in the examples library.
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in  # 1 typographic point in figure-y coords
-    line_gap = 3.5 * pt2fig
-    rule_gap = 2.0 * pt2fig
+    line_gap = INTER_BLOCK_GAP_PT * pt2fig
+    rule_gap = RULE_GAP_PT * pt2fig
     y_cursor = bbox.y1 + y_start
 
     # If x-tick labels render above the axes top (e.g. bar_h puts them on top,
@@ -285,7 +504,7 @@ def finalize(
             if top_y > highest_fig_y:
                 highest_fig_y = top_y
         if highest_fig_y > bbox.y1:
-            y_cursor = highest_fig_y + 6.0 * pt2fig
+            y_cursor = highest_fig_y + TOP_TICK_CLEARANCE_PT * pt2fig
     except Exception:
         pass
 
@@ -297,20 +516,20 @@ def finalize(
             tx,
             y_cursor,
             descriptor,
-            fontsize=9.5,
+            fontsize=DESCRIPTOR_SIZE_PT,
             fontproperties=fp_desc,
             color=C_SPINE,
             va="bottom",
             ha="left",
-            linespacing=1.20,
+            linespacing=DESCRIPTOR_LINESPACING,
         )
         # Descriptor line box ≈ 9.5pt × 1.20 ≈ 11.4pt for each line.
-        y_cursor += 11.4 * pt2fig * n_desc_lines + line_gap
+        y_cursor += DESCRIPTOR_LINE_BOX_PT * pt2fig * n_desc_lines + line_gap
 
     if title:
         n_title_lines = title.count("\n") + 1
-        fp = fm.FontProperties(family=_get_font(), weight=700)
-        title_size_pt = 12.0
+        fp = fm.FontProperties(family=_get_font(), weight=TITLE_WEIGHT)
+        title_size_pt = TITLE_SIZE_PT
 
         if marker == "delta":
             # Inline layout: triangle's height matches the title's cap-height
@@ -318,9 +537,9 @@ def finalize(
             # cap-height ≈ 0.72 × em size. A small upward nudge compensates
             # for matplotlib's baseline placement so the bottom of the
             # triangle visually lines up with the bottom of "B".
-            marker_size_pt = title_size_pt * 0.80
+            marker_size_pt = title_size_pt * MARKER_SIZE_RATIO
             marker_w_fig = marker_size_pt / 72.0 / fig.get_figwidth()
-            marker_gap_fig = (4.0 * pt2fig) * (fig.get_figheight() / fig.get_figwidth())
+            marker_gap_fig = (MARKER_GAP_PT * pt2fig) * (fig.get_figheight() / fig.get_figwidth())
             title_x_inline = tx + marker_w_fig + marker_gap_fig
             _draw_logo_triangle(fig, tx, y_cursor, size_pt=marker_size_pt)
             render_text_with_superscripts(
@@ -333,9 +552,9 @@ def finalize(
                 color=C_SPINE,
                 va="baseline",
                 ha="left",
-                linespacing=1.15,
+                linespacing=TITLE_LINESPACING,
             )
-            y_cursor += 14.0 * pt2fig * n_title_lines
+            y_cursor += TITLE_LINE_BOX_PT * pt2fig * n_title_lines
         else:
             # Standard above-title layout: title at y_cursor, rule (if any)
             # rendered above with a small gap.
@@ -349,9 +568,9 @@ def finalize(
                 color=C_SPINE,
                 va="bottom",
                 ha="left",
-                linespacing=1.15,
+                linespacing=TITLE_LINESPACING,
             )
-            y_cursor += 14.0 * pt2fig * n_title_lines + rule_gap
+            y_cursor += TITLE_LINE_BOX_PT * pt2fig * n_title_lines + rule_gap
             if marker == "rule":
                 _draw_rule(fig, tx, y_cursor)
     elif marker == "delta":
@@ -363,7 +582,7 @@ def finalize(
         # Place source below the lowest of: xlabel, x-tick labels.
         # Wrapped multi-line x-tick labels can extend further down than the
         # xlabel and previously caused the source line to overlap them.
-        source_y = bbox.y0 - 0.06
+        source_y = bbox.y0 - SOURCE_Y_OFFSET
         try:
             renderer = fig.canvas.get_renderer()
             lowest_fig_y = bbox.y0
@@ -382,7 +601,7 @@ def finalize(
                     lowest_fig_y,
                     tl_bb.transformed(fig.transFigure.inverted()).y0,
                 )
-            source_y = min(source_y, lowest_fig_y - 0.015)
+            source_y = min(source_y, lowest_fig_y - SOURCE_TICK_CLEARANCE)
         except Exception:
             pass
         fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
@@ -391,17 +610,24 @@ def finalize(
             tx,
             source_y,
             source,
-            fontsize=7.5,
+            fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_src,
             color=C_SOURCE,
             va="top",
             ha="left",
         )
 
+    # Post-process axis labels so footnote markers in ``set_xlabel`` /
+    # ``set_ylabel`` strings render as superscripts. Runs after the source
+    # line is placed so the xlabel's window-extent is still available for
+    # the clearance calculation above.
+    _superscript_axis_label(ax, "x")
+    _superscript_axis_label(ax, "y")
+
     return fig, ax
 
 
-def panel_label(ax, label: str, *, fontsize: int = 10) -> None:
+def panel_label(ax, label: str, *, fontsize: int = PANEL_LABEL_SIZE_PT) -> None:
     """Bold panel sub-heading with a short dark rule — for faceted charts.
 
     Renders above the axes::
@@ -413,21 +639,21 @@ def panel_label(ax, label: str, *, fontsize: int = 10) -> None:
     fig.canvas.draw()
     bbox = ax.get_position()
 
-    rule_w = 35 / (fig.get_figwidth() * fig.dpi)
+    rule_w = PANEL_RULE_WIDTH_PX / (fig.get_figwidth() * fig.dpi)
     fig.add_artist(
         plt.Line2D(
             [bbox.x0, bbox.x0 + rule_w],
-            [bbox.y1 + 0.052, bbox.y1 + 0.052],
+            [bbox.y1 + PANEL_RULE_Y_OFFSET, bbox.y1 + PANEL_RULE_Y_OFFSET],
             transform=fig.transFigure,
             color=C_SPINE,
-            linewidth=1.2,
+            linewidth=PANEL_RULE_LINEWIDTH,
             solid_capstyle="butt",
             clip_on=False,
         )
     )
     fig.text(
         bbox.x0,
-        bbox.y1 + 0.010,
+        bbox.y1 + PANEL_LABEL_Y_OFFSET,
         label,
         transform=fig.transFigure,
         fontsize=fontsize,
@@ -438,6 +664,28 @@ def panel_label(ax, label: str, *, fontsize: int = 10) -> None:
     )
 
 
+def x_axis_label(
+    ax,
+    text: str,
+    *,
+    color: str | None = None,
+    fontsize: float = Y_AXIS_LABEL_SIZE_PT,
+    labelpad: float | None = None,
+) -> None:
+    """Set the x-axis label with project-default colour and size.
+
+    Thin wrapper around ``ax.set_xlabel`` that applies ``C_SPINE`` colour
+    and the standard axis-label point size. Footnote markers (``*``, ``†``,
+    ``‡``, ``§``) in ``text`` are auto-superscripted by ``finalize`` via its
+    post-processing pass — no separate call needed.
+    """
+    color = color if color is not None else C_SPINE
+    kwargs: dict = {"color": color, "fontsize": fontsize}
+    if labelpad is not None:
+        kwargs["labelpad"] = labelpad
+    ax.set_xlabel(text, **kwargs)
+
+
 def y_axis_label(
     ax,
     text: str,
@@ -445,7 +693,7 @@ def y_axis_label(
     unit: str | None = None,
     side: str = "right",
     width_frac: float = 0.5,
-    fontsize: float = 8.5,
+    fontsize: float = Y_AXIS_LABEL_SIZE_PT,
     color: str | None = None,
     unit_color: str | None = None,
 ) -> None:
@@ -492,9 +740,9 @@ def y_axis_label(
     pt2fig = 1.0 / 72.0 / fig_h_in
     # Line box ≈ fontsize * 1.2 points; advance the cursor by one line per
     # wrapped text line so the unit sits just below the main label.
-    line_h = fontsize * 1.2 * pt2fig
+    line_h = fontsize * Y_AXIS_LABEL_LINESPACING * pt2fig
     n_text_lines = wrapped.count("\n") + 1
-    y_text = bbox.y1 + 0.005
+    y_text = bbox.y1 + Y_AXIS_LABEL_MARGIN
     if unit:
         y_text += line_h  # leave room below for the unit line
 
@@ -508,7 +756,7 @@ def y_axis_label(
         color=color if color is not None else C_SPINE,
         va="bottom",
         ha=ha,
-        linespacing=1.2,
+        linespacing=Y_AXIS_LABEL_LINESPACING,
     )
 
     if unit:
@@ -524,7 +772,7 @@ def y_axis_label(
             color=unit_color if unit_color is not None else C_LABEL_MUTED,
             va="bottom",
             ha=ha,
-            linespacing=1.2,
+            linespacing=Y_AXIS_LABEL_LINESPACING,
         )
 
 
@@ -645,13 +893,13 @@ def footnotes(
         # Legacy mode — render notes only at the historical position.
         if not notes_str:
             return
-        y_pos = y if y is not None else base_y0 - 0.045
+        y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
         render_text_with_superscripts(
             fig,
             x,
             y_pos,
             notes_str,
-            fontsize=7,
+            fontsize=FOOTNOTE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",
@@ -661,7 +909,7 @@ def footnotes(
 
     # Source-aware mode: render source on its own baseline, pack notes
     # alongside if there is room, otherwise wrap them one row above.
-    source_y = y if y is not None else base_y0 - 0.06
+    source_y = y if y is not None else base_y0 - SOURCE_Y_OFFSET
 
     def _text_width_frac(text: str, fp, fontsize: float) -> float:
         if not text:
@@ -672,12 +920,12 @@ def footnotes(
         t.remove()
         return bb.width / (fig.get_figwidth() * fig.dpi)
 
-    src_w = _text_width_frac(source, fp_src, 7.5)
-    notes_w = _text_width_frac(notes_str, fp_notes, 7) if notes_str else 0.0
+    src_w = _text_width_frac(source, fp_src, SOURCE_MEASURE_SIZE_PT)
+    notes_w = _text_width_frac(notes_str, fp_notes, FOOTNOTE_SIZE_PT) if notes_str else 0.0
 
     # Available room between source's right edge and the chart's right edge,
     # minus a small visual gap.
-    gap = 0.02
+    gap = FOOTNOTES_PACK_GAP
     src_right = x + src_w
     notes_fits = notes_str and (src_right + gap + notes_w) <= min(
         right_x, max_width_frac
@@ -690,7 +938,7 @@ def footnotes(
             x,
             source_y,
             source,
-            fontsize=7.5,
+            fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_src,
             color=C_SOURCE,
             va="top",
@@ -707,7 +955,7 @@ def footnotes(
             right_x,
             source_y,
             notes_str,
-            fontsize=7,
+            fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",
@@ -718,9 +966,9 @@ def footnotes(
         render_text_with_superscripts(
             fig,
             x,
-            source_y + 0.022,
+            source_y + FOOTNOTES_STACK_GAP,
             notes_str,
-            fontsize=7,
+            fontsize=SOURCE_SIZE_PT,
             fontproperties=fp_notes,
             color=C_SOURCE,
             va="top",

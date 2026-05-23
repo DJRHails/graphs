@@ -28,7 +28,6 @@ gdp_2000 = [10.25, 1.21, 1.95, 4.72, 0.47, 0.65]
 gdp_2020 = [20.93, 14.72, 3.84, 5.06, 2.62, 1.44]
 
 fig, ax = plt.subplots(figsize=(8, 4.5))
-fig.subplots_adjust(top=0.62, bottom=0.12, left=0.18, right=0.88)
 
 dumbbell(
     ax,

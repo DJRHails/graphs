@@ -37,7 +37,6 @@ labels = [r[0] for r in rows]
 values = [r[1] for r in rows]
 
 fig, ax = plt.subplots(figsize=(7, 3.6))
-fig.subplots_adjust(top=0.62, bottom=0.16, left=0.20, right=0.92)
 
 bar_h(ax, labels, [v / 1000 for v in values], highlight_max=True)
 

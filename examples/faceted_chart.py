@@ -73,6 +73,7 @@ finalize(
     y_axis_right=False,
     title_x=0.04,
     y_start=0.075,
+    auto_layout=False,  # 1×3 facet needs explicit wspace
 )
 
 out = Path(__file__).resolve().parent / "faceted_chart.png"

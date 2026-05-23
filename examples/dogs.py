@@ -18,10 +18,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, color_axis, finalize, footnotes, set_theme
+from graphs import PALETTE, color_axis, finalize, footnotes, get_font, set_theme
+from graphs._superscript import render_text_with_superscripts
 
 set_theme()
 
@@ -40,7 +42,6 @@ for row in reader:
 # on both axes. Midpoints ≈ 19.3 kg and 43.4 cm → ratio 2.25, so neck range
 # must be 2.25× the weight range.
 fig, ax_left = plt.subplots(figsize=(7, 4.2))
-fig.subplots_adjust(top=0.66, bottom=0.14, left=0.08, right=0.90)
 
 ax_right = ax_left.twinx()
 
@@ -71,6 +72,7 @@ ax_right.grid(False)
 
 ax_left.set_xticks(years[::2])
 
+
 def _draw_axis_titles(fig, ax) -> None:
     """Place series labels at the top of each y-axis after finalize() runs.
 
@@ -84,26 +86,30 @@ def _draw_axis_titles(fig, ax) -> None:
     """
     fig.canvas.draw()
     bbox = ax.get_position()
-    fig.text(
+    fp = fm.FontProperties(family=get_font(), weight="normal")
+    render_text_with_superscripts(
+        fig,
         bbox.x0,
         bbox.y1 + 0.005,
         "Neck size†, cm",
-        transform=fig.transFigure,
-        color=PALETTE["cyan"],
         fontsize=9,
+        fontproperties=fp,
+        color=PALETTE["cyan"],
         va="bottom",
         ha="left",
     )
-    fig.text(
+    render_text_with_superscripts(
+        fig,
         bbox.x1,
         bbox.y1 + 0.005,
         "Weight*, kg",
-        transform=fig.transFigure,
-        color=PALETTE["red"],
         fontsize=9,
+        fontproperties=fp,
+        color=PALETTE["red"],
         va="bottom",
         ha="right",
     )
+
 
 # Pre-wrap the descriptor at ~70 chars so it lays out as two natural lines
 # rather than a hard break. fig.text does not auto-wrap, so doing it here
@@ -123,6 +129,7 @@ finalize(
     title_x=0.02,
     y_start=0.035,
     autoscale_y=False,
+    footnote_lines=1,  # notes pack alongside source line
 )
 
 _draw_axis_titles(fig, ax_left)

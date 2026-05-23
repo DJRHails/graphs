@@ -63,6 +63,7 @@ finalize(
     title_x=0.02,
     y_start=0.060,
     autoscale_y=False,
+    auto_layout=False,  # stacked panels need explicit hspace
 )
 footnotes(fig, source="Sources: US Census Bureau; BLS")
 
