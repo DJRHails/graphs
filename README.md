@@ -4,7 +4,7 @@ Economist-style chart theme for matplotlib and seaborn — global theme, title-s
 finaliser, direct line labels, CI bands, horizontal bars, and dumbbell charts.
 Uses IBM Plex Sans typography and a curated 8-colour palette.
 
-Version: 0.3.0
+Version: 0.3.1
 
 ## Install
 

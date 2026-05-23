@@ -23,7 +23,9 @@ Limitations
   link's display text — emit a ``UserWarning`` and the URL is dropped for
   that span. Mark up either the marker outside the link, or accept the
   visual-only treatment.
-* Only HTTP/HTTPS URLs are recognised (matches the markdown link regex).
+* Only HTTP/HTTPS targets produce hyperlinks in SVG/PDF. Markdown links to
+  relative paths, file URIs, or other schemes are stripped to their display
+  text — the brackets and target are removed but no ``set_url`` is called.
 """
 
 from __future__ import annotations
@@ -31,20 +33,31 @@ from __future__ import annotations
 import re
 import warnings
 
+# Match any non-empty target, hyperlink-capable or not. ``strip_links`` decides
+# whether the target should produce a ``set_url`` span (http/https) or render
+# as plain display text (everything else: relative paths, file URIs, etc.).
 _LINK_PATTERN = re.compile(
-    r"""(?x)              # verbose mode
-    \[                    # opening bracket
-    (?P<display>[^\]]+)   # display text — no nested brackets
-    \]                    # closing bracket
-    \(                    # opening paren
-    (?P<url>https?://[^)]+)  # URL — http or https, no closing paren
-    \)                    # closing paren
+    r"""(?x)                # verbose mode
+    \[                      # opening bracket
+    (?P<display>[^\]]+)     # display text — no nested brackets
+    \]                      # closing bracket
+    \(                      # opening paren
+    (?P<target>[^)]+)       # link target — anything but a closing paren
+    \)                      # closing paren
     """
 )
 
+_URL_SCHEME = re.compile(r"^https?://", re.IGNORECASE)
+
 
 def strip_links(text: str) -> tuple[str, list[tuple[int, int, str]]]:
-    """Replace ``[display](url)`` with ``display``; return clean text + spans.
+    """Replace ``[display](target)`` with ``display``; return clean text + spans.
+
+    Both HTTP/HTTPS targets and non-URL targets (relative paths, file URIs,
+    other schemes) are stripped to their display text. Spans are emitted
+    **only** for HTTP/HTTPS targets so the SVG/PDF backends can attach an
+    ``<a href="...">`` wrapper; non-URL targets render as plain display text
+    with no ``set_url`` annotation.
 
     Args:
         text: Source string containing zero or more markdown links.
@@ -66,8 +79,9 @@ def strip_links(text: str) -> tuple[str, list[tuple[int, int, str]]]:
         out.append(prefix)
         cursor += len(prefix)
         display = m.group("display")
-        url = m.group("url")
-        spans.append((cursor, cursor + len(display), url))
+        target = m.group("target")
+        if _URL_SCHEME.match(target):
+            spans.append((cursor, cursor + len(display), target))
         out.append(display)
         cursor += len(display)
         last = m.end()

@@ -87,7 +87,7 @@ from graphs._palette import (
 )
 from graphs._theme import set_theme
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     # theme + finalize
