@@ -816,6 +816,39 @@ def year_axis(ax, *, abbreviate: bool = True, set_locator: bool = True) -> None:
     ax.xaxis.set_major_formatter(plt.FuncFormatter(_fmt))
 
 
+def _wrap_preserve_offsets(text: str, max_chars: int) -> str:
+    """Greedy word-wrap that converts inter-word spaces into newlines.
+
+    Length-preserving: a space becomes a ``\\n`` (one char for one char), so the
+    character offsets used by URL spans and superscript markers stay valid — the
+    superscript renderer counts the newline at the same offset the space held.
+    Words longer than ``max_chars`` are left intact (no mid-word breaks).
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    out: list[str] = []
+    line_len = 0
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == " ":
+            j = i + 1
+            while j < n and text[j] != " ":
+                j += 1
+            next_word = j - (i + 1)
+            if line_len > 0 and line_len + 1 + next_word > max_chars:
+                out.append("\n")
+                line_len = 0
+            else:
+                out.append(" ")
+                line_len += 1
+        else:
+            out.append(ch)
+            line_len += 1
+        i += 1
+    return "".join(out)
+
+
 def footnotes(
     fig,
     *notes: str,
@@ -895,29 +928,6 @@ def footnotes(
     notes_clean, notes_urls = strip_links(notes_str) if notes_str else ("", [])
     source_clean, source_urls = strip_links(source) if source else ("", [])
 
-    if source is None:
-        # Legacy mode — render notes only at the historical position.
-        if not notes_str:
-            return
-        y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
-        render_text_with_superscripts(
-            fig,
-            x,
-            y_pos,
-            notes_clean,
-            fontsize=FOOTNOTE_SIZE_PT,
-            fontproperties=fp_notes,
-            color=C_SOURCE,
-            va="top",
-            ha="left",
-            url_spans=notes_urls,
-        )
-        return
-
-    # Source-aware mode: render source on its own baseline, pack notes
-    # alongside if there is room, otherwise wrap them one row above.
-    source_y = y if y is not None else base_y0 - SOURCE_Y_OFFSET
-
     def _text_width_frac(text: str, fp, fontsize: float) -> float:
         if not text:
             return 0.0
@@ -927,10 +937,42 @@ def footnotes(
         t.remove()
         return bb.width / (fig.get_figwidth() * fig.dpi)
 
+    notes_w = _text_width_frac(notes_clean, fp_notes, FOOTNOTE_SIZE_PT) if notes_clean else 0.0
+    line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
+
+    def _draw_wrapped(text: str, urls, anchor_y: float, avail_frac: float) -> None:
+        """Word-wrap ``text`` to ``avail_frac`` of the figure width and stack the
+        lines upward, so the bottom line sits at ``anchor_y`` (va='top' baseline)."""
+        per_char = notes_w / len(text) if text else 0.0
+        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
+        wrapped = _wrap_preserve_offsets(text, max_chars)
+        n_lines = wrapped.count("\n") + 1
+        render_text_with_superscripts(
+            fig,
+            x,
+            anchor_y + (n_lines - 1) * line_h,
+            wrapped,
+            fontsize=FOOTNOTE_SIZE_PT,
+            fontproperties=fp_notes,
+            color=C_SOURCE,
+            va="top",
+            ha="left",
+            url_spans=urls,
+        )
+
+    if source is None:
+        # Legacy mode — render notes only at the historical position, wrapped.
+        if not notes_str:
+            return
+        y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
+        _draw_wrapped(notes_clean, notes_urls, y_pos, max(0.0, min(max_width_frac, 1.0) - 2 * x))
+        return
+
+    # Source-aware mode: render source on its own baseline, pack notes
+    # alongside if there is room, otherwise word-wrap them above.
+    source_y = y if y is not None else base_y0 - SOURCE_Y_OFFSET
+
     src_w = _text_width_frac(source_clean, fp_src, SOURCE_MEASURE_SIZE_PT)
-    notes_w = (
-        _text_width_frac(notes_clean, fp_notes, FOOTNOTE_SIZE_PT) if notes_clean else 0.0
-    )
 
     # Available room between source's right edge and the chart's right edge,
     # minus a small visual gap.
@@ -973,16 +1015,10 @@ def footnotes(
             url_spans=notes_urls,
         )
     else:
-        # Wrap above the source line.
-        render_text_with_superscripts(
-            fig,
-            x,
-            source_y + FOOTNOTES_STACK_GAP,
+        # Too wide for the source row — word-wrap and stack the lines above it.
+        _draw_wrapped(
             notes_clean,
-            fontsize=SOURCE_SIZE_PT,
-            fontproperties=fp_notes,
-            color=C_SOURCE,
-            va="top",
-            ha="left",
-            url_spans=notes_urls,
+            notes_urls,
+            source_y + FOOTNOTES_STACK_GAP,
+            max(0.0, min(right_x, max_width_frac) - x),
         )
