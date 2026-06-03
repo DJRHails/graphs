@@ -1,0 +1,47 @@
+"""Compact number formatting for figure labels (ticks, annotations, footnotes)."""
+
+from __future__ import annotations
+
+from decimal import ROUND_HALF_UP, Decimal
+
+_UNITS = ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "k"))
+
+
+def _round_sig(n: float, sig: int) -> float:
+    """Round ``n`` to ``sig`` significant figures (half away from zero, FP-stable).
+
+    Uses :class:`~decimal.Decimal` so exact halves (e.g. 1.25M → 1.3M) round
+    deterministically rather than at the mercy of binary floating-point error.
+    """
+    if n == 0:
+        return 0.0
+    d = Decimal(str(n))
+    quant = Decimal(1).scaleb(d.adjusted() - sig + 1)
+    return float(d.quantize(quant, rounding=ROUND_HALF_UP))
+
+
+def format_count(n: float, *, sig: int = 2) -> str:
+    """Format a count to ``sig`` significant figures with a magnitude unit.
+
+    Rounds to ``sig`` significant figures first, then applies a thousands unit
+    (k/M/B/T), stripping any trailing ``.0``. Designed for token counts and other
+    large tallies on figure tick labels and annotations.
+
+    Examples (``sig=2``):
+        ``2030 -> "2k"``, ``1234 -> "1.2k"``, ``16384 -> "16k"``,
+        ``500 -> "500"``, ``64 -> "64"``, ``1_250_000 -> "1.2M"``.
+
+    Args:
+        n: The count to format. Negative values keep their sign.
+        sig: Number of significant figures to round to (default 2).
+
+    Returns:
+        A compact string label, e.g. ``"1.2k"`` or ``"500"``.
+    """
+    rounded = _round_sig(n, sig)
+    sign = "-" if rounded < 0 else ""
+    mag = abs(rounded)
+    for threshold, unit in _UNITS:
+        if mag >= threshold:
+            return f"{sign}{mag / threshold:g}{unit}"
+    return f"{sign}{mag:g}"
