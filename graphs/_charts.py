@@ -787,3 +787,69 @@ def _spread_annotations_y(ax, annotations) -> None:
                 moved = True
         if not moved:
             break
+
+
+def pie_marker(ax, x, y, wedge_colors, *, size: float = 150, edgecolor: str = "white"):
+    """Draw a marker at ``(x, y)`` split into equal wedges — one colour per overlapping series.
+
+    A single colour draws a plain dot; N colours draw an N-way pie (two halves, three thirds, …)
+    so points that share a value stay individually visible. Wedge size is in points², so the
+    marker keeps a constant on-screen size regardless of the data scale.
+
+    Args:
+        wedge_colors: One colour per series sharing this point; its length sets the split count.
+        size: Marker area in points² (matches ``scatter`` ``s``).
+        edgecolor: Outline colour for the single-dot case (kept white to read on gridlines).
+    """
+    import numpy as np
+    from matplotlib.path import Path
+
+    wedge_colors = list(wedge_colors)
+    if len(wedge_colors) == 1:
+        ax.scatter([x], [y], marker="o", s=size, color=wedge_colors[0], zorder=4,
+                   edgecolors=edgecolor, linewidths=0.6)
+        return
+    n = len(wedge_colors)
+    for i, colour in enumerate(wedge_colors):  # start at 90° so a 2-split reads as two halves
+        angles = np.linspace(np.radians(90 + i * 360 / n), np.radians(90 + (i + 1) * 360 / n), 24)
+        verts = [(0.0, 0.0), *((float(np.cos(t)), float(np.sin(t))) for t in angles), (0.0, 0.0)]
+        ax.scatter([x], [y], marker=Path(verts), s=size, color=colour, zorder=4)
+
+
+def dot_plot(ax, categories, series, *, series_colors=None, size: float = 150, value_round: int = 2):
+    """Cleveland dot plot with overlap-aware split markers.
+
+    One row per category, one dot per series. Dots that land on the same value in a row are merged
+    into a single pie-split marker (see :func:`pie_marker`) so none hide — for any number of
+    overlapping series.
+
+    Args:
+        categories: Row labels (drawn top-to-bottom in the order given).
+        series: Mapping of series label -> per-category values (aligned to ``categories``).
+        series_colors: Optional series-label -> colour map; defaults to the standard cycle.
+        size: Marker area in points².
+        value_round: Decimal places at which two series count as sharing a value.
+
+    Returns:
+        One legend handle per series (pass to ``ax.legend`` / ``fig.legend``).
+    """
+    from matplotlib.lines import Line2D
+
+    labels = list(series)
+    palette = series_colors or {lbl: colors[i % len(colors)] for i, lbl in enumerate(labels)}
+    rows = list(categories)
+    for y in range(len(rows)):
+        groups: dict[float, list[str]] = {}
+        for lbl in labels:
+            groups.setdefault(round(float(series[lbl][y]), value_round), []).append(lbl)
+        for value, members in groups.items():
+            pie_marker(ax, value, y, [palette[m] for m in members], size=size)
+    ax.set_yticks(range(len(rows)), rows)
+    ax.set_ylim(-0.6, len(rows) - 0.4)
+    ax.spines[["top", "left", "right"]].set_visible(False)
+    ax.spines["bottom"].set_color(C_SPINE)
+    ax.yaxis.set_tick_params(length=0, pad=6)
+    ax.grid(axis="x", color=C_GRID, linewidth=0.6, zorder=0)
+    ax.grid(axis="y", visible=False)
+    return [Line2D([], [], marker="o", color=palette[lbl], ls="", markersize=8, label=lbl)
+            for lbl in labels]
