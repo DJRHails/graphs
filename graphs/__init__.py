@@ -61,7 +61,7 @@ from graphs._finalize import (
 )
 from graphs._fonts import _get_font as get_font
 from graphs._fonts import _get_font_condensed as get_font_condensed
-from graphs._format import format_count
+from graphs._format import format_count, magnitude_word, scale_axis
 from graphs._labels import (
     inset_tick_labels,
     italicize_labels,
@@ -168,4 +168,6 @@ __all__ = [
     "get_font_condensed",
     # formatting
     "format_count",
+    "magnitude_word",
+    "scale_axis",
 ]
