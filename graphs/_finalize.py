@@ -849,6 +849,145 @@ def _wrap_preserve_offsets(text: str, max_chars: int) -> str:
     return "".join(out)
 
 
+def verify_layout(fig, *, tolerance: float = 0.005) -> list[str]:
+    """Warn when any text artist on ``fig`` extends outside the figure bbox.
+
+    Why this matters: matplotlib's ``savefig(bbox_inches="tight")`` silently
+    expands the saved canvas to include any artist that runs past the
+    figure edges, which means a broken layout (unwrapped footnotes, an
+    over-large legend, a title that overflowed) renders as a much wider or
+    taller PNG instead of failing visibly. By the time you notice, you
+    have a published figure with the wrong aspect ratio and no error to
+    grep.
+
+    This helper walks every text artist on the figure (``fig.texts`` plus
+    each axes' tick labels, axis labels, and in-chart text), measures its
+    extent in figure coordinates, and emits one ``UserWarning`` per artist
+    that crosses ``[tolerance, 1 - tolerance]`` on either axis.
+
+    Auto-called by ``footnotes()`` after rendering. Call it manually
+    before ``savefig`` for charts that don't use ``footnotes``.
+
+    Args:
+        fig: Figure to inspect.
+        tolerance: Fraction of the figure dimension treated as an
+            acceptable spill (default 0.5% — accommodates antialiased
+            text edges).
+
+    Returns:
+        List of warning message strings emitted (for tests / silent-mode
+        callers).
+    """
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        return []
+    inv = fig.transFigure.inverted()
+
+    def _collect():
+        for t in fig.texts:
+            yield t
+        for axes in fig.axes:
+            for t in axes.texts:
+                yield t
+            if axes.title.get_text():
+                yield axes.title
+            if axes.xaxis.label.get_text():
+                yield axes.xaxis.label
+            if axes.yaxis.label.get_text():
+                yield axes.yaxis.label
+            for tl in axes.get_xticklabels() + axes.get_yticklabels():
+                if tl.get_text():
+                    yield tl
+        for leg in fig.legends:
+            yield leg
+
+    issued: list[str] = []
+    for artist in _collect():
+        try:
+            bb = artist.get_window_extent(renderer=renderer)
+        except Exception:
+            continue
+        if bb.width <= 0 or bb.height <= 0:
+            continue
+        fig_bb = bb.transformed(inv)
+        overflows = []
+        if fig_bb.x0 < -tolerance:
+            overflows.append(f"left edge at x={fig_bb.x0:.3f}")
+        if fig_bb.x1 > 1 + tolerance:
+            overflows.append(f"right edge at x={fig_bb.x1:.3f}")
+        if fig_bb.y0 < -tolerance:
+            overflows.append(f"bottom edge at y={fig_bb.y0:.3f}")
+        if fig_bb.y1 > 1 + tolerance:
+            overflows.append(f"top edge at y={fig_bb.y1:.3f}")
+        if not overflows:
+            continue
+        # Snippet of the offending text for the warning body.
+        text = getattr(artist, "get_text", lambda: "")() or "<legend>"
+        snippet = text[:60].replace("\n", " ")
+        if len(text) > 60:
+            snippet += "…"
+        msg = (
+            f"graphs.verify_layout: text {snippet!r} extends past the "
+            f"figure bounds ({', '.join(overflows)}). "
+            f"`savefig(bbox_inches=\"tight\")` will silently expand the "
+            f"saved canvas to include it. Fix by wrapping the text, "
+            f"shrinking the figure margins, or removing the artist."
+        )
+        warnings.warn(msg, stacklevel=3)
+        issued.append(msg)
+    return issued
+
+
+_LEADING_MARKERS = ("**", "††", "‡‡", "§§", "*", "†", "‡", "§")
+
+
+def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
+    """Warn when a footnote's leading marker isn't anchored elsewhere.
+
+    Walks every existing :class:`~matplotlib.text.Text` artist on ``fig``
+    and treats their concatenated text as the universe of possible anchors
+    (title, descriptor, axis labels, in-chart annotations). Notes whose
+    leading marker doesn't appear in that universe trigger a
+    ``UserWarning`` so the reader can trace each footnote back to its
+    referent.
+
+    Pure introspection — never raises and never modifies the figure.
+    """
+    if not notes:
+        return
+    existing = []
+    for axes in fig.axes:
+        for t in axes.texts:
+            existing.append(t.get_text() or "")
+        existing.append(axes.title.get_text() or "")
+        existing.append(axes.xaxis.label.get_text() or "")
+        existing.append(axes.yaxis.label.get_text() or "")
+        for tl in axes.get_xticklabels() + axes.get_yticklabels():
+            existing.append(tl.get_text() or "")
+    for t in fig.texts:
+        existing.append(t.get_text() or "")
+    universe = " ".join(existing)
+
+    for note in notes:
+        stripped = note.lstrip()
+        for marker in _LEADING_MARKERS:
+            if stripped.startswith(marker):
+                # The check runs before notes render, so the universe doesn't
+                # yet contain this note — a single membership test suffices.
+                if marker not in universe:
+                    warnings.warn(
+                        f"graphs.footnotes: footnote starts with {marker!r} but "
+                        f"no matching anchor was found in the title, descriptor, "
+                        f"axis labels, or in-chart text. Add {marker!r} after a "
+                        f"word in the title or descriptor so the reader can "
+                        f"trace the note back to its referent.",
+                        stacklevel=3,
+                    )
+                break
+
+
 def footnotes(
     fig,
     *notes: str,
@@ -856,6 +995,9 @@ def footnotes(
     y: float | None = None,
     x: float = 0.02,
     max_width_frac: float = 0.95,
+    wrap: bool = True,
+    check_anchors: bool = True,
+    verify: bool = True,
 ) -> None:
     """Render footnote strip with optional source-line co-location.
 
@@ -886,9 +1028,20 @@ def footnotes(
         max_width_frac: When ``source`` is provided, packing falls back to
             a stacked layout if source + notes would exceed this fraction
             of the figure width. Defaults to 0.95.
+        wrap: When True (default), word-wrap notes that overflow one row
+            (offset-preserving, so URL spans and superscript markers stay
+            valid). Disable for fixed-width legacy layouts.
+        check_anchors: When True (default), warn if any footnote's leading
+            marker (``*``, ``†``, ``‡``, ``§``) isn't found in the title,
+            descriptor, axis labels, or any in-chart text.
+        verify: When True (default), run :func:`verify_layout` after
+            rendering to warn if any text artist has overflowed the figure
+            bbox (a silent ``bbox_inches="tight"`` expansion).
     """
     if not notes and not source:
         return
+    if check_anchors:
+        _check_footnote_anchors(fig, notes)
 
     fig.canvas.draw()
     axes_y0 = [a.get_position().y0 for a in fig.axes]
@@ -945,7 +1098,7 @@ def footnotes(
         lines upward, so the bottom line sits at ``anchor_y`` (va='top' baseline)."""
         per_char = notes_w / len(text) if text else 0.0
         max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
-        wrapped = _wrap_preserve_offsets(text, max_chars)
+        wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
         n_lines = wrapped.count("\n") + 1
         render_text_with_superscripts(
             fig,
@@ -966,6 +1119,8 @@ def footnotes(
             return
         y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
         _draw_wrapped(notes_clean, notes_urls, y_pos, max(0.0, min(max_width_frac, 1.0) - 2 * x))
+        if verify:
+            verify_layout(fig)
         return
 
     # Source-aware mode: render source on its own baseline, pack notes
@@ -998,6 +1153,8 @@ def footnotes(
         )
 
     if not notes_clean:
+        if verify:
+            verify_layout(fig)
         return
 
     if notes_fits:
@@ -1022,3 +1179,6 @@ def footnotes(
             source_y + FOOTNOTES_STACK_GAP,
             max(0.0, min(right_x, max_width_frac) - x),
         )
+
+    if verify:
+        verify_layout(fig)

@@ -85,6 +85,241 @@ def bar_h(
     return ax
 
 
+def bar_v(
+    ax,
+    categories: Sequence[str],
+    values: Sequence[float],
+    *,
+    color: str | None = None,
+    bar_colors: Sequence[str] | None = None,
+    highlight_max: bool = True,
+    highlight_idx: int | None = None,
+    width: float = 0.68,
+    log: bool = False,
+    log_linthresh: float = 1.0,
+    log_ticks: Sequence[float] | None = None,
+    log_tick_labels: Sequence[str] | None = None,
+    headroom: float = 1.25,
+    y_formatter=None,
+):
+    """Vertical bar chart in Economist style — mirror of ``bar_h``.
+
+    Handles the spine/grid/tick boilerplate that every per-script reimplements:
+    left/top/right spines hidden, bottom spine in ``C_GRID``, horizontal
+    gridlines at ``C_GRID``, ``set_axisbelow(True)``, zero-length x-ticks.
+
+    Args:
+        ax: Axes to draw on.
+        categories: One x-tick label per bar.
+        values: One numeric value per bar.
+        color: Bar colour when all bars share the same fill. Defaults to
+            ``PALETTE["blue"]`` (matches the styleguide bar order).
+        bar_colors: Explicit per-bar colour list. Overrides ``color``.
+        highlight_max: When True (default) and no ``highlight_idx`` is given,
+            recolour the largest bar in ``C_RED``.
+        highlight_idx: Index of a specific bar to recolour in ``C_RED``;
+            overrides ``highlight_max``.
+        width: Bar width as a fraction of the category spacing.
+        log: When True, set ``ax.set_yscale("symlog", linthresh=log_linthresh)``
+            and apply default decade ticks. Pass ``log_ticks`` to override.
+        log_linthresh: ``linthresh`` for the symlog scale.
+        log_ticks: Override the y-tick positions when ``log=True``.
+        log_tick_labels: Override the y-tick labels (defaults to ``"0"``,
+            ``"100"``, ``"1k"``, ``"10k"`` ... auto-formatted).
+        headroom: Multiplier on the data max for the y-limit upper bound —
+            leaves room for value labels above the bars.
+        y_formatter: Optional ``matplotlib`` formatter for the y-axis (e.g.
+            ``plt.FuncFormatter(lambda v, _: f"{v:.0f}%")``). Ignored when
+            ``log=True``.
+
+    Returns:
+        The list of ``Rectangle`` patches (matches ``ax.bar`` contract).
+    """
+    import numpy as np
+
+    if bar_colors is not None:
+        fills = list(bar_colors)
+    else:
+        fills = [color or PALETTE["blue"]] * len(values)
+    bars = ax.bar(
+        list(categories), list(values), width=width, color=fills, edgecolor="none", zorder=2
+    )
+
+    if highlight_idx is not None:
+        bars[highlight_idx].set_color(C_RED)
+    elif highlight_max and len(values):
+        # nanargmax skips NaNs (rate charts can have NaNs in empty buckets).
+        idx = int(np.nanargmax(np.asarray(values, dtype=float)))
+        bars[idx].set_color(C_RED)
+
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.spines["bottom"].set_color(C_GRID)
+    ax.tick_params(axis="x", length=0)
+    ax.grid(axis="y", color=C_GRID, linewidth=0.8, zorder=0)
+    ax.grid(axis="x", visible=False)
+    ax.set_axisbelow(True)
+
+    if log:
+        ax.set_yscale("symlog", linthresh=log_linthresh)
+        if log_ticks is None:
+            # Decade ticks from 0 up to next power of ten above data max.
+            max_val = float(max(values)) if values else 1.0
+            top_decade = 10 ** int(np.ceil(np.log10(max(max_val, 1))))
+            decades = [0]
+            t = max(log_linthresh, 1.0)
+            while t <= top_decade:
+                decades.append(t)
+                t *= 10
+            log_ticks = decades
+        ax.set_yticks(list(log_ticks))
+        if log_tick_labels is not None:
+            ax.set_yticklabels(list(log_tick_labels))
+        else:
+            ax.set_yticklabels([_fmt_decade(t) for t in log_ticks])
+        # Pad top by one decade so labels above the tallest bar don't clip.
+        top_tick = max(log_ticks) if log_ticks else max(values)
+        max_val = max(values) if values else top_tick
+        ax.set_ylim(0, max(top_tick, max_val * headroom))
+    else:
+        if values:
+            max_val = max(values)
+            if max_val > 0:
+                ax.set_ylim(0, max_val * headroom)
+        if y_formatter is not None:
+            ax.yaxis.set_major_formatter(y_formatter)
+
+    return bars
+
+
+def _fmt_decade(v: float) -> str:
+    """Compact decade label: 0, 100, 1k, 10k, 1M ..."""
+    if v == 0:
+        return "0"
+    if v >= 1e9:
+        return f"{int(v / 1e9)}B"
+    if v >= 1e6:
+        return f"{int(v / 1e6)}M"
+    if v >= 1e3:
+        return f"{int(v / 1e3)}k"
+    return f"{int(v)}"
+
+
+def bar_value_labels(
+    ax,
+    bars,
+    values: Sequence[float] | None = None,
+    *,
+    fmt: str | None = "{:,.0f}",
+    formatter=None,
+    color: str | None = None,
+    fontsize: float = 9,
+    offset_pt: float = 4,
+    skip_zero: bool = False,
+):
+    """Annotate vertical bars with their values above each bar.
+
+    Replaces the per-script ``for i, v in enumerate(values): ax.annotate(...)``
+    boilerplate. Use ``formatter`` for complex cases (currency mixing $k/$M/$B);
+    use ``fmt`` for a single format string.
+
+    Args:
+        ax: Axes containing ``bars``.
+        bars: The list of ``Rectangle`` patches returned by ``bar_v`` (or
+            ``ax.bar``).
+        values: Override values used for the label text. Defaults to each bar's
+            height.
+        fmt: ``str.format`` template applied to each value. Ignored when
+            ``formatter`` is set.
+        formatter: Callable ``value → str``. Use for currency, percentages,
+            or per-bar custom formatting.
+        color: Text colour. Defaults to ``C_LABEL`` (``#404040``).
+        fontsize: Label point size.
+        offset_pt: Vertical offset above each bar's top in typographic points.
+        skip_zero: When True, omit labels for zero-valued bars.
+    """
+    import numpy as np
+
+    label_color = color if color is not None else C_LABEL
+    if values is None:
+        values = [bar.get_height() for bar in bars]
+    for bar, v in zip(bars, values, strict=True):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            continue
+        if skip_zero and v == 0:
+            continue
+        text = formatter(v) if formatter is not None else fmt.format(v)
+        ax.annotate(
+            text,
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, offset_pt),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=fontsize,
+            color=label_color,
+        )
+
+
+def bar_sublabels(
+    ax,
+    bars,
+    labels: Sequence[str],
+    *,
+    color: str | None = None,
+    fontsize: float = 8,
+    offset_pt: float = 4,
+    pad_xticks: bool = True,
+):
+    """Render secondary text BELOW each vertical bar's baseline.
+
+    Inserts the labels between the chart spine and the x-tick labels, then
+    auto-pads ``ax.tick_params(axis="x", pad=...)`` so the tick labels sit
+    below the sublabel band (no collision with the per-bar caption).
+
+    Use for "denominator", "n=...", or sample-size annotations that pair
+    one-to-one with the bars but should sit under the baseline rather than
+    above the bar.
+
+    Args:
+        ax: Axes containing ``bars``.
+        bars: ``Rectangle`` patches returned by ``bar_v``/``ax.bar``.
+        labels: One label per bar (may contain ``\\n`` for two-line labels).
+        color: Text colour; defaults to ``C_LABEL_MUTED``.
+        fontsize: Label point size.
+        offset_pt: Gap between the baseline (y=0) and the top of the sublabel
+            text, in typographic points.
+        pad_xticks: When True (default), push the x-tick labels down so the
+            sublabel band has clear vertical space. Disable if the chart has
+            no x-tick labels or you've handled the padding yourself.
+    """
+    sub_color = color if color is not None else C_LABEL_MUTED
+    max_lines = 1
+    for bar, lbl in zip(bars, labels, strict=True):
+        if lbl is None or lbl == "":
+            continue
+        ax.annotate(
+            lbl,
+            xy=(bar.get_x() + bar.get_width() / 2, 0),
+            xytext=(0, -offset_pt),
+            textcoords="offset points",
+            ha="center",
+            va="top",
+            fontsize=fontsize,
+            color=sub_color,
+        )
+        max_lines = max(max_lines, lbl.count("\n") + 1)
+
+    if pad_xticks:
+        # Reserve offset + (font line-box × n_lines) + small gutter for the
+        # x-tick labels to render below the sublabel band.
+        line_box = fontsize * 1.2
+        ax.tick_params(
+            axis="x",
+            pad=offset_pt + line_box * max_lines + 4,
+            length=0,
+        )
+
+
 def dumbbell(
     ax,
     categories: Sequence[str],

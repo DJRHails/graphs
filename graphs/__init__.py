@@ -32,6 +32,9 @@ from graphs._annotations import (
 )
 from graphs._charts import (
     bar_h,
+    bar_sublabels,
+    bar_v,
+    bar_value_labels,
     bump_chart,
     ci_fill,
     color_axis,
@@ -51,6 +54,7 @@ from graphs._finalize import (
     finalize,
     footnotes,
     panel_label,
+    verify_layout,
     x_axis_label,
     y_axis_label,
     year_axis,
@@ -90,7 +94,7 @@ from graphs._palette import (
 )
 from graphs._theme import set_theme
 
-__version__ = "0.3.1"
+__version__ = "0.3.3"
 
 __all__ = [
     # theme + finalize
@@ -98,6 +102,7 @@ __all__ = [
     "finalize",
     "footnotes",
     "panel_label",
+    "verify_layout",
     "x_axis_label",
     "y_axis_label",
     "year_axis",
@@ -125,6 +130,9 @@ __all__ = [
     "C_TEXT",
     # charts
     "bar_h",
+    "bar_v",
+    "bar_value_labels",
+    "bar_sublabels",
     "bump_chart",
     "ci_fill",
     "color_axis",

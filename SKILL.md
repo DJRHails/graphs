@@ -76,6 +76,31 @@ Behaviour that's automatic unless you override it:
 - **`finalize(auto_layout=True)` (default)** sizes `subplots_adjust`
   margins to fit the title-stack and source line. Set `auto_layout=False`
   on faceted charts that need explicit `hspace`/`wspace` control.
+- **Long footnotes word-wrap automatically.** `footnotes(wrap=True)` is the
+  default — overflowing notes break to multiple lines that stack above the
+  source line, and the chart shifts up to reserve room. No need to hand-
+  break with `\n`.
+- **Orphan footnote markers warn.** `footnotes(check_anchors=True)` (default)
+  raises a `UserWarning` when a note starts with `*` / `†` / `‡` / `§`
+  that isn't found in the title, descriptor, axis labels, or any in-chart
+  text. Anchor the marker by adding it after a word in the descriptor
+  (e.g. `descriptor="Verified contracts* per TVL bucket"`).
+
+### Vertical bar charts (plug-and-play)
+
+For the common "one bar per category" layout, the three-helper combo
+collapses ~30 lines of per-script spine/grid/tick boilerplate:
+
+```python
+bars = bar_v(ax, labels, values, log=True)               # spines, grid, ticks
+bar_value_labels(ax, bars, fmt="{:,}", skip_zero=True)   # value above each bar
+bar_sublabels(ax, bars, [f"n={n}" for n in counts])      # denominator below
+finalize(ax, title="…", descriptor="…", source="…")
+```
+
+`bar_v` highlights the max in `C_RED` by default; pass `highlight_idx=` to
+spotlight a specific bar, or `highlight_max=False` to skip. `bar_sublabels`
+auto-pads the x-tick labels down so the sublabel band doesn't collide.
 
 
 ## Core design principles
@@ -237,7 +262,7 @@ Style overrides to apply on top:
 | `set_theme(bg=None, transparent=True)`                              | Apply theme globally. Call once.                       |
 | `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, …)` | Title stack, optional marker, source line, y-axis right. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
-| `footnotes(fig, *notes, source=None)`                               | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. |
+| `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 
@@ -248,6 +273,9 @@ Style overrides to apply on top:
 | `cycle_for(chart_type) → list[str]`                                 | Recommended colour order for a chart type.             |
 | `snapshot_palette(n, *, accent=None)`                               | Chronological slate→accent ramp for snapshot lines.    |
 | `bar_h(ax, categories, values, *, highlight_max=True)`              | Horizontal bars; max in `C_RED` by default.            |
+| `bar_v(ax, categories, values, *, highlight_max=True, log=False, headroom=1.25, y_formatter=None)` | Vertical bars; handles spine/grid/tick boilerplate. `log=True` gives symlog + auto decade ticks. |
+| `bar_value_labels(ax, bars, *, fmt="{:,.0f}", formatter=None, fontsize=9)` | Annotate each bar with its value above the bar. Pass `formatter` for currency / mixed units. |
+| `bar_sublabels(ax, bars, labels, *, fontsize=8, offset_pt=4)`       | Per-bar secondary text below the baseline (denominators, "n=…"). Auto-pads x-tick labels down to clear the band. |
 | `dumbbell(ax, categories, start, end, *, label_start, label_end)`   | Before/after dot-and-line. Defaults red→blue.          |
 | `thermometer(ax, categories, values, *, series_labels, dot=True)`   | Tick-and-dot ranked categories. Warns above 4 series.  |
 | `threshold_lollipop(ax, categories, values, *, threshold=1.0)`      | Horizontal lollipop with fixed centre + leader lines.  |
@@ -284,7 +312,15 @@ Style overrides to apply on top:
 | `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
 | `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack.   |
 
+### Verification
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
+| `verify_layout(fig, *, tolerance=0.005)`                            | Warn when any text artist (tick labels, titles, legends, footnotes) extends past the figure bounds. Catches the class of bug where `savefig(bbox_inches="tight")` silently expands the saved canvas to fit overflow. Auto-called by `footnotes()`. |
+
 ## Workflow
+
+### Build
 
 1. `set_theme()`.
 2. (If not the default cycle) `ax.set_prop_cycle(color=cycle_for("…"))`.
@@ -295,6 +331,51 @@ Style overrides to apply on top:
 7. Faceted: `panel_label()` per axes; call `fig.subplots_adjust(...,
    hspace=…, wspace=…)` first, then `finalize()` on the first axes with
    `title_x` pinned, `y_start=0.075`, and `auto_layout=False`.
+
+### Review
+
+**Building the chart is half the job. Reading it back is the other half.**
+Every figure should be opened (with the `Read` tool inline, or in a viewer)
+and evaluated against the story it was made to tell. Don't ship a draft.
+
+For each rendered figure, answer three questions before moving on:
+
+1. **Does the chart tell its intended story at a glance?**
+   If the reader needs body text to know what to look at, the title is
+   doing too little. Re-read the title — does it state the *finding*, or
+   only the topic? "Eastern promise" tells you what to see; "GDP growth,
+   2010–2024" doesn't. Iterate until the title carries the story alone.
+
+2. **Is every element earning its place?**
+   Bars at the rounding-noise threshold, legends that duplicate direct
+   labels, gridlines that don't anchor anything, sub-labels nobody will
+   read, decimal places past the data's precision — cut them. **Less data
+   often makes the point sharper.** A six-row table reduced to its three
+   meaningful rows is a better chart, not a smaller one. Apply the
+   "Every element earns its place" core principle ruthlessly.
+
+3. **Is this the right chart type?**
+   Switching costs nothing — the script is ten lines.
+   - Six-bucket bar chart trying to show "climbs then dips"? → **line
+     chart**.
+   - Two-series grouped bars comparing the same metric at two points in
+     time? → **dumbbell**.
+   - Scatter with 200 points and a single highlight? → **histogram +
+     `callout`** (or `scatter_standard` + `scatter_highlight`).
+   - Pie / doughnut with more than four slices? → **`bar_h`** ranked.
+   - "How does X depend on Y" with strong trend? → **`smoothed_line`**,
+     not raw scatter.
+   - Long-form ranking change over time? → **`bump_chart`**, not stacked
+     bars.
+
+   The chart-type table in `cycle_for()` and the per-type rules in the
+   core design principles are the reference.
+
+If any answer is "no" or "kind of", iterate — re-title, cut elements, or
+switch chart type. The first render is a draft. `verify_layout()` (auto-
+called from `footnotes()`) catches mechanical overflow bugs, but it
+cannot tell you whether the chart is *good* — that part is editorial,
+not mechanical.
 
 ## Development
 
