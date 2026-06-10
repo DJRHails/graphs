@@ -404,6 +404,12 @@ review:
 Generated comparisons land in `examples/comparisons/<name>.png` (gitignored —
 the reference images aren't ours to redistribute).
 
+`examples/fetch_refs.py` populates `examples/comparisons/_originals/` for the
+daily-chart replicas: it downloads the Economist "2019 daily charts" grid and
+cuts it into per-chart reference cells (rows are located via the red Economist
+tag that tops every chart — blank-gap heuristics misfire on detached
+titles/footnotes).
+
 CSVs fetched at runtime by example scripts are cached under
 `examples/.data/` via `examples/_data.py::load_csv_text(url)`.
 
@@ -428,3 +434,33 @@ specific helper or pattern combination.
 - [`eu_balance.py`](./examples/eu_balance.py) — side-by-side panels of pos+neg stacked bars, shared `top_legend`, `right_axis`, `footnotes(source=)`.
 - [`affordability_chart.py`](./examples/affordability_chart.py) — `threshold_lollipop(threshold=1.0)` on a log x-axis + `threshold_arrows` straddling the threshold + two-note `footnotes`.
 - [`age_gap_chart.py`](./examples/age_gap_chart.py) — chronological snapshot lines via `snapshot_palette(4)`, in-chart series labels, `broken_axis(side="right")`, right-anchored `footnotes(y=, x=)`.
+
+### Daily-chart replicas
+
+Faithful replicas of Economist daily charts (references via
+`examples/fetch_refs.py`; comparisons via `examples/build_comparisons.py`).
+Useful as worked examples of less-common chart shapes:
+
+- [`australia_heat.py`](./examples/australia_heat.py) — diverging annual bars (positive red / negative blue) around a zero baseline.
+- [`malaria.py`](./examples/malaria.py) — history line splitting into three dashed forecast paths inside a `highlight_panel` FORECAST band.
+- [`co2_emissions.py`](./examples/co2_emissions.py) — variable-width Mekko bars (height = per-person CO2, width = population) + dashed global-average rule.
+- [`christianity.py`](./examples/christianity.py) — two-point slope chart with endpoint dots and stacked value labels.
+- [`graduate_pay.py`](./examples/graduate_pay.py) — dense `scatter_standard` cloud with reversed x-axis and a solid trend curve.
+- [`generational_politics.py`](./examples/generational_politics.py) — survey-wave lines with PCHIP smoothing, gap segments in lighter tint, dotted average.
+- [`uber_tips.py`](./examples/uber_tips.py) — vertical dumbbell/lollipop pairs with a ringed reference marker.
+- [`us_refugees.py`](./examples/us_refugees.py) — annual bars + stepped policy-cap line (real published data).
+- [`polluted_cities.py`](./examples/polluted_cities.py) — two-block ranked table with colour-graded value chips.
+- [`arctic_warming.py`](./examples/arctic_warming.py) — latitude-profile dot-line over translucent range bars, x-axis on top.
+- [`trump_sanctions.py`](./examples/trump_sanctions.py) — `bar_v` time series on presidential-era `highlight_panel` bands.
+- [`populist_votes.py`](./examples/populist_votes.py) — 40-year two-series stacked bars, pixel-extracted values.
+- [`plastic_bottles.py`](./examples/plastic_bottles.py) — stacked percentage bars + locator-globe inset.
+- [`alcohol_drinkers.py`](./examples/alcohol_drinkers.py) — pictogram legend strip over three stacked 100% bars.
+- [`language_speed.py`](./examples/language_speed.py) — two-panel ridgeline densities with `direction_label` cues.
+- [`london_roads.py`](./examples/london_roads.py) — day×hour heatmap with discrete sampled colour scale and hand-built legend.
+- [`elderly_screens.py`](./examples/elderly_screens.py) — two-panel stacked areas with shared scale.
+- [`wework.py`](./examples/wework.py) — per-metric banded panels with paired bars and per-panel scales.
+- [`millennial_parents.py`](./examples/millennial_parents.py) — `snapshot_palette` generation lines vs mother's age.
+- [`bad_bunny.py`](./examples/bad_bunny.py) — survey `bar_h` with x-axis on top.
+- [`spending_convergence.py`](./examples/spending_convergence.py) — converging pair of lines, truncated axis signalled with `broken_axis`.
+- [`gold_rally.py`](./examples/gold_rally.py) — indexed returns lines with `index_marker` and month-letter ticks.
+- [`nuclear_warheads.py`](./examples/nuclear_warheads.py) — stacked `barh` inventories, top axis/legend, dashed forecast box.

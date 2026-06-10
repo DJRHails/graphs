@@ -88,6 +88,45 @@ CHARTS: dict[str, dict] = {
     },
 }
 
+# Daily-chart replicas: references are per-chart cells cut from two grid
+# images by fetch_refs.py (run it once to populate _originals/).
+DAILY_REPLICAS = [
+    "australia_heat",
+    "malaria",
+    "co2_emissions",
+    "christianity",
+    "graduate_pay",
+    "generational_politics",
+    "uber_tips",
+    "us_refugees",
+    "polluted_cities",
+    "arctic_warming",
+    "trump_sanctions",
+    "populist_votes",
+    "plastic_bottles",
+    "alcohol_drinkers",
+    "language_speed",
+    "london_roads",
+    "elderly_screens",
+    "wework",
+    "millennial_parents",
+    "bad_bunny",
+    "spending_convergence",
+    "gold_rally",
+    "nuclear_warheads",
+]
+CHARTS.update(
+    {
+        slug: {
+            "local_ref": f"_originals/{slug}.png",
+            "replica": f"{slug}.png",
+            "ref_caption": "The Economist — original daily chart",
+            "replica_caption": "Our replica using the graphs skill",
+        }
+        for slug in DAILY_REPLICAS
+    }
+)
+
 DEFAULT_URL_TOP = "The Economist — original (left) vs. their redesign (right)"
 DEFAULT_URL_BOTTOM = "Our replica using the graphs skill"
 
