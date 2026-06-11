@@ -469,16 +469,43 @@ def finalize(
             fontproperties=fp_title_wrap,
             avail_fig_w=AUTO_LAYOUT_RIGHT - wrap_x0 - title_indent,
         )
+    # The semibold descriptor lead is keyed to the EXPLICIT "\n" (the
+    # semantic subject / unit split), never to breaks added by the wrap —
+    # so capture the boundary before wrapping. The lead wraps measured at
+    # its rendered (semibold) width.
+    desc_lead = ""
     if descriptor:
         fp_desc_wrap = fm.FontProperties(
             family=_get_font_condensed(), weight="normal", size=DESCRIPTOR_SIZE_PT
         )
-        descriptor = _wrap_to_fig_width(
-            fig,
-            descriptor,
-            fontproperties=fp_desc_wrap,
-            avail_fig_w=AUTO_LAYOUT_RIGHT - wrap_x0,
-        )
+        desc_avail_w = AUTO_LAYOUT_RIGHT - wrap_x0
+        if "\n" in descriptor:
+            lead_raw, rest_raw = descriptor.split("\n", 1)
+            fp_desc_lead_wrap = fm.FontProperties(
+                family=_get_font_condensed(),
+                weight="semibold",
+                size=DESCRIPTOR_SIZE_PT,
+            )
+            desc_lead = _wrap_to_fig_width(
+                fig,
+                lead_raw,
+                fontproperties=fp_desc_lead_wrap,
+                avail_fig_w=desc_avail_w,
+            )
+            desc_rest = _wrap_to_fig_width(
+                fig,
+                rest_raw,
+                fontproperties=fp_desc_wrap,
+                avail_fig_w=desc_avail_w,
+            )
+            descriptor = f"{desc_lead}\n{desc_rest}"
+        else:
+            descriptor = _wrap_to_fig_width(
+                fig,
+                descriptor,
+                fontproperties=fp_desc_wrap,
+                avail_fig_w=desc_avail_w,
+            )
 
     _check_x_monotonic(ax)
     if autoscale_y:
@@ -563,9 +590,13 @@ def finalize(
         desc_lines = descriptor.split("\n")
         n_desc_lines = len(desc_lines)
         fp_desc = fm.FontProperties(family=_get_font_condensed(), weight="normal")
-        if n_desc_lines >= 2:
-            # Multi-line descriptors lead with a semibold first line (the
-            # subject) over regular continuation lines (scope/units).
+        if desc_lead:
+            # An explicit "\n" splits the descriptor into a semibold lead
+            # (the subject — every line it wrapped to) over regular
+            # continuation lines (scope/units). Auto-wrap breaks alone
+            # never trigger the lead styling.
+            n_lead_lines = desc_lead.count("\n") + 1
+            n_rest_lines = n_desc_lines - n_lead_lines
             fp_desc_lead = fm.FontProperties(
                 family=_get_font_condensed(), weight="semibold"
             )
@@ -573,7 +604,7 @@ def finalize(
                 fig,
                 tx,
                 y_cursor,
-                "\n".join(desc_lines[1:]),
+                "\n".join(desc_lines[n_lead_lines:]),
                 fontsize=DESCRIPTOR_SIZE_PT,
                 fontproperties=fp_desc,
                 color=C_SPINE,
@@ -584,8 +615,8 @@ def finalize(
             render_text_with_superscripts(
                 fig,
                 tx,
-                y_cursor + DESCRIPTOR_LINE_BOX_PT * pt2fig * (n_desc_lines - 1),
-                desc_lines[0],
+                y_cursor + DESCRIPTOR_LINE_BOX_PT * pt2fig * n_rest_lines,
+                desc_lead,
                 fontsize=DESCRIPTOR_SIZE_PT,
                 fontproperties=fp_desc_lead,
                 color=C_SPINE,
@@ -943,31 +974,32 @@ def _wrap_to_fig_width(
     if not text or avail_fig_w <= 0:
         return text
     try:
-        out_lines: list[str] = []
-        for segment in text.split("\n"):
-            words = segment.split(" ")
-            lines: list[str] = []
-            line = ""
-            for word in words:
-                candidate = f"{line} {word}" if line else word
-                if (
-                    line
-                    and _text_width_fig(fig, candidate, fontproperties) > avail_fig_w
-                ):
-                    lines.append(line)
-                    line = word
-                else:
-                    line = candidate
-            lines.append(line)
-            if len(lines) >= 2 and " " not in lines[-1] and " " in lines[-2]:
-                head, _, pulled = lines[-2].rpartition(" ")
-                rebalanced = f"{pulled} {lines[-1]}"
-                if _text_width_fig(fig, rebalanced, fontproperties) <= avail_fig_w:
-                    lines[-2], lines[-1] = head, rebalanced
-            out_lines.extend(lines)
-        return "\n".join(out_lines)
-    except Exception:
+        fig.canvas.get_renderer()
+    except AttributeError:
+        # Non-Agg backends can't measure text without drawing — skip the
+        # wrap rather than guess. Anything else raising below is a real
+        # bug and must surface, not silently disable wrapping.
         return text
+    out_lines: list[str] = []
+    for segment in text.split("\n"):
+        words = segment.split(" ")
+        lines: list[str] = []
+        line = ""
+        for word in words:
+            candidate = f"{line} {word}" if line else word
+            if line and _text_width_fig(fig, candidate, fontproperties) > avail_fig_w:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        lines.append(line)
+        if len(lines) >= 2 and " " not in lines[-1] and " " in lines[-2]:
+            head, _, pulled = lines[-2].rpartition(" ")
+            rebalanced = f"{pulled} {lines[-1]}"
+            if _text_width_fig(fig, rebalanced, fontproperties) <= avail_fig_w:
+                lines[-2], lines[-1] = head, rebalanced
+        out_lines.extend(lines)
+    return "\n".join(out_lines)
 
 
 def _wrap_preserve_offsets(text: str, max_chars: int) -> str:
