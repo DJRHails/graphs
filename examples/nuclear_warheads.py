@@ -53,8 +53,18 @@ fig.subplots_adjust(top=0.74, bottom=0.065, left=0.24, right=0.96)
 
 y = np.arange(len(countries))
 ax.barh(y, deployed, height=0.68, color=C_DEPLOYED, label="Deployed", zorder=2)
-ax.barh(y, reserve, height=0.68, left=deployed, color=C_RESERVE, label="Reserve", zorder=2)
-ax.barh(y, retired, height=0.68, left=deployed + reserve, color=C_RETIRED, label="Retired", zorder=2)
+ax.barh(
+    y, reserve, height=0.68, left=deployed, color=C_RESERVE, label="Reserve", zorder=2
+)
+ax.barh(
+    y,
+    retired,
+    height=0.68,
+    left=deployed + reserve,
+    color=C_RETIRED,
+    label="Retired",
+    zorder=2,
+)
 ax.invert_yaxis()
 
 # bar_h conventions, applied manually for the stacked variant: country labels
@@ -76,14 +86,22 @@ ax.axvline(0, color=C_SPINE, linewidth=1.0, zorder=3)
 # Per-country totals for the small arsenals, left-aligned on a shared column.
 for i, total in enumerate(deployed + reserve + retired):
     if total <= 300:
-        ax.text(400, y[i], f"{total:,}", ha="left", va="center", fontsize=9, color=C_LABEL)
+        ax.text(
+            400, y[i], f"{total:,}", ha="left", va="center", fontsize=9, color=C_LABEL
+        )
 
 # The original knocks gridlines out of the bars in the background colour.
 totals = deployed + reserve + retired
 for gx in (2000, 4000):
     for i, total in enumerate(totals):
         if gx < total:
-            ax.plot([gx, gx], [y[i] - 0.34, y[i] + 0.34], color="white", linewidth=0.7, zorder=4)
+            ax.plot(
+                [gx, gx],
+                [y[i] - 0.34, y[i] + 0.34],
+                color="white",
+                linewidth=0.7,
+                zorder=4,
+            )
 
 # Dashed forecast box on the China row: the US DoW projects ~1,000 warheads
 # by 2030 — the box extends China's bar from today's 600 to that mark.
@@ -94,12 +112,18 @@ ax.add_patch(
         400,
         0.68,
         facecolor="white",
-        edgecolor=C_SPINE,
-        linewidth=1.0,
-        linestyle=(0, (3, 2)),
+        edgecolor="none",
         zorder=3,
     )
 )
+# Dashed on top/right/bottom only — the box continues the bar, so the
+# left side (where it meets today's 600) stays open.
+dash = dict(
+    color=C_SPINE, linewidth=1.0, linestyle=(0, (3, 2)), zorder=3, clip_on=False
+)
+ax.plot([600, 1000], [china - 0.34, china - 0.34], **dash)
+ax.plot([600, 1000], [china + 0.34, china + 0.34], **dash)
+ax.plot([1000, 1000], [china - 0.34, china + 0.34], **dash)
 ax.text(
     1200,
     china,
@@ -135,7 +159,9 @@ handles = [
     Patch(facecolor=C_RESERVE, label="Reserve"),
     Patch(facecolor=C_RETIRED, label="Retired"),
 ]
-top_legend(fig, handles, [h.get_label() for h in handles], y=0.815, ncol=3, handlelength=0.9)
+top_legend(
+    fig, handles, [h.get_label() for h in handles], y=0.815, ncol=3, handlelength=0.9
+)
 
 # Pin the source-line top explicitly: the default (axes y0 - 0.06) would
 # drop the 9pt text below the figure with this chart's tight bottom margin.

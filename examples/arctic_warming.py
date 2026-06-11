@@ -21,7 +21,15 @@ import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
-from graphs import C_GRID, C_LABEL, C_SPINE, finalize, set_theme, top_legend
+from graphs import (
+    C_GRID,
+    C_LABEL,
+    C_SPINE,
+    finalize,
+    set_theme,
+    top_legend,
+    y_labels_on_grid,
+)
 
 set_theme()
 
@@ -69,8 +77,6 @@ ax.xaxis.set_tick_params(labelsize=9, length=3.5, direction="out")
 ax.set_yticks([90, 45, 0, -45, -90])
 ax.set_yticklabels(["90°N", "45°N", "0", "45°S", "90°S"], fontsize=9, color=C_LABEL)
 ax.yaxis.set_tick_params(length=0, pad=8)
-for lbl in ax.get_yticklabels():
-    lbl.set_va("bottom")  # original sets each label just above its gridline
 
 ax.grid(axis="x", color=C_GRID, linewidth=0.6, zorder=1)
 ax.grid(axis="y", color=C_GRID, linewidth=0.6, zorder=1)
@@ -84,9 +90,29 @@ ax.spines[["top", "left", "right", "bottom"]].set_visible(False)
 
 # Region labels inside the plot, left of the zero line. Arctic / Antarctic sit
 # dead-centre in their pale-blue bands (66.5-90 degrees), like the original.
-ax.text(-1.05, 78.25, "Arctic", ha="center", va="center", fontsize=9, color=C_SPINE, zorder=4)
-ax.text(-1.05, 1.5, "Equator", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4)
-ax.text(-1.05, -78.25, "Antarctic", ha="center", va="center", fontsize=9, color=C_SPINE, zorder=4)
+ax.text(
+    -1.05,
+    78.25,
+    "Arctic",
+    ha="center",
+    va="center",
+    fontsize=9,
+    color=C_SPINE,
+    zorder=4,
+)
+ax.text(
+    -1.05, 1.5, "Equator", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4
+)
+ax.text(
+    -1.05,
+    -78.25,
+    "Antarctic",
+    ha="center",
+    va="center",
+    fontsize=9,
+    color=C_SPINE,
+    zorder=4,
+)
 
 ax.text(
     2.55,
@@ -112,10 +138,14 @@ finalize(
     auto_layout=False,
 )
 
+y_labels_on_grid(ax)
+
 # "Latitude" column header, level with the x tick labels.
 fig.canvas.draw()
 bbox = ax.get_position()
-fig.text(0.02, bbox.y1 + 0.035, "Latitude", fontsize=9, color=C_LABEL, ha="left", va="bottom")
+fig.text(
+    0.02, bbox.y1 + 0.035, "Latitude", fontsize=9, color=C_LABEL, ha="left", va="bottom"
+)
 
 handles = [
     mlines.Line2D([], [], color=C_RED_LINE, marker="o", linestyle="None", markersize=6),

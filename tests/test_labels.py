@@ -55,3 +55,18 @@ def test_idempotent_recall(finalized_ax):
     first = len(_gid_artists(ax))
     y_labels_on_grid(ax)
     assert len(_gid_artists(ax)) == first
+
+
+def test_left_side_labels_extend_leftward():
+    set_theme()
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    ax.plot([2000, 2010, 2020], [0, 50, 100])
+    finalize(ax, title="Test", descriptor="Things, %", y_axis_right=False)
+    y_labels_on_grid(ax)
+    lines = [a for a in _gid_artists(ax) if a in ax.lines]
+    texts = [a for a in _gid_artists(ax) if a in ax.texts]
+    assert lines and texts
+    # Extensions run leftward from the axes edge into negative axes-x.
+    assert all(line.get_xdata()[1] < 0.0 for line in lines)
+    assert all(t.get_ha() == "left" for t in texts)
+    plt.close(fig)
