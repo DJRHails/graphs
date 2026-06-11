@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import finalize, footnotes, set_theme
+from graphs import finalize, footnotes, save_chart, set_theme
 
 set_theme()
 
@@ -117,7 +117,4 @@ finalize(
 )
 footnotes(fig, source="Sources: GCP; CDIAC; UN")
 
-out = Path(__file__).resolve().parent / "co2_emissions.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved CO2-emissions chart")
+save_chart(__file__)

@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_text
-from graphs import PALETTE, bump_chart, finalize, set_theme
+from graphs import PALETTE, bump_chart, finalize, save_chart, set_theme
 
 set_theme()
 
@@ -126,7 +126,4 @@ finalize(
     auto_layout=False,
 )
 
-out = Path(__file__).resolve().parent / "bump_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved bump chart")
+save_chart(__file__)

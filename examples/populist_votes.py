@@ -21,9 +21,10 @@ from graphs import (
     C_RED,
     finalize,
     footnotes,
-    inset_tick_labels,
+    save_chart,
     set_theme,
     top_legend,
+    year_ticks,
 )
 
 set_theme()
@@ -57,9 +58,7 @@ bars_left = ax.bar(years, left, width=0.5, bottom=right, color=C_LEFT, zorder=2)
 ax.set_xlim(1979.2, 2020.2)
 ax.set_ylim(0, 25)
 ax.set_yticks(range(0, 26, 5))
-ax.set_xticks([1980, 1990, 2000, 2010, 2019])
-ax.set_xticklabels(["1980", "90", "2000", "10", "19"])
-inset_tick_labels(ax)
+year_ticks(ax, [1980, 1990, 2000, 2010, 2019])
 
 finalize(
     ax,
@@ -76,7 +75,4 @@ footnotes(
     max_width_frac=0.3,  # force the note onto its own row, as in the original
 )
 
-out = Path(__file__).resolve().parent / "populist_votes.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved populist votes chart")
+save_chart(__file__)

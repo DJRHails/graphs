@@ -21,6 +21,7 @@ from matplotlib.ticker import FixedLocator, NullLocator
 from graphs import (
     finalize,
     footnotes,
+    save_chart,
     set_theme,
     threshold_arrows,
     threshold_lollipop,
@@ -100,7 +101,4 @@ footnotes(
     "†30% of which is enough to pay rent on an average one-bedroom flat",
 )
 
-out = Path(__file__).resolve().parent / "affordability_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved affordability chart")
+save_chart(__file__)

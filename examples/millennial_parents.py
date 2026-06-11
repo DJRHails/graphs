@@ -26,6 +26,7 @@ from graphs import (
     C_LABEL,
     finalize,
     footnotes,
+    save_chart,
     set_theme,
     snapshot_palette,
 )
@@ -111,7 +112,4 @@ footnotes(
     source="Source: American Heritage Time Use Study",
 )
 
-out = Path(__file__).resolve().parent / "millennial_parents.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved millennial parents chart")
+save_chart(__file__)

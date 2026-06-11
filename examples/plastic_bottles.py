@@ -26,7 +26,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import PALETTE, finalize, footnotes, set_theme, top_legend
+from graphs import PALETTE, finalize, footnotes, save_chart, set_theme, top_legend
 
 _LAND_URL = (
     "https://raw.githubusercontent.com/martynafford/natural-earth-geojson"
@@ -166,7 +166,4 @@ ax_map.text(island_xy[0] - 0.02, island_xy[1] - 0.28, "Inaccessible\nIsland",
 
 footnotes(fig, source="Source: [PNAS](https://www.pnas.org/doi/10.1073/pnas.1909816116)")
 
-out = Path(__file__).resolve().parent / "plastic_bottles.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved plastic-bottles chart")
+save_chart(__file__)

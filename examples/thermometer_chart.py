@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import cycle_for, finalize, set_theme, thermometer, top_legend
+from graphs import cycle_for, finalize, save_chart, set_theme, thermometer, top_legend
 
 set_theme()
 
@@ -85,7 +85,4 @@ finalize(
 handles, labels = ax.get_legend_handles_labels()
 top_legend(fig, handles, labels, y=0.72, ncol=3)
 
-out = Path(__file__).resolve().parent / "thermometer_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved thermometer chart")
+save_chart(__file__)

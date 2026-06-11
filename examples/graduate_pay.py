@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_RED, C_TEXT, finalize, scatter_standard, set_theme
+from graphs import C_RED, C_TEXT, finalize, scatter_standard, save_chart, set_theme
 
 set_theme()
 
@@ -104,7 +104,4 @@ with warnings.catch_warnings():
         autoscale_y=False,
     )
 
-out = Path(__file__).resolve().parent / "graduate_pay.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved graduate pay chart")
+save_chart(__file__)

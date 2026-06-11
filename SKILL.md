@@ -23,7 +23,7 @@ footnote-plus-source row — the conventions the library is built for.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import set_theme, finalize, footnotes, label_lines
+from graphs import finalize, footnotes, label_lines, save_chart, set_theme
 
 set_theme()
 
@@ -32,7 +32,7 @@ us = 2.0 + 4.0 * np.exp(-months / 9) + np.random.default_rng(0).normal(0, 0.25, 
 eu = 1.8 + 4.5 * np.exp(-months / 11) + np.random.default_rng(7).normal(0, 0.30, 24)
 
 fig, ax = plt.subplots(figsize=(7, 4.4))
-ax.plot(months, us, label="United States")
+ax.plot(months, us, label="America")
 ax.plot(months, eu, label="Euro area")
 label_lines(ax)
 
@@ -40,6 +40,7 @@ finalize(
     ax,
     title="Cooling off",
     descriptor="Headline CPI*, % change on a year earlier, monthly",
+    footnote_lines=1,  # reserve room for the footnote row drawn below
 )
 footnotes(
     fig,
@@ -48,13 +49,15 @@ footnotes(
            "[Eurostat](https://ec.europa.eu/eurostat)",
 )
 
-plt.savefig("inflation.png", bbox_inches="tight", dpi=150)
+save_chart(__file__)  # writes quick.png beside the script
 ```
 
 Save to `quick.py` and run; the output sits next to it. `finalize()`
 auto-sizes margins, and `footnotes()` packs the note and source onto one
 row when they fit, wrapping when they don't — leave `source=` off
-`finalize()` so they belong to the same line.
+`finalize()` so they belong to the same line, and pass `footnote_lines=`
+so auto-layout reserves the bottom band for them. `save_chart` is the
+standard epilogue: tight bbox, 150 dpi, close, one-line confirmation.
 
 ### Default visual conventions
 
@@ -69,8 +72,10 @@ Behaviour that's automatic unless you override it:
   *this* figure needs it (with a widow fix, so no single-word last lines).
   Never copy a reference chart's line breaks; explicit `\n` is reserved
   for semantic breaks (a descriptor's subject / unit split).
-- **Multi-line descriptors lead semibold.** When the descriptor has two or
-  more lines, the first renders semibold over regular continuation lines.
+- **Explicit descriptor breaks get a semibold lead.** An explicit `\n`
+  splits the descriptor into a semibold subject lead over regular
+  scope/unit lines; the lead stays semibold even if it wraps. Breaks
+  added by the auto-wrap alone never trigger the styling.
 - **Numeric y labels sit on their gridlines** (`y_labels="on_grid"`,
   the `finalize()` default): each gridline extends into the label gutter
   and ends flush with the labels' outer edge; the label rests on its
@@ -89,8 +94,8 @@ Behaviour that's automatic unless you override it:
 - **Frameless legends are default** for both `smart_legend()` and
   `top_legend()`. Boxed legends are opt-in.
 - **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
-  75% black) — slightly darker than `C_LABEL` so attribution reads as
-  metadata, not as data.
+  75% black) — darker than the muted `C_LABEL_MUTED` grey, so
+  attribution stays legible while reading as metadata.
 - **`finalize(auto_layout=True)` (default)** sizes `subplots_adjust`
   margins to fit the title-stack and source line. Set `auto_layout=False`
   on faceted charts that need explicit `hspace`/`wspace` control.
@@ -277,12 +282,16 @@ Style overrides to apply on top:
 
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
-| `set_theme(bg=None, transparent=True)`                              | Apply theme globally. Call once.                       |
+| `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
 | `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, y_labels="on_grid", …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
+| `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
+| `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
+| `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
+| `save_chart(__file__)`                                              | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. |
 
 ### Chart helpers
 
@@ -298,6 +307,8 @@ Style overrides to apply on top:
 | `thermometer(ax, categories, values, *, series_labels, dot=True)`   | Tick-and-dot ranked categories. Warns above 4 series.  |
 | `threshold_lollipop(ax, categories, values, *, threshold=1.0)`      | Horizontal lollipop with fixed centre + leader lines.  |
 | `bump_chart(ax, ranks, *, highlight, aspect=…, max_rank=…)`         | Rank-over-time PCHIP-smoothed lines with white halo at crossings. `max_rank` crops the rank axis so a large backdrop can't compress the story band. |
+| `dot_plot(ax, categories, series, *, size=150)`                     | Cleveland dot plot; same-value dots in a row merge into pie-split markers. Returns legend handles. |
+| `pie_marker(ax, x, y, wedge_colors, *, size=150)`                   | One marker split into N equal wedges so overlapping points stay visible. |
 | `scatter_standard(ax, x, y)`                                        | General-trend scatter, 50% opacity, no stroke.         |
 | `scatter_highlight(ax, x, y)`                                       | Outlier / labelled scatter, 100% opacity.              |
 | `scatter_category(ax, x, y)`                                        | Bubble dot, 50% fill + 0.3px stroke for overlap.       |
@@ -313,7 +324,8 @@ Style overrides to apply on top:
 | `highlight_panel(ax, x_start, x_end, *, label=None)`                | Vertical event-period band.                            |
 | `highlight_label(ax, xy, text, *, role="primary")`                  | Single-point label. `"secondary"` = grey/caps/light.   |
 | `index_marker(ax, x, *, y=100)`                                     | Red rule + black dot for index charts.                 |
-| `broken_axis(ax, *, axis="y", side="left")`                         | Non-zero-baseline squiggle. Line/scatter/thermometer.  |
+| `broken_axis(ax, *, axis="y", side="auto")`                         | Non-zero-baseline squiggle. Line/scatter/thermometer. `side="auto"` follows the y-label side. |
+| `direction_label(ax, text, xy, *, arrow="↑")`                       | One-sided directional cue ("↑ Older husband") in axes-fraction coords. |
 | `number_box(ax, xy, n)`                                             | Numbered cross-reference box.                          |
 | `threshold_arrows(ax, threshold, *, left_text, right_text)`         | Directional label pair straddling a threshold.         |
 
@@ -321,7 +333,7 @@ Style overrides to apply on top:
 
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
-| `label_lines(ax, *, stroke=False)`                                  | Direct labels at line ends with collision avoidance.   |
+| `label_lines(ax, *, stroke=True)`                                   | Direct labels at line ends with collision avoidance; white halo on by default. |
 | `inset_tick_labels(ax, *, axis="x")`                                | First tick label `ha="left"`, last `ha="right"`.       |
 | `y_labels_on_grid(ax)`                                              | Sit y tick labels on gridlines extended under them (the `finalize()` default; call manually on extra facet panels). |
 | `italicize_labels(ax, labels)`                                      | Italicise specific tick labels in place.               |
@@ -330,6 +342,14 @@ Style overrides to apply on top:
 | `right_axis(ax)`                                                    | Apply right-axis convention to a panel.                |
 | `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
 | `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack.   |
+
+### Number formatting
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
+| `format_count(n, *, sig=2)`                                         | Compact count label: 2 s.f. + k/M/B/T unit (`1234 → "1.2k"`, `500 → "500"`). |
+| `scale_axis(ax, *, axis="y", by=1000)`                              | Divide an axis's tick labels by a shared magnitude (`20,000 → 20`); name the magnitude in the descriptor. |
+| `magnitude_word(by)`                                                | English name for the divisor (`1000 → "thousand"`) — pairs with `scale_axis` for the descriptor unit. |
 
 ### Verification
 
@@ -434,52 +454,55 @@ CSVs fetched at runtime by example scripts are cached under
 
 ## Examples
 
-Runnable scripts in `examples/`. Each one is the worked example for a
-specific helper or pattern combination.
+Runnable scripts in `examples/`. Each entry leads with the situation that
+should make you open it — match your data shape and story shape against the
+**Load when** clause, then read the script as the worked reference for that
+pattern.
 
-- [`bar_chart.py`](./examples/bar_chart.py) — `bar_h` synthetic demo with default `highlight_max=True`.
-- [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — `dumbbell` before/after + right-aligned `top_legend` via `ax._dumbbell_handles`.
-- [`faceted_chart.py`](./examples/faceted_chart.py) — three-panel layout: `panel_label` per axes, `right_axis`, `ci_fill`, `y_start=0.075` + `auto_layout=False`.
-- [`scatter_chart.py`](./examples/scatter_chart.py) — `scatter_standard` + `scatter_highlight` + `trend_line` + `callout` for the outliers.
-- [`thermometer_chart.py`](./examples/thermometer_chart.py) — `thermometer(dot=False)` 3-series variant, x-axis on top, frameless `top_legend`.
-- [`index_chart.py`](./examples/index_chart.py) — `index_marker` + `highlight_panel` (Pandemic band) + secondary `highlight_label` + `broken_axis` + `label_lines`.
-- [`line_chart.py`](./examples/line_chart.py) — `smoothed_line` (scatter + CI band + trend), custom `_LineBandHandler` legend, `year_axis(set_locator=False)`, `footnotes(source=)`.
-- [`bump_chart.py`](./examples/bump_chart.py) — `bump_chart` with `highlight=`, `colors=` override, `right_labels=True`, `x_labels_top=True`, `aspect=0.85`; real WHR data via `_data.py`.
-- [`corbyn.py`](./examples/corbyn.py) — `bar_h` + `style_labels(italic=, bold=)` for per-row emphasis; full-range scale fixes the original truncation.
-- [`dogs.py`](./examples/dogs.py) — twin y-axis with `color_axis(spine=False, ticks=False)`, manual series titles via `render_text_with_superscripts`, `footnotes(source=)` packing two notes alongside the source.
-- [`brexit.py`](./examples/brexit.py) — `scatter_standard` + Savitzky-Golay smoothed line, manual year ticks + `year_axis(set_locator=False)` + `inset_tick_labels` + `broken_axis(axis="both")`.
-- [`us_trade.py`](./examples/us_trade.py) — stacked two-panel `sharex=True` layout: `panel_label`, `right_axis`, `inset_tick_labels`, source delegated to `footnotes(source=…)`.
-- [`pensions.py`](./examples/pensions.py) — same-hue scatter with opacity-for-emphasis, italic OECD label via `FontProperties`, `y_axis_label(unit="% of GDP")`.
-- [`eu_balance.py`](./examples/eu_balance.py) — side-by-side panels of pos+neg stacked bars, shared `top_legend`, `right_axis`, `footnotes(source=)`.
-- [`affordability_chart.py`](./examples/affordability_chart.py) — `threshold_lollipop(threshold=1.0)` on a log x-axis + `threshold_arrows` straddling the threshold + two-note `footnotes`.
-- [`age_gap_chart.py`](./examples/age_gap_chart.py) — chronological snapshot lines via `snapshot_palette(4)`, in-chart series labels, `broken_axis(side="right")`, right-anchored `footnotes(y=, x=)`.
+- [`bar_chart.py`](./examples/bar_chart.py) — **Load when:** one value per category, ranked, and the biggest (or one chosen) value is the point. Minimal `bar_h` demo with the default `highlight_max=True`.
+- [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — **Load when:** each category has a before and an after value and the change is the message. `dumbbell` plus a right-aligned `top_legend` fed from `ax._dumbbell_handles`.
+- [`faceted_chart.py`](./examples/faceted_chart.py) — **Load when:** several series share an axis but overlap so badly that one panel buries the story — split into small multiples. The faceting workflow: `panel_label` per axes, `right_axis`, `ci_fill`, manual `y_start=0.075` + `auto_layout=False`.
+- [`scatter_chart.py`](./examples/scatter_chart.py) — **Load when:** a relationship cloud where a few named outliers carry the story. `scatter_standard` + `scatter_highlight` two-layer treatment, `trend_line`, `callout` on the outliers.
+- [`thermometer_chart.py`](./examples/thermometer_chart.py) — **Load when:** 2–4 series compared across the same ranked categories, where grouped bars would clutter. `thermometer(dot=False)` three-series variant, x-axis on top, frameless `top_legend`.
+- [`index_chart.py`](./examples/index_chart.py) — **Load when:** series of different magnitudes must be compared as growth since a common moment, with an event window to flag. `index_marker` + `highlight_panel` band + secondary `highlight_label` + `broken_axis` + `label_lines`.
+- [`line_chart.py`](./examples/line_chart.py) — **Load when:** noisy point estimates over time with uncertainty — the reader should see trend and range, not individual points. `smoothed_line` (scatter + CI band + trend), custom `_LineBandHandler` legend, `year_axis(set_locator=False)`.
+- [`bump_chart.py`](./examples/bump_chart.py) — **Load when:** the story is rank changes over time in a large field, with only a few entities highlighted against a faded backdrop. `bump_chart` with `highlight=`, `colors=`, `right_labels=True`, `x_labels_top=True`, `max_rank` cropping; real data via `_data.py`.
+- [`corbyn.py`](./examples/corbyn.py) — **Load when:** ranked bars where one dominant value tempts you to truncate the scale (don't — show it whole), or specific row labels need bold/italic emphasis. `bar_h` + `style_labels(italic=, bold=)`.
+- [`dogs.py`](./examples/dogs.py) — **Load when:** two different units genuinely must share one panel and the twin axes have to be honest — both ranges sized so 1% of the midpoint spans equal distance. `color_axis(spine=False, ticks=False)`, manual series titles via `render_text_with_superscripts`, `footnotes(source=)` packing two notes.
+- [`brexit.py`](./examples/brexit.py) — **Load when:** irregular poll/survey readings over time — connecting the dots would look erratic, so show points plus a smoothed trend on a truncated axis. `scatter_standard` + Savitzky-Golay smoothing, manual year ticks + `year_axis(set_locator=False)`, `inset_tick_labels`, `broken_axis(axis="both")`.
+- [`us_trade.py`](./examples/us_trade.py) — **Load when:** two related time series with incompatible units or baselines tempt you toward a double axis — split into stacked `sharex` panels instead. `panel_label`, `right_axis`, `inset_tick_labels`, source via `footnotes(source=)`.
+- [`pensions.py`](./examples/pensions.py) — **Load when:** a scatter where labelled points need emphasis but a second colour would falsely read as a category — use opacity within one hue. Same-hue dots with opacity-for-emphasis, italic average label via `FontProperties`, `y_axis_label(unit=)`.
+- [`eu_balance.py`](./examples/eu_balance.py) — **Load when:** a stacked composition has too many members to colour — keep the named few plus an "Others" bucket, and show two measures as side-by-side panels. Positive+negative stacked bars per year, shared `top_legend`, `right_axis`.
+- [`affordability_chart.py`](./examples/affordability_chart.py) — **Load when:** categories are measured against a meaningful threshold (above = fine, below = not) and span a wide value range. `threshold_lollipop(threshold=1.0)` on a log x-axis + `threshold_arrows` straddling the threshold + two-note `footnotes`.
+- [`age_gap_chart.py`](./examples/age_gap_chart.py) — **Load when:** the same curve measured at several historical moments, and the story is how its shape shifted — earlier years fade, the present pops. Chronological lines via `snapshot_palette(4)`, in-chart series labels, `broken_axis(side="right")`, right-anchored `footnotes(y=, x=)`.
 
 ### Daily-chart replicas
 
 Faithful replicas of Economist daily charts (references via
-`examples/fetch_refs.py`; comparisons via `examples/build_comparisons.py`).
-Useful as worked examples of less-common chart shapes:
+`examples/fetch_refs.py`, comparisons via `examples/build_comparisons.py`).
+Beyond fidelity checks, these double as the worked examples for less-common
+data and story shapes the core helpers don't cover directly.
 
-- [`australia_heat.py`](./examples/australia_heat.py) — diverging annual bars (positive red / negative blue) around a zero baseline.
-- [`malaria.py`](./examples/malaria.py) — history line splitting into three dashed forecast paths inside a `highlight_panel` FORECAST band.
-- [`co2_emissions.py`](./examples/co2_emissions.py) — variable-width Mekko bars (height = per-person CO2, width = population) + dashed global-average rule.
-- [`christianity.py`](./examples/christianity.py) — two-point slope chart with endpoint dots and stacked value labels.
-- [`graduate_pay.py`](./examples/graduate_pay.py) — dense `scatter_standard` cloud with reversed x-axis and a solid trend curve.
-- [`generational_politics.py`](./examples/generational_politics.py) — survey-wave lines with PCHIP smoothing, gap segments in lighter tint, dotted average.
-- [`uber_tips.py`](./examples/uber_tips.py) — vertical dumbbell/lollipop pairs with a ringed reference marker.
-- [`us_refugees.py`](./examples/us_refugees.py) — annual bars + stepped policy-cap line (real published data).
-- [`polluted_cities.py`](./examples/polluted_cities.py) — two-block ranked table with colour-graded value chips.
-- [`arctic_warming.py`](./examples/arctic_warming.py) — latitude-profile dot-line over translucent range bars, x-axis on top.
-- [`trump_sanctions.py`](./examples/trump_sanctions.py) — `bar_v` time series on presidential-era `highlight_panel` bands.
-- [`populist_votes.py`](./examples/populist_votes.py) — 40-year two-series stacked bars, pixel-extracted values.
-- [`plastic_bottles.py`](./examples/plastic_bottles.py) — stacked percentage bars + locator-globe inset.
-- [`alcohol_drinkers.py`](./examples/alcohol_drinkers.py) — pictogram legend strip over three stacked 100% bars.
-- [`language_speed.py`](./examples/language_speed.py) — two-panel ridgeline densities with `direction_label` cues.
-- [`london_roads.py`](./examples/london_roads.py) — day×hour heatmap with discrete sampled colour scale and hand-built legend.
-- [`elderly_screens.py`](./examples/elderly_screens.py) — two-panel stacked areas with shared scale.
-- [`wework.py`](./examples/wework.py) — per-metric banded panels with paired bars and per-panel scales.
-- [`millennial_parents.py`](./examples/millennial_parents.py) — `snapshot_palette` generation lines vs mother's age.
-- [`bad_bunny.py`](./examples/bad_bunny.py) — survey `bar_h` with x-axis on top.
-- [`spending_convergence.py`](./examples/spending_convergence.py) — converging pair of lines, truncated axis signalled with `broken_axis`.
-- [`gold_rally.py`](./examples/gold_rally.py) — indexed returns lines with `index_marker` and month-letter ticks.
-- [`nuclear_warheads.py`](./examples/nuclear_warheads.py) — stacked `barh` inventories, top axis/legend, dashed forecast box.
+- [`australia_heat.py`](./examples/australia_heat.py) — **Load when:** a time series of signed deviations around zero where direction is the story. Diverging annual `bar_v` bars, positive red / negative blue on a zero baseline.
+- [`malaria.py`](./examples/malaria.py) — **Load when:** observed history fans out into multiple scenario paths and the reader must not confuse projection with fact. Solid history line splitting into three dashed forecasts inside a `highlight_panel` FORECAST band.
+- [`co2_emissions.py`](./examples/co2_emissions.py) — **Load when:** each category has two multiplicative dimensions (rate × size = total) and the totals matter as much as the rates. Variable-width Mekko bars with on-bar totals + dashed global-average rule.
+- [`christianity.py`](./examples/christianity.py) — **Load when:** many categories each have exactly two time points and the trajectories — who's rising, who's flat — are the message. Two-point slope chart with endpoint dots, stacked value labels, one accent line.
+- [`graduate_pay.py`](./examples/graduate_pay.py) — **Load when:** a dense dot cloud with a strong nonlinear trend, where the x variable reads better reversed ("more selective →"). `scatter_standard` cloud, reversed x-axis, solid trend curve.
+- [`generational_politics.py`](./examples/generational_politics.py) — **Load when:** cohort or panel-survey waves — several groups tracked over irregular waves, with gaps in coverage and an overall average. PCHIP-smoothed lines, gap segments in lighter tint, dotted average, end-of-line labels.
+- [`uber_tips.py`](./examples/uber_tips.py) — **Load when:** paired group values per category, expressed relative to an explicit reference point that needs marking. Vertical dumbbell/lollipop pairs with a ringed reference marker and leader line.
+- [`us_refugees.py`](./examples/us_refugees.py) — **Load when:** an actual annual quantity tracked against an administrative limit — the gap between allowed and delivered is the story. Neutral grey bars + stepped red policy-cap line (real published data).
+- [`polluted_cities.py`](./examples/polluted_cities.py) — **Load when:** the ranking itself is the chart — a top-N list where membership patterns matter more than precise values, and >~10 rows need splitting into blocks. Two-block ranked table with colour-graded value chips and selective row bands.
+- [`arctic_warming.py`](./examples/arctic_warming.py) — **Load when:** a value profiled across an ordered spatial dimension (latitude, depth, distance), with a per-point range across sources. Dot-line over translucent range bars, x-axis on top, banded regions of interest.
+- [`trump_sanctions.py`](./examples/trump_sanctions.py) — **Load when:** annual-count bars where eras or regimes are the comparison frame. `bar_v` time series on tinted presidential-era `highlight_panel` bands, `inset_tick_labels`.
+- [`populist_votes.py`](./examples/populist_votes.py) — **Load when:** a two-part composition over a long period where both the total and the mix change — the flip is the story. Two-series stacked bars across 40 years, `top_legend`.
+- [`plastic_bottles.py`](./examples/plastic_bottles.py) — **Load when:** composition shares across a few snapshots, and the reader also needs geographic orientation for an obscure location. Stacked 100% bars + orthographic locator-globe inset under the legend.
+- [`alcohol_drinkers.py`](./examples/alcohol_drinkers.py) — **Load when:** the same group breakdown applied across several different denominators (population vs revenue vs consumption) — the mismatch is the point. Three stacked 100% horizontal bars under a shared pictogram legend strip.
+- [`language_speed.py`](./examples/language_speed.py) — **Load when:** comparing full distributions per category, not summary statistics — especially when a second panel shows the distributions collapsing together. Two-panel ridgeline densities (plain `fill_between`), `direction_label` reading cues, `panel_label`.
+- [`london_roads.py`](./examples/london_roads.py) — **Load when:** one metric over two cyclic dimensions (day × hour) where the pattern lives in the grid, not in any single series. Heatmap with a discrete sampled colour scale and hand-built legend.
+- [`elderly_screens.py`](./examples/elderly_screens.py) — **Load when:** composition totals over time compared between two groups — both the level and the mix matter, so neither lines nor 100% bars suffice. Two stacked-area panels on a shared scale, `right_axis`.
+- [`wework.py`](./examples/wework.py) — **Load when:** comparing two entities across several metrics of wildly different scales — per-panel normalisation so every comparison spans its band. Per-metric banded panels with paired bars, per-panel x-scales, value labels inside or beyond the bar tip.
+- [`millennial_parents.py`](./examples/millennial_parents.py) — **Load when:** chronological snapshot lines (as `age_gap_chart.py`) but specific snapshots must pin to exact colours from a reference. `snapshot_palette` with per-line colour overrides.
+- [`bad_bunny.py`](./examples/bad_bunny.py) — **Load when:** response shares for a single survey question — ranked `bar_h` (as `bar_chart.py`) but with the survey convention of the x-axis on top. `bar_h` + `footnotes`.
+- [`spending_convergence.py`](./examples/spending_convergence.py) — **Load when:** two lines converging or crossing, where the meaningful window forces a truncated y-axis that must be signalled, not hidden. Crossing line pair with the `broken_axis` squiggle beside the right tick column.
+- [`gold_rally.py`](./examples/gold_rally.py) — **Load when:** comparing returns over a sub-year window — rebased to 100 (as `index_chart.py`) but with dense daily data and month-resolution ticks. `index_marker` + month-letter ticks, direct line labels.
+- [`nuclear_warheads.py`](./examples/nuclear_warheads.py) — **Load when:** ranked totals per entity with an internal status breakdown, plus a forecast for one entity that must read as projection. Stacked `barh` inventories, top axis + `top_legend`, dashed forecast box.

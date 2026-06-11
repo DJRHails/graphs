@@ -25,8 +25,9 @@ from graphs import (
     bar_v,
     finalize,
     highlight_panel,
-    inset_tick_labels,
+    save_chart,
     set_theme,
+    year_ticks,
 )
 
 set_theme()
@@ -67,13 +68,11 @@ ax.set_ylim(0, 1940)
 ax.set_yticks([0, 500, 1000, 1500])
 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:,.0f}"))
 
-ax.set_xticks([2001, 2005, 2010, 2015, 2018])
-ax.set_xticklabels(["2001", "05", "10", "15", "18"])
+year_ticks(ax, [2001, 2005, 2010, 2015, 2018])
 # Original draws a small dark tick below the axis for every year (minor
 # ticks coinciding with the labelled majors simply overdraw them).
 ax.set_xticks(years, minor=True)
 ax.tick_params(axis="x", which="both", length=3.5, color=C_SPINE)
-inset_tick_labels(ax, axis="x")
 
 finalize(
     ax,
@@ -83,7 +82,4 @@ finalize(
     autoscale_y=False,
 )
 
-out = Path(__file__).resolve().parent / "trump_sanctions.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Trump-sanctions chart")
+save_chart(__file__)

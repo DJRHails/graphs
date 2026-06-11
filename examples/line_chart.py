@@ -38,6 +38,7 @@ from graphs import (
     finalize,
     footnotes,
     inset_tick_labels,
+    save_chart,
     set_theme,
     smoothed_line,
     year_axis,
@@ -187,7 +188,4 @@ footnotes(
     ),
 )
 
-out = Path(__file__).resolve().parent / "line_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved line chart")
+save_chart(__file__)

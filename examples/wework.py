@@ -24,6 +24,7 @@ from graphs import (
     finalize,
     footnotes,
     get_font,
+    save_chart,
     set_theme,
     top_legend,
 )
@@ -149,7 +150,4 @@ footnotes(
     max_width_frac=0.6,  # force the notes onto their own row above the source
 )
 
-out = Path(__file__).resolve().parent / "wework.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved WeWork chart")
+save_chart(__file__)

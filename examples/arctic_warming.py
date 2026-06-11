@@ -27,8 +27,10 @@ from graphs import (
     C_LABEL,
     C_SPINE,
     finalize,
+    save_chart,
     set_theme,
     top_legend,
+    x_axis_top,
 )
 
 set_theme()
@@ -72,8 +74,7 @@ ax.plot(AVG, LAT, color=C_RED_LINE, linewidth=2.0, marker="o", markersize=6.5, z
 ax.set_xlim(-1.7, 5)
 ax.set_ylim(-90, 90)
 ax.set_xticks([0, 1, 2, 3, 4, 5])
-ax.xaxis.tick_top()
-ax.xaxis.set_tick_params(labelsize=9, length=3.5, direction="out")
+x_axis_top(ax)
 ax.set_yticks([90, 45, 0, -45, -90])
 ax.set_yticklabels(["90°N", "45°N", "0", "45°S", "90°S"], fontsize=9, color=C_LABEL)
 ax.yaxis.set_tick_params(length=0, pad=8)
@@ -160,7 +161,4 @@ top_legend(
     fontsize=9,
 )
 
-out = Path(__file__).resolve().parent / "arctic_warming.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Arctic warming chart")
+save_chart(__file__)

@@ -25,6 +25,7 @@ from graphs import (
     C_SPINE,
     C_TEXT,
     finalize,
+    save_chart,
     set_theme,
     x_axis_label,
 )
@@ -89,7 +90,4 @@ finalize(
 # reference's lighter axis line after the title stack is laid out.
 ax.spines["bottom"].set_color("#b3b3b3")
 
-out = Path(__file__).resolve().parent / "uber_tips.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Uber tips chart")
+save_chart(__file__)

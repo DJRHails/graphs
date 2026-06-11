@@ -22,7 +22,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, color_axis, finalize, footnotes, get_font, set_theme
+from graphs import PALETTE, color_axis, finalize, footnotes, get_font, save_chart, set_theme
 from graphs._superscript import render_text_with_superscripts
 
 set_theme()
@@ -141,7 +141,4 @@ footnotes(
     source="Sources: [Kennel Club](https://www.thekennelclub.org.uk/); [The Economist](https://www.economist.com/)",
 )
 
-out = Path(__file__).resolve().parent / "dogs.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Dogs chart")
+save_chart(__file__)

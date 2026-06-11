@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, finalize, footnotes, inset_tick_labels, panel_label, right_axis, set_theme
+from graphs import PALETTE, finalize, footnotes, inset_tick_labels, panel_label, right_axis, save_chart, set_theme
 
 set_theme()
 
@@ -67,7 +67,4 @@ finalize(
 )
 footnotes(fig, source="Sources: [US Census Bureau](https://www.census.gov/); [US Bureau of Labor Statistics](https://www.bls.gov/)")
 
-out = Path(__file__).resolve().parent / "us_trade.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved US-trade chart")
+save_chart(__file__)

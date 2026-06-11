@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, finalize, footnotes, panel_label, right_axis, set_theme, top_legend
+from graphs import PALETTE, finalize, footnotes, panel_label, right_axis, save_chart, set_theme, top_legend
 
 set_theme()
 
@@ -118,7 +118,4 @@ top_legend(fig, handles, labels, y=0.82, ncol=len(handles))
 
 footnotes(fig, source="Source: [Eurostat](https://ec.europa.eu/eurostat)")
 
-out = Path(__file__).resolve().parent / "eu_balance.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved EU-balance chart")
+save_chart(__file__)

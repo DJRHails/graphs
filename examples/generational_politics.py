@@ -34,6 +34,7 @@ from graphs import (
     PALETTE,
     finalize,
     footnotes,
+    save_chart,
     set_theme,
 )
 
@@ -250,7 +251,4 @@ footnotes(
     ),
 )
 
-out = Path(__file__).resolve().parent / "generational_politics.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved generational politics chart")
+save_chart(__file__)

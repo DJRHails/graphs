@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import bar_h, finalize, footnotes, set_theme
+from graphs import bar_h, finalize, footnotes, save_chart, set_theme
 
 set_theme()
 
@@ -74,7 +74,4 @@ LINE_ADVANCE = 11.0 / 72.0 / FIG_H_IN  # one 9pt source line at 1.2 leading
 note_y = ax.get_position().y0 - SOURCE_Y_OFFSET + LINE_ADVANCE
 footnotes(fig, "*Jan 30th-Feb 2nd 2026", y=note_y)
 
-out = Path(__file__).resolve().parent / "bad_bunny.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Bad Bunny chart")
+save_chart(__file__)

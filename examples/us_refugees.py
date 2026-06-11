@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme
+from graphs import C_RED, finalize, footnotes, save_chart, set_theme, year_ticks
 
 set_theme()
 
@@ -64,9 +64,7 @@ ax.text(1982.0, 208, "Annual cap", color=C_RED, fontsize=10.5, fontweight="bold"
 ax.set_xlim(1979.2, 2021.5)
 ax.set_ylim(0, 250)
 ax.set_yticks(range(0, 251, 50))
-ax.set_xticks([1980, 1990, 2000, 2010, 2020])
-ax.set_xticklabels(["1980", "90", "2000", "10", "20"])
-inset_tick_labels(ax)
+year_ticks(ax, [1980, 1990, 2000, 2010, 2020])
 ax.get_xticklabels()[-1].set_ha("center")  # original centres the final "20"
 ax.set_xlabel("Fiscal years ending September 30th")
 
@@ -78,7 +76,4 @@ finalize(
 )
 footnotes(fig, source="Source: Refugee Processing Centre")
 
-out = Path(__file__).resolve().parent / "us_refugees.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved US refugees chart")
+save_chart(__file__)

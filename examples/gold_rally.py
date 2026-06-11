@@ -21,7 +21,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_LABEL, C_RED, C_SPINE, finalize, index_marker, set_theme
+from graphs import C_LABEL, C_RED, C_SPINE, finalize, index_marker, save_chart, set_theme
 
 set_theme()
 
@@ -171,7 +171,4 @@ finalize(
     autoscale_y=False,
 )
 
-out = Path(__file__).resolve().parent / "gold_rally.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved gold rally chart")
+save_chart(__file__)

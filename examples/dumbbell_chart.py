@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-from graphs import dumbbell, finalize, set_theme, top_legend
+from graphs import dumbbell, finalize, save_chart, set_theme, top_legend
 
 set_theme()
 
@@ -62,7 +62,4 @@ top_legend(
     ncol=2,
 )
 
-out = Path(__file__).resolve().parent / "dumbbell_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved dumbbell chart")
+save_chart(__file__)

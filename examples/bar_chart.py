@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import bar_h, finalize, set_theme
+from graphs import bar_h, finalize, save_chart, set_theme
 
 set_theme()
 
@@ -31,7 +31,4 @@ finalize(
     title_x=0.02,
 )
 
-out = Path(__file__).resolve().parent / "bar_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved bar chart")
+save_chart(__file__)
