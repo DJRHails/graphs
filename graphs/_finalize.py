@@ -1267,7 +1267,7 @@ def footnotes(
     """Render footnote strip with optional source-line co-location.
 
     Joins ``notes`` with two spaces and renders them in IBM Plex Sans
-    Condensed Light 7pt ``C_LABEL_MUTED``.
+    Condensed at the source line's size (9pt, ``C_SOURCE``).
 
     Behaviour depends on whether ``source`` is provided:
 

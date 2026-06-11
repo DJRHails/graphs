@@ -18,13 +18,16 @@ The import package is `graphs`.
 
 ```python
 import matplotlib.pyplot as plt
+import numpy as np
+
 from graphs import finalize, label_lines, save_chart, set_theme
 
 set_theme()
 
+x = np.arange(12)
 fig, ax = plt.subplots(figsize=(7, 4.4))
-ax.plot(x, y, label="Series A")
-ax.plot(x, z, label="Series B")
+ax.plot(x, 40 + 2.1 * x, label="Series A")
+ax.plot(x, 58 - 1.3 * x, label="Series B")
 label_lines(ax)
 finalize(
     ax,
@@ -54,11 +57,13 @@ spines/grid/labels/source; `cycle_for(chart_type)` for per-chart-type orders.
 
 ### Typography
 
-IBM Plex Sans is loaded automatically. If already registered in matplotlib's
-font manager, no download occurs. Otherwise TTFs are fetched from
-`github.com/IBM/plex` on first use and cached inside the installed package.
+IBM Plex Sans (headlines) and IBM Plex Sans Condensed (everything else) are
+loaded automatically. If already registered in matplotlib's font manager, no
+download occurs. Otherwise TTFs are fetched from `github.com/IBM/plex` on
+first use and cached inside the installed package.
 
-Fallback chain: IBM Plex Sans → Verdana → Arial → DejaVu Sans.
+Fallback chain: IBM Plex Sans Condensed → IBM Plex Sans → Verdana → Arial →
+DejaVu Sans.
 
 ## Development
 

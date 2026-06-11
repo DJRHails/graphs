@@ -32,7 +32,7 @@ us = 2.0 + 4.0 * np.exp(-months / 9) + np.random.default_rng(0).normal(0, 0.25, 
 eu = 1.8 + 4.5 * np.exp(-months / 11) + np.random.default_rng(7).normal(0, 0.30, 24)
 
 fig, ax = plt.subplots(figsize=(7, 4.4))
-ax.plot(months, us, label="United States")
+ax.plot(months, us, label="America")
 ax.plot(months, eu, label="Euro area")
 label_lines(ax)
 
@@ -40,6 +40,7 @@ finalize(
     ax,
     title="Cooling off",
     descriptor="Headline CPI*, % change on a year earlier, monthly",
+    footnote_lines=1,  # reserve room for the footnote row drawn below
 )
 footnotes(
     fig,
@@ -54,7 +55,8 @@ save_chart(__file__)  # writes quick.png beside the script
 Save to `quick.py` and run; the output sits next to it. `finalize()`
 auto-sizes margins, and `footnotes()` packs the note and source onto one
 row when they fit, wrapping when they don't — leave `source=` off
-`finalize()` so they belong to the same line. `save_chart` is the
+`finalize()` so they belong to the same line, and pass `footnote_lines=`
+so auto-layout reserves the bottom band for them. `save_chart` is the
 standard epilogue: tight bbox, 150 dpi, close, one-line confirmation.
 
 ### Default visual conventions
@@ -92,8 +94,8 @@ Behaviour that's automatic unless you override it:
 - **Frameless legends are default** for both `smart_legend()` and
   `top_legend()`. Boxed legends are opt-in.
 - **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
-  75% black) — slightly darker than `C_LABEL` so attribution reads as
-  metadata, not as data.
+  75% black) — darker than the muted `C_LABEL_MUTED` grey, so
+  attribution stays legible while reading as metadata.
 - **`finalize(auto_layout=True)` (default)** sizes `subplots_adjust`
   margins to fit the title-stack and source line. Set `auto_layout=False`
   on faceted charts that need explicit `hspace`/`wspace` control.
@@ -280,11 +282,12 @@ Style overrides to apply on top:
 
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
-| `set_theme(bg=None, transparent=True)`                              | Apply theme globally. Call once.                       |
+| `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
 | `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, y_labels="on_grid", …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
+| `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
@@ -304,6 +307,8 @@ Style overrides to apply on top:
 | `thermometer(ax, categories, values, *, series_labels, dot=True)`   | Tick-and-dot ranked categories. Warns above 4 series.  |
 | `threshold_lollipop(ax, categories, values, *, threshold=1.0)`      | Horizontal lollipop with fixed centre + leader lines.  |
 | `bump_chart(ax, ranks, *, highlight, aspect=…, max_rank=…)`         | Rank-over-time PCHIP-smoothed lines with white halo at crossings. `max_rank` crops the rank axis so a large backdrop can't compress the story band. |
+| `dot_plot(ax, categories, series, *, size=150)`                     | Cleveland dot plot; same-value dots in a row merge into pie-split markers. Returns legend handles. |
+| `pie_marker(ax, x, y, wedge_colors, *, size=150)`                   | One marker split into N equal wedges so overlapping points stay visible. |
 | `scatter_standard(ax, x, y)`                                        | General-trend scatter, 50% opacity, no stroke.         |
 | `scatter_highlight(ax, x, y)`                                       | Outlier / labelled scatter, 100% opacity.              |
 | `scatter_category(ax, x, y)`                                        | Bubble dot, 50% fill + 0.3px stroke for overlap.       |
@@ -319,7 +324,8 @@ Style overrides to apply on top:
 | `highlight_panel(ax, x_start, x_end, *, label=None)`                | Vertical event-period band.                            |
 | `highlight_label(ax, xy, text, *, role="primary")`                  | Single-point label. `"secondary"` = grey/caps/light.   |
 | `index_marker(ax, x, *, y=100)`                                     | Red rule + black dot for index charts.                 |
-| `broken_axis(ax, *, axis="y", side="left")`                         | Non-zero-baseline squiggle. Line/scatter/thermometer.  |
+| `broken_axis(ax, *, axis="y", side="auto")`                         | Non-zero-baseline squiggle. Line/scatter/thermometer. `side="auto"` follows the y-label side. |
+| `direction_label(ax, text, xy, *, arrow="↑")`                       | One-sided directional cue ("↑ Older husband") in axes-fraction coords. |
 | `number_box(ax, xy, n)`                                             | Numbered cross-reference box.                          |
 | `threshold_arrows(ax, threshold, *, left_text, right_text)`         | Directional label pair straddling a threshold.         |
 
@@ -327,7 +333,7 @@ Style overrides to apply on top:
 
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
-| `label_lines(ax, *, stroke=False)`                                  | Direct labels at line ends with collision avoidance.   |
+| `label_lines(ax, *, stroke=True)`                                   | Direct labels at line ends with collision avoidance; white halo on by default. |
 | `inset_tick_labels(ax, *, axis="x")`                                | First tick label `ha="left"`, last `ha="right"`.       |
 | `y_labels_on_grid(ax)`                                              | Sit y tick labels on gridlines extended under them (the `finalize()` default; call manually on extra facet panels). |
 | `italicize_labels(ax, labels)`                                      | Italicise specific tick labels in place.               |
@@ -336,6 +342,14 @@ Style overrides to apply on top:
 | `right_axis(ax)`                                                    | Apply right-axis convention to a panel.                |
 | `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
 | `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack.   |
+
+### Number formatting
+
+| Function                                                            | Purpose                                                |
+|---------------------------------------------------------------------|--------------------------------------------------------|
+| `format_count(n, *, sig=2)`                                         | Compact count label: 2 s.f. + k/M/B/T unit (`1234 → "1.2k"`, `500 → "500"`). |
+| `scale_axis(ax, *, axis="y", by=1000)`                              | Divide an axis's tick labels by a shared magnitude (`20,000 → 20`); name the magnitude in the descriptor. |
+| `magnitude_word(by)`                                                | English name for the divisor (`1000 → "thousand"`) — pairs with `scale_axis` for the descriptor unit. |
 
 ### Verification
 
