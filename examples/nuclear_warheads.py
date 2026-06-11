@@ -20,12 +20,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch, Rectangle
 
-from graphs import C_GRID, C_LABEL, C_SPINE, finalize, footnotes, set_theme, top_legend
+from graphs import C_GRID, C_LABEL, C_RED_BRAND, C_SPINE, finalize, footnotes, set_theme, top_legend
 
 set_theme()
 
 # Sampled from the original chart (FAS uses these in the source graphic too).
-C_DEPLOYED = "#E3120B"
+C_DEPLOYED = C_RED_BRAND
 C_RESERVE = "#FBA594"
 C_RETIRED = "#989583"
 

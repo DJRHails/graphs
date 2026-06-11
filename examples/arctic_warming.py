@@ -22,6 +22,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
 from graphs import (
+    C_RED_BRAND,
     C_GRID,
     C_LABEL,
     C_SPINE,
@@ -32,7 +33,7 @@ from graphs import (
 
 set_theme()
 
-C_RED_LINE = "#E3120B"
+C_RED_LINE = C_RED_BRAND
 C_RANGE = "#EE7479"  # at RANGE_ALPHA over white this gives the original's pink
 C_POLAR_BAND = "#D9F0F5"
 RANGE_ALPHA = 0.45

@@ -61,9 +61,27 @@ row when they fit, wrapping when they don't — leave `source=` off
 Behaviour that's automatic unless you override it:
 
 - **Title marker is the favicon triangle** (`marker="delta"`). The hollow
-  red triangle is drawn inline at the title baseline, sized to the cap
-  height. Pass `marker="rule"` for the legacy short red rule above the
-  title, or `marker="none"` to suppress entirely.
+  red triangle is drawn inline at the first title line's baseline, sized
+  to the cap height. Pass `marker="rule"` for the legacy short red rule
+  above the title, or `marker="none"` to suppress entirely.
+- **Titles and descriptors auto-wrap to the figure width.** Pass them as
+  single lines — `finalize()` measures with the renderer and breaks where
+  *this* figure needs it (with a widow fix, so no single-word last lines).
+  Never copy a reference chart's line breaks; explicit `\n` is reserved
+  for semantic breaks (a descriptor's subject / unit split).
+- **Multi-line descriptors lead semibold.** When the descriptor has two or
+  more lines, the first renders semibold over regular continuation lines.
+- **Numeric y labels sit on their gridlines** (`y_labels="on_grid"`,
+  the `finalize()` default): each gridline extends into the label gutter
+  and ends flush with the labels' outer edge; the label rests on its
+  line, and the bottom tick inherits the dark baseline stroke. Applied
+  only when the axes has visible y gridlines, so categorical axes are
+  untouched; works on either side (e.g. a left latitude axis). Opt out
+  with `y_labels="ticks"`, or call `y_labels_on_grid(ax)` manually on
+  extra facet panels.
+- **Annotations default to 9pt** — `callout`, `highlight_label`,
+  `direction_label`, `threshold_arrows` match direct-label size (the
+  print spec's 7.5pt reads too small at daily-chart scale).
 - **Footnote markers auto-superscript.** `*, †, ‡, §, **, ††, ‡‡, §§`
   render as superscripts anywhere they appear in titles, descriptors,
   source lines, or footnote bodies — write plain text, the renderer
@@ -260,7 +278,7 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=True)`                              | Apply theme globally. Call once.                       |
-| `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, …)` | Title stack, optional marker, source line, y-axis right. Auto-sizes margins. |
+| `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, y_labels="on_grid", …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
@@ -279,7 +297,7 @@ Style overrides to apply on top:
 | `dumbbell(ax, categories, start, end, *, label_start, label_end)`   | Before/after dot-and-line. Defaults red→blue.          |
 | `thermometer(ax, categories, values, *, series_labels, dot=True)`   | Tick-and-dot ranked categories. Warns above 4 series.  |
 | `threshold_lollipop(ax, categories, values, *, threshold=1.0)`      | Horizontal lollipop with fixed centre + leader lines.  |
-| `bump_chart(ax, ranks, *, highlight, aspect=…)`                     | Rank-over-time PCHIP-smoothed lines with white halo at crossings. |
+| `bump_chart(ax, ranks, *, highlight, aspect=…, max_rank=…)`         | Rank-over-time PCHIP-smoothed lines with white halo at crossings. `max_rank` crops the rank axis so a large backdrop can't compress the story band. |
 | `scatter_standard(ax, x, y)`                                        | General-trend scatter, 50% opacity, no stroke.         |
 | `scatter_highlight(ax, x, y)`                                       | Outlier / labelled scatter, 100% opacity.              |
 | `scatter_category(ax, x, y)`                                        | Bubble dot, 50% fill + 0.3px stroke for overlap.       |
@@ -305,6 +323,7 @@ Style overrides to apply on top:
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `label_lines(ax, *, stroke=False)`                                  | Direct labels at line ends with collision avoidance.   |
 | `inset_tick_labels(ax, *, axis="x")`                                | First tick label `ha="left"`, last `ha="right"`.       |
+| `y_labels_on_grid(ax)`                                              | Sit y tick labels on gridlines extended under them (the `finalize()` default; call manually on extra facet panels). |
 | `italicize_labels(ax, labels)`                                      | Italicise specific tick labels in place.               |
 | `style_labels(ax, *, italic=(), bold=())`                           | Per-label italic/bold preserving tick colour.          |
 | `color_axis(ax, side, color, *, spine=True, ticks=True)`            | Colour a spine + ticks + labels to match a series.     |
