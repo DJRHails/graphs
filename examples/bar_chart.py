@@ -9,16 +9,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import bar_h, finalize, save_chart, set_theme
+from graphs import bar_h, finalize, save_chart, set_theme, subplots
 
 set_theme()
 
 categories = ["Germany", "France", "Italy", "Spain", "Poland", "Sweden"]
 values = [3.7, 2.4, 1.8, 2.1, 4.2, 3.1]
 
-fig, ax = plt.subplots(figsize=(7, 4))
+fig, ax = subplots("wide", height=4.0)
 
 bar_h(ax, categories, values)
 

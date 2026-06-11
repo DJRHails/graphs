@@ -15,9 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import C_RED, C_SPINE, bar_v, finalize, save_chart, set_theme, year_ticks
+from graphs import C_RED, C_SPINE, bar_v, finalize, save_chart, set_theme, subplots, year_ticks
 
 set_theme()
 
@@ -36,7 +34,7 @@ ANOMALY = [
     0.32, 0.00, 0.24, 1.32, 1.03, 0.94, 0.99, 1.09, 1.13, 1.50,           # 2010s
 ]
 
-fig, ax = plt.subplots(figsize=(5.0, 5.1))
+fig, ax = subplots("daily", height=4.7)
 
 bar_v(
     ax,

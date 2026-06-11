@@ -20,12 +20,12 @@ The import package is `graphs`.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import finalize, label_lines, save_chart, set_theme
+from graphs import finalize, label_lines, save_chart, set_theme, subplots
 
 set_theme()
 
 x = np.arange(12)
-fig, ax = plt.subplots(figsize=(7, 4.4))
+fig, ax = subplots("wide")
 ax.plot(x, 40 + 2.1 * x, label="Series A")
 ax.plot(x, 58 - 1.3 * x, label="Series B")
 label_lines(ax)

@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import (
@@ -19,6 +18,7 @@ from graphs import (
     scatter_highlight,
     scatter_standard,
     set_theme,
+    subplots,
     trend_line,
 )
 
@@ -33,7 +33,7 @@ y = 0.6 * x + rng.normal(0, 8, n) + 10
 x_out = np.array([18, 82])
 y_out = np.array([72, 24])
 
-fig, ax = plt.subplots(figsize=(7, 4.4))
+fig, ax = subplots("wide")
 
 scatter_standard(ax, x, y)
 scatter_highlight(ax, x_out, y_out)

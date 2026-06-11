@@ -19,7 +19,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.patheffects as patheffects
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -32,6 +31,7 @@ from graphs import (
     inset_tick_labels,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -105,8 +105,8 @@ poorest_50pct = np.array(
     ]
 )
 
-# Reference is ~325x428 px, so the figure keeps a w/h ratio near 0.76.
-fig, ax = plt.subplots(figsize=(3.85, 5.45))
+# Reference is ~325x428 px; height keeps the replica near that w/h ratio.
+fig, ax = subplots("daily", height=6.5)
 
 ax.plot(years, richest_1pct, color=C_GREY, linewidth=1.8, zorder=3)
 # White underlay so the red line reads cleanly where it crosses the grey.

@@ -20,10 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.font_manager as fm
-import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import C_LABEL, C_SPINE, PALETTE, finalize, save_chart, set_theme, y_axis_label
+from graphs import C_LABEL, C_SPINE, PALETTE, finalize, save_chart, set_theme, subplots, y_axis_label
 
 set_theme()
 
@@ -47,7 +46,7 @@ for row in reader:
 oecd_x = statistics.mean(r[1] for r in rows)
 oecd_y = statistics.mean(r[2] for r in rows)
 
-fig, ax = plt.subplots(figsize=(7, 4.8))
+fig, ax = subplots("wide", height=4.8)
 
 # Background: all dots same colour, faded.
 faded_x = [r[1] for r in rows if r[0] not in LABELLED]

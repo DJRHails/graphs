@@ -19,10 +19,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.font_manager as fm
-import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, color_axis, finalize, footnotes, get_font, save_chart, set_theme
+from graphs import PALETTE, color_axis, finalize, footnotes, get_font, save_chart, set_theme, subplots
 from graphs._superscript import render_text_with_superscripts
 
 set_theme()
@@ -41,7 +40,7 @@ for row in reader:
 # Axis ranges: 1% of the midpoint occupies the same vertical pixel distance
 # on both axes. Midpoints ≈ 19.3 kg and 43.4 cm → ratio 2.25, so neck range
 # must be 2.25× the weight range.
-fig, ax_left = plt.subplots(figsize=(7, 4.2))
+fig, ax_left = subplots("wide", height=4.2)
 
 ax_right = ax_left.twinx()
 

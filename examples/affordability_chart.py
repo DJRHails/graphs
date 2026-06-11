@@ -15,7 +15,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, NullLocator
 
 from graphs import (
@@ -23,6 +22,7 @@ from graphs import (
     footnotes,
     save_chart,
     set_theme,
+    subplots,
     threshold_arrows,
     threshold_lollipop,
 )
@@ -64,7 +64,7 @@ CITY_VALUES: list[tuple[str, float]] = [
 categories = [name for name, _ in CITY_VALUES]
 values = [v for _, v in CITY_VALUES]
 
-fig, ax = plt.subplots(figsize=(6.6, 8.4))
+fig, ax = subplots("daily", height=5.9)
 
 threshold_lollipop(ax, categories, values, threshold=1.0)
 
@@ -81,10 +81,11 @@ finalize(
     ax,
     title="Average wage* relative to renters' wage†",
     descriptor="Selected European cities, 2025, log scale",
-    source="Sources: [Eurostat](https://ec.europa.eu/eurostat); [ERI Economic Research Institute](https://www.erieri.com/); [The Economist](https://www.economist.com/)",
+    source="",  # owned by footnotes() below so notes stack above it
     y_axis_right=False,
     title_x=0.02,
     autoscale_y=False,
+    y_start=0.050,  # clear the top-mounted x-tick labels at the 4.6in width
     footnote_lines=2,
 )
 
@@ -99,6 +100,7 @@ footnotes(
     fig,
     "*Based on location of workplace, not residence",
     "†30% of which is enough to pay rent on an average one-bedroom flat",
+    source="Sources: [Eurostat](https://ec.europa.eu/eurostat); [ERI Economic Research Institute](https://www.erieri.com/); [The Economist](https://www.economist.com/)",
 )
 
 save_chart(__file__)

@@ -15,14 +15,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from graphs import (
     C_RED,
     finalize,
     footnotes,
     save_chart,
     set_theme,
+    subplots,
     top_legend,
     year_ticks,
 )
@@ -50,7 +49,7 @@ years = list(SHARES)
 right = [SHARES[y][0] for y in years]
 left = [SHARES[y][1] for y in years]
 
-fig, ax = plt.subplots(figsize=(6.2, 5.8))
+fig, ax = subplots("daily", height=4.3)
 
 bars_right = ax.bar(years, right, width=0.5, color=C_RED, zorder=2)
 bars_left = ax.bar(years, left, width=0.5, bottom=right, color=C_LEFT, zorder=2)

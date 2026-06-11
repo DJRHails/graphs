@@ -20,7 +20,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -35,6 +34,7 @@ from graphs import (
     save_chart,
     set_theme,
     snapshot_palette,
+    subplots,
 )
 
 set_theme()
@@ -156,7 +156,7 @@ series = [
 ]
 colors = snapshot_palette(len(series))
 
-fig, ax = plt.subplots(figsize=(8.4, 5.0))
+fig, ax = subplots("wide", height=4.2)
 
 for (label, ys), color in zip(series, colors):
     lw = 2.0 if label == "2024" else 1.6

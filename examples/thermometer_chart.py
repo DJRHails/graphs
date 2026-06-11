@@ -15,9 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import cycle_for, finalize, save_chart, set_theme, thermometer, top_legend
+from graphs import cycle_for, finalize, save_chart, set_theme, subplots, thermometer, top_legend
 
 set_theme()
 
@@ -49,7 +47,7 @@ values = [
     [60, 90, 115],    # Communication
 ]
 
-fig, ax = plt.subplots(figsize=(7, 5.0))
+fig, ax = subplots("wide", height=5.0)
 # Custom layout: top-mounted x-ticks + a top_legend at y=0.72 sit between
 # the title-stack and the chart, so the standard auto_layout doesn't fit.
 fig.subplots_adjust(top=0.66, bottom=0.10, left=0.22, right=0.94)

@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -23,6 +22,7 @@ from graphs import (
     right_axis,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -37,7 +37,7 @@ panels = {
     "Sexual": np.cumsum(np.random.randn(80) * 0.006),
 }
 
-fig, axes = plt.subplots(1, 3, figsize=(10, 5.5), sharey=False)
+fig, axes = subplots("wide", height=3.9, ncols=3, sharey=False)
 fig.subplots_adjust(
     top=0.72, bottom=0.16, left=0.04, right=0.97, wspace=0.35
 )

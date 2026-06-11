@@ -23,7 +23,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 from scipy.signal import savgol_filter
@@ -37,6 +36,7 @@ from graphs import (
     save_chart,
     scatter_standard,
     set_theme,
+    subplots,
     year_axis,
 )
 
@@ -68,7 +68,7 @@ def smooth(xs: list[datetime], ys: list[float], n: int = 200) -> tuple[np.ndarra
     return grid, y_smooth
 
 
-fig, ax = plt.subplots(figsize=(7, 4.4))
+fig, ax = subplots("wide")
 
 scatter_standard(ax, dates, right, color=PALETTE["blue"], size=12)
 scatter_standard(ax, dates, wrong, color=PALETTE["red"], size=12)

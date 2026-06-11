@@ -22,7 +22,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import (
@@ -34,6 +33,7 @@ from graphs import (
     panel_label,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -96,7 +96,7 @@ def ridgeline(ax, langs, xlim, fill):
     ax.tick_params(axis="x", length=3, pad=4)
 
 
-fig, (ax_syl, ax_bit) = plt.subplots(1, 2, figsize=(7.4, 7.0))
+fig, (ax_syl, ax_bit) = subplots("wide", height=6.6, ncols=2)
 fig.subplots_adjust(top=0.80, bottom=0.12, left=0.02, right=0.98, wspace=0.22)
 
 ridgeline(ax_syl, SYLLABLES, (3.3, 9.6), RED_FILL)

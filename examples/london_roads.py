@@ -16,11 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
-from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme
+from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -52,7 +51,7 @@ BOUNDS = list(range(0, 80, 10))
 CMAP = ListedColormap(BIN_COLORS)
 NORM = BoundaryNorm(BOUNDS, CMAP.N)
 
-fig, ax = plt.subplots(figsize=(4.7, 4.35))
+fig, ax = subplots("daily", height=4.3)
 fig.subplots_adjust(top=0.625, bottom=0.125, left=0.085, right=0.96)
 
 ax.pcolormesh(

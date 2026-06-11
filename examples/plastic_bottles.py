@@ -23,10 +23,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import PALETTE, finalize, footnotes, save_chart, set_theme, top_legend
+from graphs import PALETTE, finalize, footnotes, save_chart, set_theme, subplots, top_legend
 
 _LAND_URL = (
     "https://raw.githubusercontent.com/martynafford/natural-earth-geojson"
@@ -88,7 +87,7 @@ SERIES = [
     ("Other regions", C_OTHER_LIGHT, [7, 6, 2]),
 ]
 
-fig, ax = plt.subplots(figsize=(5.2, 5.2))
+fig, ax = subplots("daily", height=4.6)
 fig.subplots_adjust(top=0.72, bottom=0.16, left=0.33, right=0.93)
 
 bottom = np.zeros(len(YEARS))

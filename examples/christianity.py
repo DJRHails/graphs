@@ -16,9 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import C_GRID, PALETTE, finalize, save_chart, set_theme
+from graphs import C_GRID, PALETTE, finalize, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -35,7 +33,7 @@ SERIES = [
 
 X_LEFT, X_RIGHT = 2015, 2060
 
-fig, ax = plt.subplots(figsize=(5.0, 5.3))
+fig, ax = subplots("daily", height=4.9)
 
 # Two vertical gridlines anchor the slope chart — no horizontal grid.
 for x in (X_LEFT, X_RIGHT):

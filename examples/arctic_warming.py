@@ -19,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 
 from graphs import (
     C_RED_BRAND,
@@ -29,6 +28,7 @@ from graphs import (
     finalize,
     save_chart,
     set_theme,
+    subplots,
     top_legend,
     x_axis_top,
 )
@@ -48,10 +48,10 @@ AVG = [3.05, 2.20, 1.40, 1.10, 0.95, 0.85, 0.85, 0.75, 0.80, 0.45, 0.65, 0.70]
 LO = [2.15, 0.55, -0.25, 0.20, 0.30, 0.40, 0.35, 0.15, 0.25, -0.25, -0.25, 0.15]
 HI = [4.80, 3.60, 2.35, 1.90, 1.75, 1.55, 1.60, 1.45, 1.30, 1.15, 1.95, 1.15]
 
-fig, ax = plt.subplots(figsize=(5.4, 4.5))
+fig, ax = subplots("daily", height=3.8)
 # Top-mounted x-ticks plus a top_legend sit between the title and the chart,
 # so the standard auto_layout doesn't fit (same pattern as nuclear_warheads).
-fig.subplots_adjust(top=0.70, bottom=0.155, left=0.095, right=0.965)
+fig.subplots_adjust(top=0.62, bottom=0.155, left=0.095, right=0.965)
 
 # Pale blue Arctic / Antarctic panels, run across the full figure width like
 # the original (under the latitude labels in the left margin).
@@ -157,7 +157,7 @@ top_legend(
     ["Average", "Range‡"],
     align="right",
     x=bbox.x1,
-    y=bbox.y1 + 0.10,
+    y=bbox.y1 + 0.12,
     fontsize=9,
 )
 

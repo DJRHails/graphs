@@ -16,8 +16,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from graphs import (
     C_GRID,
     C_LABEL_MUTED,
@@ -27,6 +25,7 @@ from graphs import (
     finalize,
     save_chart,
     set_theme,
+    subplots,
     x_axis_label,
 )
 
@@ -39,7 +38,7 @@ MALE = [0.0, -0.004, -0.004, -0.0095, -0.018, -0.022]
 
 BAR_COLOR = "#cee1ea"  # pale-blue connector sampled from the reference
 
-fig, ax = plt.subplots(figsize=(4.8, 5.0))
+fig, ax = subplots("daily", height=4.8)
 
 # Connector bars first so the dots sit on top.
 for i, (f, m) in enumerate(zip(FEMALE, MALE)):

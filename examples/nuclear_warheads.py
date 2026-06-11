@@ -16,7 +16,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch, Rectangle
 
@@ -29,6 +28,7 @@ from graphs import (
     footnotes,
     save_chart,
     set_theme,
+    subplots,
     top_legend,
     x_axis_top,
 )
@@ -57,7 +57,7 @@ retired = np.array([1150, 1477, 0, 0, 0, 0, 0, 0, 0])
 
 # Narrow portrait canvas to match the original daily-chart proportions
 # (~0.77 w/h), so typography and bar thickness read at the same scale.
-fig, ax = plt.subplots(figsize=(4.6, 6.0))
+fig, ax = subplots("daily", height=6.0)
 # Top-mounted x-ticks plus a top_legend sit between the title and the chart,
 # so the standard auto_layout doesn't fit (same pattern as thermometer_chart).
 fig.subplots_adjust(top=0.74, bottom=0.065, left=0.24, right=0.96)

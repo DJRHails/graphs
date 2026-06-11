@@ -9,10 +9,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-from graphs import dumbbell, finalize, save_chart, set_theme, top_legend
+from graphs import dumbbell, finalize, save_chart, set_theme, subplots, top_legend
 
 set_theme()
 
@@ -27,7 +26,7 @@ countries = [
 gdp_2000 = [10.25, 1.21, 1.95, 4.72, 0.47, 0.65]
 gdp_2020 = [20.93, 14.72, 3.84, 5.06, 2.62, 1.44]
 
-fig, ax = plt.subplots(figsize=(8, 4.5))
+fig, ax = subplots("wide", height=3.9)
 
 dumbbell(
     ax,

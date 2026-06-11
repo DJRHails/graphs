@@ -14,9 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import bar_h, finalize, footnotes, save_chart, set_theme
+from graphs import bar_h, finalize, footnotes, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -28,8 +26,8 @@ BAR_RED = "#f5423c"
 categories = ["Don’t care", "Yes", "No", "Not sure"][::-1]
 values = [34, 28, 27, 11][::-1]
 
-FIG_H_IN = 4.9
-fig, ax = plt.subplots(figsize=(3.4, FIG_H_IN))
+FIG_H_IN = 6.6
+fig, ax = subplots("daily", height=FIG_H_IN)
 # Manual margins: auto-layout's left edge would clip the category labels
 # (bar_h hangs them left of the axes), and the top-mounted x-ticks need
 # extra headroom under the title stack.

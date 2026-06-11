@@ -20,11 +20,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from examples._data import load_csv_lines
-from graphs import PALETTE, finalize, footnotes, panel_label, right_axis, save_chart, set_theme, top_legend
+from graphs import (
+    PALETTE,
+    finalize,
+    footnotes,
+    panel_label,
+    right_axis,
+    save_chart,
+    set_theme,
+    subplots,
+    top_legend,
+)
 
 set_theme()
 
@@ -91,8 +100,8 @@ def stacked(ax, d: dict[str, list[float]], title: str) -> None:
     ax.set_xticks(years)
 
 
-fig, (ax_bb, ax_ca) = plt.subplots(1, 2, figsize=(9, 4.8), sharey=False)
-fig.subplots_adjust(top=0.62, bottom=0.10, left=0.02, right=0.96, wspace=0.18)
+fig, (ax_bb, ax_ca) = subplots("wide", height=3.7, ncols=2, sharey=False)
+fig.subplots_adjust(top=0.62, bottom=0.16, left=0.02, right=0.95, wspace=0.18)
 
 stacked(ax_bb, bb, "Budget balance, € bn")
 stacked(ax_ca, ca, "Current-account balance, € bn")

@@ -18,10 +18,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_LABEL, C_RED, C_SPINE, finalize, index_marker, save_chart, set_theme
+from graphs import (
+    C_LABEL,
+    C_RED,
+    C_SPINE,
+    finalize,
+    index_marker,
+    save_chart,
+    set_theme,
+    subplots,
+)
 
 set_theme()
 
@@ -107,7 +115,7 @@ def _daily(anchors: list[tuple[date, float]], noise: float, seed: int):
 gold_x, gold_y = _daily(GOLD_ANCHORS, noise=0.7, seed=4)
 sp_x, sp_y = _daily(SP500_ANCHORS, noise=0.5, seed=11)
 
-fig, ax = plt.subplots(figsize=(3.8, 5.2))
+fig, ax = subplots("daily", height=6.3)
 
 ax.plot(sp_x, sp_y, color=C_SP500, linewidth=1.8, zorder=3)
 ax.plot(gold_x, gold_y, color=C_RED, linewidth=1.8, zorder=4)
