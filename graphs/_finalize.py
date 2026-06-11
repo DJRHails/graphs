@@ -553,20 +553,52 @@ def finalize(
         pass
 
     if descriptor:
-        n_desc_lines = descriptor.count("\n") + 1
+        desc_lines = descriptor.split("\n")
+        n_desc_lines = len(desc_lines)
         fp_desc = fm.FontProperties(family=_get_font_condensed(), weight="normal")
-        render_text_with_superscripts(
-            fig,
-            tx,
-            y_cursor,
-            descriptor,
-            fontsize=DESCRIPTOR_SIZE_PT,
-            fontproperties=fp_desc,
-            color=C_SPINE,
-            va="bottom",
-            ha="left",
-            linespacing=DESCRIPTOR_LINESPACING,
-        )
+        if n_desc_lines >= 2:
+            # Multi-line descriptors lead with a semibold first line (the
+            # subject) over regular continuation lines (scope/units).
+            fp_desc_lead = fm.FontProperties(
+                family=_get_font_condensed(), weight="semibold"
+            )
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor,
+                "\n".join(desc_lines[1:]),
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor + DESCRIPTOR_LINE_BOX_PT * pt2fig * (n_desc_lines - 1),
+                desc_lines[0],
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc_lead,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
+        else:
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor,
+                descriptor,
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
         # Descriptor line box ≈ 9.5pt × 1.20 ≈ 11.4pt for each line.
         y_cursor += DESCRIPTOR_LINE_BOX_PT * pt2fig * n_desc_lines + line_gap
 

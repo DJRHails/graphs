@@ -228,6 +228,18 @@ def inset_tick_labels(ax, *, axis: str = "x") -> None:
     labels[-1].set_ha("right")
 
 
+def y_labels_on_grid(ax) -> None:
+    """Sit y-axis tick labels on top of their gridlines (daily-chart style).
+
+    Standard Economist daily-chart convention: instead of centring each
+    y tick label vertically on its gridline, rest the label's bottom edge
+    on the line so it reads as sitting *on* the grid. Works on either
+    side of the axes (applies to whichever tick labels are visible).
+    """
+    for label in list(ax.get_yticklabels()) + list(ax.get_yticklabels(minor=True)):
+        label.set_verticalalignment("bottom")
+
+
 def italicize_labels(
     ax,
     labels: Iterable[str],

@@ -67,6 +67,7 @@ from graphs._labels import (
     italicize_labels,
     label_lines,
     style_labels,
+    y_labels_on_grid,
 )
 from graphs._legend import smart_legend, top_legend
 from graphs._palette import (
@@ -161,6 +162,7 @@ __all__ = [
     "italicize_labels",
     "style_labels",
     "label_lines",
+    "y_labels_on_grid",
     "smart_legend",
     "top_legend",
     # fonts
