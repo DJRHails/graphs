@@ -114,7 +114,6 @@ ax.text(
 finalize(
     ax,
     title="A more complex arms race than that of the cold war looms",
-    marker="rule",
     descriptor="Estimated nuclear-warhead inventories, Oct 2025",
     source="",
     y_axis_right=False,

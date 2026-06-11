@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_RED, C_TEXT, finalize, scatter_standard, set_theme
+from graphs import C_RED, C_TEXT, finalize, scatter_standard, set_theme, y_labels_on_grid
 
 set_theme()
 
@@ -64,10 +64,13 @@ y = np.concatenate([y, y_hi])
 
 fig, ax = plt.subplots(figsize=(6.2, 5.2))
 
-scatter_standard(ax, x, y, color=C_RED, size=76)
+# Firmer dots than the scatter_standard default 50% — the published chart's
+# cloud reads more solid — with the trend curve drawn last so it stays on top.
+dots = scatter_standard(ax, x, y, color=C_RED, size=76)
+dots.set_alpha(0.7)
 
 xs = np.linspace(0, 100, 200)
-ax.plot(xs, trend(xs), color=C_RED, linewidth=2.4, zorder=4)
+ax.plot(xs, trend(xs), color=C_RED, linewidth=3.0, zorder=5)
 
 ax.set_xlim(104, -4)
 ax.set_xticks([100, 75, 50, 25, 0])
@@ -95,12 +98,12 @@ with warnings.catch_warnings():
     finalize(
         ax,
         title="Which degree gives you the best salary after one year in the workforce?",
-        marker="rule",
         descriptor="United States, earnings one year after graduation\n"
         "By major and college selectivity, 2017-18, $'000",
         source="Source: Department of Education",
         autoscale_y=False,
     )
+y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "graduate_pay.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

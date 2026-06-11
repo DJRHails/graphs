@@ -9,9 +9,12 @@ rate (red) and information rate (blue). Languages that pack less
 information per syllable (Japanese, Spanish) are spoken faster, so the
 information-rate distributions cluster — the original's point.
 
-Distributions are approximated from the chart as small Gaussian mixtures
-(the underlying study is Coupé et al., Science Advances 2019), drawn with
-plain ``fill_between`` on per-language baselines.
+Each distribution is a Gaussian centred on the real per-language mean
+with the real standard deviation, computed from the study's published
+raw data (Coupé, Oh, Dediu & Pellegrino, "Different languages, similar
+encoding efficiency", Science Advances 2019; supplementary data set
+``InfoRateData.csv``). Drawn with plain ``fill_between`` on per-language
+baselines.
 """
 
 import sys
@@ -37,28 +40,30 @@ set_theme()
 RED_FILL = "#E92A36"   # vivid red sampled from the original
 BLUE_FILL = "#80AEC5"  # muted steel blue sampled from the original
 
-# Each language maps to a list of (weight, mean, sigma) Gaussian components
-# eyeballed from the reference shapes. Weights sum to 1, so every language
-# has equal area and broad distributions (Italian, English) sit low.
+# Real per-language means and standard deviations from Coupé et al.
+# (2019), computed from the authors' supplementary data (InfoRateData.csv):
+# SR = syllables/sec, IR = bits/sec. Each language is one (weight=1, mean,
+# sigma) Gaussian, so equal area; the wide distributions (Italian, English)
+# render low and broad exactly as in the reference. Listed fast-to-slow.
 SYLLABLES = {
-    "Japanese": [(0.78, 8.10, 0.48), (0.22, 7.00, 0.75)],
-    "Spanish": [(0.78, 7.70, 0.48), (0.22, 6.80, 0.65)],
-    "Finnish": [(0.90, 7.25, 0.45), (0.10, 4.90, 0.45)],
-    "Italian": [(0.65, 7.00, 0.85), (0.35, 5.70, 1.00)],
-    "English": [(0.80, 6.20, 0.65), (0.20, 7.40, 0.85)],
-    "Thai": [(0.40, 4.18, 0.26), (0.60, 4.92, 0.33)],
+    "Japanese": [(1.0, 8.03, 0.52)],
+    "Spanish": [(1.0, 7.73, 0.47)],
+    "Finnish": [(1.0, 7.17, 0.62)],
+    "Italian": [(1.0, 7.16, 1.05)],
+    "English": [(1.0, 6.34, 0.67)],
+    "Thai": [(1.0, 4.70, 0.48)],
 }
 INFO_RATE = {
-    "Japanese": [(0.80, 38.5, 2.2), (0.20, 42.5, 3.0)],
-    "Spanish": [(0.72, 42.8, 1.6), (0.28, 39.3, 1.8)],
-    "Finnish": [(0.90, 40.5, 2.0), (0.10, 31.5, 1.6)],
-    "Italian": [(0.55, 39.5, 3.2), (0.45, 45.0, 4.0)],
-    "English": [(0.74, 45.8, 3.3), (0.26, 55.5, 2.6)],
-    "Thai": [(0.38, 30.8, 1.6), (0.62, 35.3, 2.1)],
+    "Japanese": [(1.0, 40.41, 2.63)],
+    "Spanish": [(1.0, 41.96, 2.53)],
+    "Finnish": [(1.0, 39.37, 3.41)],
+    "Italian": [(1.0, 37.89, 5.55)],
+    "English": [(1.0, 44.94, 4.78)],
+    "Thai": [(1.0, 33.80, 3.43)],
 }
 
 Y_TOP = 6.35  # headroom above the top row for the direction cue
-PEAK = 0.85  # tallest peak, in row units
+PEAK = 0.72  # tallest peak, in row units
 
 
 def mixture_pdf(x, components):
@@ -79,7 +84,7 @@ def ridgeline(ax, langs, xlim, fill):
         base = len(langs) - 1 - i  # first language on the top row
         ax.fill_between(x, base, base + density * scale, color=fill, linewidth=0, zorder=3)
         ax.hlines(base, *xlim, color=C_SPINE, linewidth=0.8, zorder=4)
-        ax.text(x[0], base + 0.42, name, fontsize=9.5, color=C_LABEL, va="bottom", zorder=5)
+        ax.text(x[0], base + 0.42, name, fontsize=10, color=C_LABEL, va="bottom", zorder=5)
 
     ax.set_xlim(*xlim)
     ax.set_ylim(0, Y_TOP)
@@ -117,7 +122,6 @@ direction_label(
 finalize(
     ax_syl,
     title="Why are some languages spoken faster than others?",
-    marker="rule",
     descriptor="Syllable rate and information rate in selected languages",
     source="",
     title_x=0.02,
@@ -126,7 +130,13 @@ finalize(
     autoscale_y=False,
     auto_layout=False,  # side-by-side panels need explicit wspace
 )
-footnotes(fig, source="Source: Science Advances (2019)")
+footnotes(
+    fig,
+    source=(
+        "Source: Coupé et al., "
+        "[Science Advances (2019)](https://doi.org/10.1126/sciadv.aaw2594)"
+    ),
+)
 
 out = Path(__file__).resolve().parent / "language_speed.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

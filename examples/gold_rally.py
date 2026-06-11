@@ -133,8 +133,8 @@ ax.annotate(
     color=C_SPINE, fontsize=9.5, ha="center", va="bottom",
 )
 
-# Axes: month-boundary tick marks, letter labels centred mid-month,
-# year labels below.
+# Axes: the bottom spine is the x-axis baseline; month-boundary tick
+# marks hang from it, letter labels sit between them, year labels below.
 month_starts = [date(2025, m, 1) for m in range(1, 13)] + [
     date(2026, 1, 1),
     date(2026, 2, 1),
@@ -144,21 +144,20 @@ ax.set_xticklabels([""] * len(month_starts))
 month_mids = [date(2025, m, 16) for m in range(1, 13)] + [date(2026, 1, 16)]
 ax.set_xticks([mdates.date2num(d) for d in month_mids], minor=True)
 ax.set_xticklabels(list("JFMAMJJASOND") + ["J"], minor=True)
-ax.tick_params(axis="x", which="minor", length=0)
-ax.tick_params(axis="x", which="major", length=6)
+ax.tick_params(axis="x", which="minor", length=0, pad=8)
+ax.tick_params(axis="x", which="major", length=6, color=C_LABEL)
 
 for d, label in ((date(2025, 7, 1), "2025"), (date(2026, 1, 16), "2026")):
     ax.annotate(
         label,
         xy=(mdates.date2num(d), 0), xycoords=("data", "axes fraction"),
-        xytext=(0, -22), textcoords="offset points",
+        xytext=(0, -24), textcoords="offset points",
         ha="center", va="top", fontsize=9, color=C_LABEL,
     )
 
 ax.set_xlim(gold_x[0] - 5, gold_x[-1] + 3)
-ax.set_ylim(76, 202)
+ax.set_ylim(80, 202)
 ax.set_yticks(range(80, 201, 20))
-ax.spines["bottom"].set_visible(False)
 
 finalize(
     ax,
@@ -166,8 +165,12 @@ finalize(
     descriptor="Returns, January 1st 2025=100",
     source="Source: LSEG Workspace",
     autoscale_y=False,
-    marker="rule",
 )
+
+# The spine doubles as the 80 line: drop the duplicate gridline and sit
+# the "80" tick label just above the baseline, as in the reference.
+ax.yaxis.get_gridlines()[0].set_visible(False)
+ax.get_yticklabels()[0].set_verticalalignment("bottom")
 
 out = Path(__file__).resolve().parent / "gold_rally.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

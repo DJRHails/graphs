@@ -116,7 +116,7 @@ for cx, name, col, sublines, bold_subs in GROUPS:
                 color=col)
 
 # --- Three stacked 100% bars ----------------------------------------------
-BAR_H = 0.075
+BAR_H = 0.054
 for i, (label, unit, segments) in enumerate(ROWS):
     label_y = 0.595 - i * 0.230
     bar_y = label_y - 0.040 - BAR_H
@@ -134,15 +134,17 @@ for i, (label, unit, segments) in enumerate(ROWS):
              (left + width, bar_y + BAR_H), (left, bar_y + BAR_H)],
             closed=True, facecolor=col, edgecolor="none", zorder=2,
         ))
-        ax.text(left + 1.0, bar_y + BAR_H / 2, str(value), ha="left",
-                va="center", fontsize=9.5, fontweight="bold", color="white",
+        ax.text(left + 1.2, bar_y + BAR_H / 2, str(value), ha="left",
+                va="center", fontsize=13.5, fontweight="bold", color="white",
                 zorder=3)
         left += width
+        if left < 100:  # white separator between adjoining segments
+            ax.plot([left, left], [bar_y, bar_y + BAR_H], color="white",
+                    lw=2.4, solid_capstyle="butt", zorder=4)
 
 finalize(
     ax,
     title="Alcohol firms depend financially on problem drinkers’ dependency",
-    marker="rule",
     descriptor="Britain, alcohol consumption, 2013-14, units per week",
     source="",
     y_axis_right=False,

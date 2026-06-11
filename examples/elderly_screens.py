@@ -73,13 +73,14 @@ for ax, (heading, tv, phone, computer) in zip(axes, PANELS):
         color=C_LABEL, ha="left", va="bottom", zorder=6,
     )
 
-# Direct in-area series labels on the left panel only, like the original.
+# Direct in-area series labels on the left panel only, like the original —
+# each centred on the panel midpoint (2017) and on its band's height there.
 ax_young = axes[0]
-ax_young.text(2016.1, 1.6, "TV", color="white", fontsize=12,
+ax_young.text(2017, 1.8, "TV", color="white", fontsize=12,
               fontweight="bold", ha="center", va="center", zorder=5)
-ax_young.text(2016.1, 4.75, "Smartphone", color="white", fontsize=12,
+ax_young.text(2017, 4.8, "Smartphone", color="white", fontsize=12,
               fontweight="bold", ha="center", va="center", zorder=5)
-ax_young.text(2016.4, 7.0, "Computer", color="#5E96B0", fontsize=12,
+ax_young.text(2017, 6.85, "Computer", color="#5E96B0", fontsize=12,
               fontweight="bold", ha="center", va="bottom", zorder=5)
 
 finalize(
@@ -87,7 +88,6 @@ finalize(
     title="America's elderly seem more screen-obsessed than the young",
     descriptor="Daily hours spent consuming media\nBy age group, in the first quarter of the year",
     source="",
-    marker="rule",
     title_x=0.03,
     y_start=0.075,  # leave room for the panel headings
     autoscale_y=False,

@@ -28,6 +28,7 @@ from graphs import (
     footnotes,
     set_theme,
     snapshot_palette,
+    y_labels_on_grid,
 )
 
 set_theme()
@@ -97,12 +98,12 @@ finalize(
     title="Millennials spend more time than past generations with their children",
     descriptor="US parents*, minutes per day spent on child care†\nBy generation, 1975-2018",
     source="",
-    marker="rule",
     y_axis_right=True,
     y_start=0.085,  # leave room for the "Mothers" panel heading
     autoscale_y=False,
     footnote_lines=3,
 )
+y_labels_on_grid(ax)
 # Narrow figure: widen the right margin so the right-hand y-tick labels fit.
 fig.subplots_adjust(right=0.915)
 footnotes(

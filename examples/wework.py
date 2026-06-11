@@ -99,7 +99,6 @@ for ax, (label, ww, iwg, ww_text, iwg_text) in zip(axes, PANELS, strict=True):
 finalize(
     axes[0],
     title="Is WeWork working?",
-    marker="rule",
     descriptor="Shared workspace providers, 2018, $bn",
     source="",
     title_x=0.02,

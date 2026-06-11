@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import finalize, footnotes, set_theme
+from graphs import finalize, footnotes, set_theme, y_labels_on_grid
 
 set_theme()
 
@@ -60,31 +60,31 @@ ax.bar(
 # Global-average reference line: dashes start above the Asia Pacific bar.
 ax.plot([4.15, X_MAX], [GLOBAL_AVG, GLOBAL_AVG], color=C_AVG, linewidth=1.0,
         linestyle=(0, (4, 2)), zorder=3)
-ax.text(6.5, GLOBAL_AVG + 0.55, "Global average ", color=C_AVG, fontsize=9.5,
+ax.text(6.5, GLOBAL_AVG + 0.55, "Global average ", color=C_AVG, fontsize=9,
         ha="right", va="baseline", fontweight="bold")
-ax.text(6.5, GLOBAL_AVG + 0.55, "4.6", color=C_AVG, fontsize=9.5,
+ax.text(6.5, GLOBAL_AVG + 0.55, "4.6", color=C_AVG, fontsize=9,
         ha="left", va="baseline")
 
 
 def bar_label(x, y, name, value, color, *, ha="center", stacked=True):
     """Bold region name with its total-emissions value, stacked or inline."""
     if stacked:
-        ax.text(x, y, name, color=color, fontsize=9.5, ha=ha, va="baseline",
+        ax.text(x, y, name, color=color, fontsize=9, ha=ha, va="baseline",
                 fontweight="bold", zorder=4)
-        ax.text(x, y - 1.1, value, color=color, fontsize=9.5, ha=ha,
+        ax.text(x, y - 0.75, value, color=color, fontsize=9, ha=ha,
                 va="baseline", zorder=4)
     else:
-        ax.text(x, y, f"{name} ", color=color, fontsize=9.5, ha="right",
+        ax.text(x, y, f"{name} ", color=color, fontsize=9, ha="right",
                 va="baseline", fontweight="bold", zorder=4)
-        ax.text(x, y, value, color=color, fontsize=9.5, ha="left",
+        ax.text(x, y, value, color=color, fontsize=9, ha="left",
                 va="baseline", zorder=4)
 
 
 # United States — label to the right of the bar top, with the total spelt out.
-ax.text(0.40, 16.6, "United States", color="#A8172A", fontsize=9.5,
+ax.text(0.40, 16.6, "United States", color="#A8172A", fontsize=9,
         ha="left", va="baseline", fontweight="bold")
-ax.text(0.40, 15.5, "Total emissions 5.3 gigatonnes", color="#A8172A",
-        fontsize=9.5, ha="left", va="baseline")
+ax.text(0.40, 15.85, "Total emissions 5.3 gigatonnes", color="#A8172A",
+        fontsize=9, ha="left", va="baseline")
 
 # Middle East — label just above its bar top, hanging to the right.
 bar_label(1.68, 9.85, "Middle East", "2.7", "#C63C4D", stacked=False)
@@ -111,11 +111,11 @@ ax.set_xlabel("Population, 2017, bn")
 finalize(
     ax,
     title="America is the biggest polluter of CO₂ per person",
-    marker="rule",
     descriptor="CO₂ emissions per person, 2017, tonnes",
     autoscale_y=False,
     footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
+y_labels_on_grid(ax)
 footnotes(fig, source="Sources: GCP; CDIAC; UN")
 
 out = Path(__file__).resolve().parent / "co2_emissions.png"

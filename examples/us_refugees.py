@@ -5,8 +5,8 @@
 """Replica: The Economist daily chart on US refugee resettlement.
 
 Annual refugee admissions (bars) against the presidential annual cap
-(red line), fiscal years 1980-2020. Bars use the styleguide pale blue so
-the red cap line carries the story: the Trump-era collapse at the right
+(red line), fiscal years 1980-2020. Bars use a light neutral grey so the
+red cap line carries the story: the Trump-era collapse at the right
 edge.
 """
 
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme
+from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme, y_labels_on_grid
 
 set_theme()
 
@@ -48,7 +48,9 @@ CAPS = {
     2020: 18.0,
 }
 
-C_BAR = "#A8C8D8"  # pale blue sampled from the original
+# Deliberate departure from the original's pale blue: a light neutral grey
+# keeps the bars recessive so the red cap line carries the story.
+C_BAR = "#C4C4C4"
 
 fig, ax = plt.subplots(figsize=(6.0, 5.2))
 
@@ -71,10 +73,10 @@ ax.set_xlabel("Fiscal years ending September 30th")
 finalize(
     ax,
     title="The days when America settled more refugees than anywhere else are over",
-    marker="rule",
     descriptor="United States, refugee resettlement, ’000",
     footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
+y_labels_on_grid(ax)
 footnotes(fig, source="Source: Refugee Processing Centre")
 
 out = Path(__file__).resolve().parent / "us_refugees.png"

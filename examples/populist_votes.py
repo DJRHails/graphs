@@ -17,7 +17,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme, top_legend
+from graphs import (
+    C_RED,
+    finalize,
+    footnotes,
+    inset_tick_labels,
+    set_theme,
+    top_legend,
+    y_labels_on_grid,
+)
 
 set_theme()
 
@@ -57,15 +65,15 @@ inset_tick_labels(ax)
 finalize(
     ax,
     title="How Europe’s populists are changing",
-    marker="rule",
     descriptor="Europe, aggregated populist votes*, %",
     source="",  # owned by footnotes() below so the note packs alongside it
-    footnote_lines=2,  # note stacks on its own row above the source
+    footnote_lines=3,  # note row + blank spacer row above the source
 )
+y_labels_on_grid(ax)
 top_legend(fig, [bars_left, bars_right], ["Left wing", "Right wing"], fontsize=9)
 footnotes(
     fig,
-    "*Index of 33 countries",
+    "*Index of 33 countries\n",  # trailing newline adds a line of air above the source
     source="Source: [TIMBRO](https://populismindex.com/)",
     max_width_frac=0.3,  # force the note onto its own row, as in the original
 )

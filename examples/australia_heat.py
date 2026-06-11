@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, C_SPINE, bar_v, finalize, inset_tick_labels, set_theme
+from graphs import C_RED, C_SPINE, bar_v, finalize, inset_tick_labels, set_theme, y_labels_on_grid
 
 set_theme()
 
@@ -57,14 +57,19 @@ ax.set_xticks([1950, 1960, 1970, 1980, 1990, 2000, 2010, 2019])
 ax.set_xticklabels(["1950", "60", "70", "80", "90", "2000", "10", "19"])
 inset_tick_labels(ax)
 
+# Original marks every fifth year with a small dark tick below the axis
+# (bar_v zeroes x-tick length, so re-enable it here).
+ax.set_xticks(range(1955, 2016, 10), minor=True)
+ax.tick_params(axis="x", which="both", length=3.5, color=C_SPINE)
+
 finalize(
     ax,
     title="2019 was Australia’s hottest year on record",
-    marker="rule",
     descriptor="Australia, average surface-air temperature\nDeviation from 1961-90 average, °C",
     source="Source: Australian Bureau of Meteorology",
     autoscale_y=False,
 )
+y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "australia_heat.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

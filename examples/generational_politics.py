@@ -12,8 +12,10 @@ Younger generations sit higher; the dotted average climbs as cohort
 replacement does its work. Reds for the younger cohorts, blues for the
 older ones; in-chart labels at the line ends replace a legend.
 
-Values are read off the published chart, smoothed with a cubic Hermite
-pass so the biennial wiggles render as the reference's soft curves.
+Values are computed from the GSS 1972-2024 cumulative microdata
+(weighted % agreeing, split by birth cohort), smoothed with a cubic
+Hermite pass so the biennial wiggles render as the reference's soft
+curves.
 """
 
 import sys
@@ -33,6 +35,7 @@ from graphs import (
     finalize,
     footnotes,
     set_theme,
+    y_labels_on_grid,
 )
 
 set_theme()
@@ -77,21 +80,27 @@ def hermite_smooth(x, y, samples_per_seg=24):
     return np.concatenate(xs_out), np.concatenate(ys_out)
 
 
-# GSS asked the gay-marriage question in 1988, then biennially 2004-18.
-# Values are % agreeing, read off the published chart. The 1988 point is
-# kept separate: the 16-year gap renders as a straight, lighter segment.
+# GSS asked the gay-marriage question (MARHOMO/marsame) in 1988, then
+# biennially 2004-18. Values below are the % agreeing, computed directly
+# from the GSS 1972-2024 cumulative microdata (wtssall-weighted, share
+# answering "strongly agree"/"agree") split by birth cohort:
+#   Millennial & Gen Z 1981+, Gen X 1965-80, Boomer 1946-64,
+#   Silent 1928-45, Greatest <1928.
+# The 1988 point is kept separate: the 16-year gap to 2004 renders as a
+# straight, lighter segment. The Greatest cohort is unreportable after
+# 2014 (cell sizes < 25), so its line stops there.
 years = np.array([2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018])
-years_mill = np.array([2006, 2008, 2010, 2012, 2014, 2016, 2018])
+years_greatest = np.array([2004, 2006, 2008, 2010, 2012, 2014])
 
 series = {
-    "millennial": (years_mill, [49.5, 47.5, 57.0, 60.0, 67.0, 71.0, 76.5]),
-    "genx": (years, [37.0, 42.0, 46.5, 49.0, 47.5, 56.0, 60.0, 66.0]),
-    "boomer": (years, [26.0, 30.0, 32.0, 38.0, 42.0, 48.0, 52.0, 56.0]),
-    "silent": (years, [22.0, 19.5, 26.5, 33.0, 27.5, 35.0, 38.0, 42.0]),
-    "greatest": (years, [23.0, 33.5, 31.0, 21.5, 23.5, 35.0, 29.5, 30.5]),
-    "average": (years, [30.0, 35.0, 39.0, 46.0, 49.0, 57.0, 59.0, 63.0]),
+    "millennial": (years, [50.8, 47.3, 51.3, 64.7, 63.6, 71.0, 74.6, 78.4]),
+    "genx": (years, [37.1, 41.5, 49.2, 48.3, 52.8, 58.2, 56.7, 68.4]),
+    "boomer": (years, [25.5, 33.8, 33.8, 41.1, 42.6, 50.8, 53.2, 58.7]),
+    "silent": (years, [23.2, 20.0, 21.8, 35.8, 30.1, 39.6, 46.8, 46.9]),
+    "greatest": (years_greatest, [17.6, 24.6, 26.7, 25.9, 26.9, 28.0]),
+    "average": (years, [30.9, 35.5, 39.2, 46.5, 48.9, 56.8, 59.2, 68.2]),
 }
-start_1988 = {"genx": 17.0, "boomer": 12.0, "silent": 11.0, "greatest": 10.0}
+start_1988 = {"genx": 11.5, "boomer": 13.8, "silent": 9.5, "greatest": 9.4}
 
 C_MILL = C_RED
 C_GENX = "#e2656c"  # lighter red, one step down from the accent
@@ -133,10 +142,10 @@ avg_x, avg_y = series["average"]
 sx, sy = hermite_smooth(avg_x, avg_y)
 ax.plot(sx, sy, color=C_SPINE, linewidth=1.7, linestyle=(0, (1, 2.0)), zorder=5)
 ax.plot(
-    [1988, 2004], [13.0, 30.0],
+    [1988, 2004], [11.6, 30.9],
     color=C_SPINE, linewidth=1.7, linestyle=(0, (1, 2.0)), zorder=5,
 )
-ax.plot(1988, 13.0, "o", color=C_SPINE, markersize=3.6, zorder=5)
+ax.plot(1988, 11.6, "o", color=C_SPINE, markersize=3.6, zorder=5)
 
 # Axis cosmetics — 0/25/75 labelled, 50 gridline left silent so the
 # series labels at the right edge stay clean (matches the reference).
@@ -153,19 +162,19 @@ ax.tick_params(axis="x", length=4, pad=4)
 # In-chart series labels: Millennial sits above its line mid-chart, the
 # rest hang off the right edge next to their line ends.
 ax.text(
-    2011.5, 71.5, "Millennial & Gen Z",
+    2009.8, 72.8, "Millennial & Gen Z",
     color=C_MILL, fontsize=10, fontweight="bold", ha="center", va="bottom", zorder=6,
 )
 end_labels = [
-    ("Gen X", C_GENX, 67.5, "bold", 10),
-    ("Baby-\nboomer", C_BOOMER, 57.0, "bold", 10),
-    ("Silent", C_SILENT, 43.5, "bold", 10),
-    ("Greatest", C_GREATEST, 32.0, "bold", 10),
-    ("(and earlier)", C_GREATEST, 28.6, "normal", 8),
+    (2018.6, "Gen X", C_GENX, 68.5, "bold", 10),
+    (2018.6, "Baby-\nboomer", C_BOOMER, 58.5, "bold", 10),
+    (2018.6, "Silent", C_SILENT, 46.5, "bold", 10),
+    (2014.5, "Greatest", C_GREATEST, 30.5, "bold", 10),
+    (2014.5, "(and earlier)", C_GREATEST, 27.1, "normal", 8),
 ]
-for text, color, y, weight, size in end_labels:
+for x, text, color, y, weight, size in end_labels:
     ax.text(
-        2018.6, y, text,
+        x, y, text,
         color=color, fontsize=size, fontweight=weight,
         ha="left", va="center", linespacing=1.05, zorder=6,
     )
@@ -179,32 +188,52 @@ ax.text(
 )
 ax.plot([2003.8, 2003.8], [57.0, 32.0], color=C_LABEL, linewidth=0.6, zorder=3)
 
-# Left-side annotation with a curved arrow onto the Gen X line.
-ax.annotate(
+# Left-side explanatory annotation with a thin arrowhead onto the 2004
+# fan-out. The label is placed by measuring its rendered extent and
+# lifting it until its baseline clears the rising cohort segments below,
+# so a long note never crowds the lines (the reviewer's ask).
+_TX, _TY = 1988.6, 33.0
+ann = ax.annotate(
     "Support for gay marriage\nhas grown steadily within\nall age groups",
-    xy=(2003.4, 36.2),
-    xytext=(1989.5, 28.0),
+    xy=(2003.6, 37.0),
+    xytext=(_TX, _TY),
     color=C_LABEL,
-    fontsize=8.5,
+    fontsize=9,
     ha="left",
-    va="center",
+    va="bottom",
     linespacing=1.35,
     arrowprops=dict(
-        arrowstyle="-",
+        arrowstyle="-|>",
         color=C_LABEL,
-        lw=0.7,
-        shrinkA=4,
-        shrinkB=2,
+        lw=0.8,
+        shrinkA=6,
+        shrinkB=4,
+        mutation_scale=10,
         connectionstyle="arc3,rad=-0.22",
-        relpos=(1.0, 0.95),
+        relpos=(1.0, 0.4),
     ),
     zorder=6,
 )
 
+
+def _genx_segment_y(x):
+    """The 1988->2004 Gen X segment — the highest line beneath the note."""
+    g0, g1 = start_1988["genx"], series["genx"][1][0]
+    return g0 + (g1 - g0) * (x - 1988) / (2004 - 1988)
+
+
+fig.canvas.draw()
+_ext = ann.get_window_extent(fig.canvas.get_renderer())
+_inv = ax.transData.inverted()
+(_bx0, _by0) = _inv.transform((_ext.x0, _ext.y0))
+(_bx1, _by1) = _inv.transform((_ext.x1, _ext.y1))
+_needed_bottom = max(_genx_segment_y(_bx0), _genx_segment_y(min(_bx1, 2004.0))) + 2.5
+if _by0 < _needed_bottom:
+    ann.set_position((_TX, _TY + (_needed_bottom - _by0)))
+
 finalize(
     ax,
     title="Public opinion changes as younger generations replace older ones",
-    marker="rule",
     descriptor=(
         "United States, % agreeing by generation\n"
         "“Gay people should be allowed to get married”"
@@ -221,6 +250,7 @@ footnotes(
         "[The Economist](https://www.economist.com/)"
     ),
 )
+y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "generational_politics.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

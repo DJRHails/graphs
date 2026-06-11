@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
@@ -103,10 +104,19 @@ poorest_50pct = np.array(
     ]
 )
 
-fig, ax = plt.subplots(figsize=(4.0, 5.4))
+# Reference is ~325x428 px, so the figure keeps a w/h ratio near 0.76.
+fig, ax = plt.subplots(figsize=(3.85, 5.45))
 
 ax.plot(years, richest_1pct, color=C_GREY, linewidth=1.8, zorder=3)
-ax.plot(years, poorest_50pct, color=C_RED, linewidth=1.8, zorder=4)
+# White underlay so the red line reads cleanly where it crosses the grey.
+ax.plot(
+    years,
+    poorest_50pct,
+    color=C_RED,
+    linewidth=1.8,
+    zorder=4,
+    path_effects=[patheffects.withStroke(linewidth=3.8, foreground="white")],
+)
 
 # Direct in-chart series labels. The reference sets both in plain dark
 # text (not series colours): "Richest 1%" above the grey line's descent,
@@ -155,7 +165,6 @@ finalize(
     source="Source: World Data Lab",
     y_axis_right=True,
     autoscale_y=False,
-    marker="rule",
 )
 
 # Squiggle in the right-hand tick column (just past the axis end, under

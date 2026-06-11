@@ -119,7 +119,6 @@ for spine in ax.spines.values():
 finalize(
     ax,
     title="Sub-Saharan Africa is the biggest area of expansion for Christianity",
-    marker="rule",
     descriptor="World Christian population\n% of total",
     source="Source: Pew Research",
     autoscale_y=False,

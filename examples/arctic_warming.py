@@ -82,10 +82,11 @@ ax.axvline(0, color=C_SPINE, linewidth=1.0, zorder=3)
 ax.plot([0, 0], [90, 93.5], color=C_SPINE, linewidth=1.0, clip_on=False, zorder=3)
 ax.spines[["top", "left", "right", "bottom"]].set_visible(False)
 
-# Region labels inside the plot, left of the zero line.
-ax.text(-1.0, 70.5, "Arctic", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4)
-ax.text(-0.95, 1.5, "Equator", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4)
-ax.text(-0.9, -80, "Antarctic", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4)
+# Region labels inside the plot, left of the zero line. Arctic / Antarctic sit
+# dead-centre in their pale-blue bands (66.5-90 degrees), like the original.
+ax.text(-1.05, 78.25, "Arctic", ha="center", va="center", fontsize=9, color=C_SPINE, zorder=4)
+ax.text(-1.05, 1.5, "Equator", ha="center", va="bottom", fontsize=9, color=C_SPINE, zorder=4)
+ax.text(-1.05, -78.25, "Antarctic", ha="center", va="center", fontsize=9, color=C_SPINE, zorder=4)
 
 ax.text(
     2.55,
@@ -103,7 +104,6 @@ ax.text(
 finalize(
     ax,
     title="The Arctic is warming twice as fast as the rest of the world",
-    marker="rule",
     descriptor="Observed temperature change by latitude, °C\n2018, relative to 1951-1980 average",
     source="Source: [Carbon Brief](https://www.carbonbrief.org/)",
     y_axis_right=False,

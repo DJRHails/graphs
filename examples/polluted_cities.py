@@ -58,6 +58,7 @@ _RAMP = [
 ]
 
 ROW_BAND = "#E8EEF0"  # pale blue-grey banding, Indian cities only
+ROW_FS = 13  # rank, city and chip numbers share one enlarged size
 
 
 def chip_color(value: float) -> tuple[float, float, float]:
@@ -82,14 +83,19 @@ ax.set_yticks([])
 ax.set_axis_off()
 
 BLOCKS = [((0.0, 0.455), LEFT), ((0.545, 1.0), RIGHT)]
-CHIP_W = 0.105
+CHIP_W = 0.10
 BAND_PAD = 0.05  # white gap between row bands, in row units
+
+
+# (bold city-name Text, ", Country" suffix) pairs, finished after finalize()
+# once the layout is settled and the bold name's width can be measured.
+CITY_SUFFIXES: list[tuple[plt.Text, str]] = []
 
 
 def draw_block(x0: float, x1: float, rows: list[tuple[int, str, int]]) -> None:
     """Draw one table column: header, header rule, banded rows, value chips."""
     rank_x = x0 + 0.012
-    city_x = x0 + 0.10
+    city_x = x0 + 0.072
     chip_x = x1 - CHIP_W
 
     ax.text(rank_x, -0.35, "Rank", fontsize=10, fontweight="bold",
@@ -110,11 +116,14 @@ def draw_block(x0: float, x1: float, rows: list[tuple[int, str, int]]) -> None:
         ax.add_patch(Rectangle((chip_x, y0), CHIP_W, y1 - y0,
                                facecolor=chip_color(value), edgecolor="none",
                                zorder=2))
-        ax.text(rank_x, i + 0.5, str(rank), fontsize=10, fontweight="bold",
+        ax.text(rank_x, i + 0.5, str(rank), fontsize=ROW_FS, fontweight="bold",
                 color=C_SPINE, ha="left", va="center", zorder=3)
-        ax.text(city_x, i + 0.5, city, fontsize=10, color=C_LABEL,
-                ha="left", va="center", zorder=3)
-        ax.text(chip_x + CHIP_W / 2, i + 0.5, str(value), fontsize=10,
+        name, _, country = city.partition(",")
+        name_text = ax.text(city_x, i + 0.5, name, fontsize=ROW_FS,
+                            fontweight="bold", color=C_LABEL,
+                            ha="left", va="center", zorder=3)
+        CITY_SUFFIXES.append((name_text, "," + country))
+        ax.text(chip_x + CHIP_W / 2, i + 0.5, str(value), fontsize=ROW_FS,
                 fontweight="bold", color="white", ha="center", va="center",
                 zorder=3)
 
@@ -125,7 +134,6 @@ for (bx0, bx1), rows in BLOCKS:
 finalize(
     ax,
     title="These are the most polluted cities in the world",
-    marker="rule",
     descriptor="2018, micrograms per cubic metre*",
     source="Source: AirVisual World Air Quality Report 2018",
     autoscale_y=False,
@@ -133,6 +141,17 @@ finalize(
 )
 
 footnotes(fig, "*PM2.5", y=ax.get_position().y0 - 0.030)
+
+# Regular-weight ", Country" suffixes, butted against each bold city name.
+# Widths are measured only after finalize() has settled the axes geometry.
+fig.canvas.draw()
+renderer = fig.canvas.get_renderer()
+to_data = ax.transData.inverted()
+for name_text, suffix in CITY_SUFFIXES:
+    right_px = name_text.get_window_extent(renderer).x1
+    suffix_x = to_data.transform((right_px, 0))[0]
+    ax.text(suffix_x, name_text.get_position()[1], suffix, fontsize=ROW_FS,
+            color=C_LABEL, ha="left", va="center", zorder=3)
 
 out = Path(__file__).resolve().parent / "polluted_cities.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

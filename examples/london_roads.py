@@ -114,7 +114,6 @@ ax.text(
 finalize(
     ax,
     title="When is the worst time to be on the road in London?",
-    marker="rule",
     descriptor="Additional time spent in traffic compared\nwith traffic-free conditions, 2018, %",
     source="",
     y_axis_right=False,

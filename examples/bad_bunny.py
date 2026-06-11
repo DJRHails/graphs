@@ -59,7 +59,6 @@ finalize(
     title_x=0.02,
     autoscale_y=False,
     auto_layout=False,
-    marker="rule",
 )
 
 # The original sets the survey question in bold; finalize renders the

@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 
 from graphs import (
     C_RED_DATA,
+    C_SPINE,
     PALETTE,
     bar_v,
     finalize,
@@ -68,13 +69,15 @@ ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:,.0f}"))
 
 ax.set_xticks([2001, 2005, 2010, 2015, 2018])
 ax.set_xticklabels(["2001", "05", "10", "15", "18"])
-ax.tick_params(axis="x", length=3)
+# Original draws a small dark tick below the axis for every year (minor
+# ticks coinciding with the labelled majors simply overdraw them).
+ax.set_xticks(years, minor=True)
+ax.tick_params(axis="x", which="both", length=3.5, color=C_SPINE)
 inset_tick_labels(ax, axis="x")
 
 finalize(
     ax,
     title="Donald Trump has imposed more financial sanctions than any other president",
-    marker="rule",
     descriptor="United States, specially designated nationals and blocked persons list, number of additions",
     source="Source: Gibson, Dunn & Crutcher",
     autoscale_y=False,

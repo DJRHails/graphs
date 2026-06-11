@@ -27,6 +27,7 @@ from graphs import (
     finalize,
     set_theme,
     x_axis_label,
+    y_labels_on_grid,
 )
 
 set_theme()
@@ -54,8 +55,9 @@ ax.scatter([0], [0], s=105, color=C_LABEL_MUTED, zorder=6, edgecolors=C_TEXT, li
 ax.plot([0, 0], [-0.0045, -0.0075], color=C_TEXT, linewidth=0.8, zorder=4)
 ax.text(-0.42, -0.0085, "Reference", color=C_TEXT, fontsize=9, ha="left", va="top")
 
-# Direct series labels, placed as in the reference.
-ax.text(2.55, 0.0295, "Female drivers", color=C_RED, fontsize=10.5, fontweight="bold",
+# Direct series labels, placed as in the reference: "Female drivers" floats
+# in the open gap above the 45-54 female dot, clear of the taller 35-44 bar.
+ax.text(3.4, 0.026, "Female drivers", color=C_RED, fontsize=10.5, fontweight="bold",
         ha="center", va="center", zorder=6)
 ax.text(1.55, -0.0095, "Male drivers", color=C_LABEL_MUTED, fontsize=10.5, fontweight="bold",
         ha="center", va="center", zorder=6)
@@ -75,7 +77,6 @@ x_axis_label(ax, "Age group", fontsize=9.5, labelpad=6)
 finalize(
     ax,
     title="Female Uber drivers receive better tips than men",
-    marker="rule",
     descriptor="Expected tip by Uber driver’s age and gender\nRelative to male drivers aged 21-25, $",
     source=(
         "Source: “Evidence from a Nationwide Tipping Field Experiment”\n"
@@ -85,6 +86,7 @@ finalize(
     autoscale_y=False,
     footnote_lines=1,  # the source wraps to a second line
 )
+y_labels_on_grid(ax)
 # finalize's bottom-spine recolour assumes the house dark spine; restore the
 # reference's lighter axis line after the title stack is laid out.
 ax.spines["bottom"].set_color("#b3b3b3")
