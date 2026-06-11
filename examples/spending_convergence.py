@@ -30,6 +30,7 @@ from graphs import (
     broken_axis,
     finalize,
     inset_tick_labels,
+    save_chart,
     set_theme,
 )
 
@@ -171,7 +172,4 @@ finalize(
 # the "6" label) flags the truncated baseline, as in the reference.
 broken_axis(ax, x=2026.3)
 
-out = Path(__file__).resolve().parent / "spending_convergence.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved spending convergence chart")
+save_chart(__file__)

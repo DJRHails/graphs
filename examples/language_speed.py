@@ -32,6 +32,7 @@ from graphs import (
     finalize,
     footnotes,
     panel_label,
+    save_chart,
     set_theme,
 )
 
@@ -138,7 +139,4 @@ footnotes(
     ),
 )
 
-out = Path(__file__).resolve().parent / "language_speed.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved language-speed chart")
+save_chart(__file__)

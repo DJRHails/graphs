@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_LABEL, C_RED_BRAND, finalize, footnotes, right_axis, set_theme
+from graphs import C_LABEL, C_RED_BRAND, finalize, footnotes, right_axis, save_chart, set_theme
 
 set_theme()
 
@@ -95,7 +95,4 @@ finalize(
 )
 footnotes(fig, source="Source: Nielsen")
 
-out = Path(__file__).resolve().parent / "elderly_screens.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved elderly-screens chart")
+save_chart(__file__)

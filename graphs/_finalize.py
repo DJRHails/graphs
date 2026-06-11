@@ -907,6 +907,85 @@ def y_axis_label(
         )
 
 
+def save_chart(
+    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True
+):
+    """Save the current figure next to ``script_file`` as ``<stem>.png``.
+
+    The standard example-script epilogue (``bbox_inches="tight"``, 150 dpi,
+    close, confirmation print) as one call::
+
+        save_chart(__file__)
+
+    Args:
+        script_file: Almost always ``__file__`` — the output lands beside
+            the script, named after it.
+        dpi: Raster resolution.
+        close: Close the current figure after saving.
+        verbose: Print a one-line confirmation.
+
+    Returns:
+        Path of the written PNG.
+    """
+    from pathlib import Path
+
+    out = Path(script_file).resolve().with_suffix(".png")
+    plt.savefig(out, bbox_inches="tight", dpi=dpi)
+    if close:
+        plt.close()
+    if verbose:
+        print(f"Saved {out.name}")
+    return out
+
+
+def year_ticks(ax, years, *, inset: bool = True) -> None:
+    """Numeric-axis year ticks with Economist abbreviation.
+
+    For integer year axes (bar charts and the like, where ``year_axis``'s
+    date machinery doesn't apply): the first tick and century ticks render
+    in full (``1950``, ``2000``), the rest as two digits (``60``, ``10``).
+
+        year_ticks(ax, [1950, 1960, ..., 2000, 2010, 2019])
+
+    Args:
+        ax: Axes with a numeric x-axis in calendar years.
+        years: Tick positions (ints). The first is always rendered in full.
+        inset: Also apply ``inset_tick_labels`` so the end labels stay
+            inside the plot bounds (the usual convention; pass False when
+            the axis has generous margins).
+    """
+    years = list(years)
+    labels = [
+        str(y) if i == 0 or y % 100 == 0 else f"{y % 100:02d}"
+        for i, y in enumerate(years)
+    ]
+    ax.set_xticks(years)
+    ax.set_xticklabels(labels)
+    if inset:
+        from graphs._labels import inset_tick_labels
+
+        inset_tick_labels(ax, axis="x")
+
+
+def x_axis_top(
+    ax, *, labelsize: float = TICK_LABEL_SIZE_PT, length: float = 3.5
+) -> None:
+    """Move the x-axis to the top of the plot (horizontal-chart convention).
+
+    Economist horizontal bars, lollipops and latitude profiles read the
+    value axis along the top. Applies the standard tick styling and hides
+    the bottom spine.
+
+    Call AFTER ``finalize()`` when a legend row sits between the title and
+    the axis — finalize pins the title stack directly above top-mounted
+    tick labels, which would leave no room for the legend otherwise.
+    """
+    ax.xaxis.tick_top()
+    ax.xaxis.set_tick_params(labelsize=labelsize, length=length, direction="out")
+    ax.spines["top"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+
+
 def year_axis(ax, *, abbreviate: bool = True, set_locator: bool = True) -> None:
     """Format a date x-axis with full-year-then-abbreviated-year ticks.
 

@@ -34,6 +34,7 @@ from graphs import (
     broken_axis,
     finalize,
     inset_tick_labels,
+    save_chart,
     scatter_standard,
     set_theme,
     year_axis,
@@ -109,7 +110,4 @@ finalize(
     autoscale_y=False,
 )
 
-out = Path(__file__).resolve().parent / "brexit.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Brexit chart")
+save_chart(__file__)

@@ -15,6 +15,7 @@ import numpy as np
 from graphs import (
     callout,
     finalize,
+    save_chart,
     scatter_highlight,
     scatter_standard,
     set_theme,
@@ -55,7 +56,4 @@ finalize(
     source="Source: Generated",
 )
 
-out = Path(__file__).resolve().parent / "scatter_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved scatter chart")
+save_chart(__file__)

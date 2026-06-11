@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
-from graphs import C_LABEL, C_SPINE, finalize, footnotes, set_theme
+from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme
 
 set_theme()
 
@@ -158,7 +158,4 @@ for bound in BOUNDS:
 
 footnotes(fig, source="Sources: TomTom Traffic Index; Institute for Fiscal Studies")
 
-out = Path(__file__).resolve().parent / "london_roads.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved London roads heatmap")
+save_chart(__file__)

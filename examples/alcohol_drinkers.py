@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from graphs import C_GRID, C_LABEL, C_RED_BRAND, PALETTE, finalize, footnotes, set_theme
+from graphs import C_GRID, C_LABEL, C_RED_BRAND, PALETTE, finalize, footnotes, save_chart, set_theme
 
 set_theme()
 
@@ -159,7 +159,4 @@ footnotes(
     y=ax.get_position().y0 - 0.030,
 )
 
-out = Path(__file__).resolve().parent / "alcohol_drinkers.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved alcohol-drinkers chart")
+save_chart(__file__)

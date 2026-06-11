@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-from graphs import C_LABEL, C_SPINE, finalize, footnotes, set_theme
+from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme
 
 set_theme()
 
@@ -153,7 +153,4 @@ for name_text, suffix in CITY_SUFFIXES:
     ax.text(suffix_x, name_text.get_position()[1], suffix, fontsize=ROW_FS,
             color=C_LABEL, ha="left", va="center", zorder=3)
 
-out = Path(__file__).resolve().parent / "polluted_cities.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved polluted cities chart")
+save_chart(__file__)

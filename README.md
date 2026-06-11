@@ -1,10 +1,9 @@
 # graphs
 
 Economist-style chart theme for matplotlib and seaborn — global theme, title-stack
-finaliser, direct line labels, CI bands, horizontal bars, and dumbbell charts.
-Uses IBM Plex Sans typography and a curated 8-colour palette.
-
-Version: 0.3.3
+finaliser with renderer-measured wrapping, on-grid axis labels, direct line labels,
+CI bands, and a catalogue of chart helpers (bars, dumbbells, thermometers, bump
+charts, lollipops). IBM Plex Sans typography and a curated palette.
 
 ## Install
 
@@ -19,50 +18,39 @@ The import package is `graphs`.
 
 ```python
 import matplotlib.pyplot as plt
-from graphs import ci_fill, finalize, label_lines, set_theme
+from graphs import finalize, label_lines, save_chart, set_theme
 
 set_theme()
 
-fig, ax = plt.subplots()
-fig.subplots_adjust(top=0.68, bottom=0.14, left=0.06, right=0.88)
-
+fig, ax = plt.subplots(figsize=(7, 4.4))
 ax.plot(x, y, label="Series A")
+ax.plot(x, z, label="Series B")
 label_lines(ax)
 finalize(
     ax,
-    title="Bold chart title",
+    title="State the finding, not the topic",
     descriptor="Country, metric, unit",
     source="Source: Organisation",
 )
+save_chart(__file__)
 ```
 
-See `examples/` for runnable scripts:
+`finalize()` does the heavy lifting: auto-sized margins, title stack with the
+delta marker (titles auto-wrap to the figure width), numeric y labels seated
+on gridlines that extend under them, source line, right-hand y-axis.
 
-- `line_chart.py` — multi-series line with CI bands + direct labels
-- `faceted_chart.py` — three-panel faceted layout with panel labels
-- `bar_chart.py` — horizontal bar with max-value highlight
-- `dumbbell_chart.py` — before/after comparison with legend
-
-## Public API
-
-| Function | Purpose |
-|----------|---------|
-| `set_theme()` | Apply global rcParams (figure, axes, ticks, fonts, palette) |
-| `finalize(ax, title, descriptor, source, *, y_axis_right, title_x, y_start, autoscale_y)` | Title stack, red rule, source line, y-axis tidy-up |
-| `label_lines(ax, ...)` | Direct end-of-line labels with collision avoidance |
-| `smart_legend(ax, ...)` | Pick the emptiest corner of the axes |
-| `ci_fill(ax, x, y_lo, y_hi, *, color)` | Confidence-interval band |
-| `bar_h(ax, categories, values, *, highlight_max)` | Horizontal bar chart |
-| `dumbbell(ax, categories, start, end, ...)` | Dot-and-line before/after chart |
-| `panel_label(ax, label)` | Bold panel sub-heading for facets |
+**[SKILL.md](./SKILL.md) is the full manual** — design principles, headline
+conventions, the complete API table, and a when-to-use index of 39 worked
+examples in [`examples/`](./examples/).
 
 ### Palette
 
 ```python
-from graphs import colors, C_BG, C_RED, C_SPINE, C_GRID, C_LABEL, C_TEXT, C_CI
+from graphs import PALETTE, colors, C_RED, C_RED_BRAND, C_SPINE, C_GRID, C_LABEL
 ```
 
-Sequence `colors` (red primary, blue, teal, green, yellow, mauve, slate, coral).
+Nine named colours in `PALETTE` (red-led default cycle); structural greys for
+spines/grid/labels/source; `cycle_for(chart_type)` for per-chart-type orders.
 
 ### Typography
 
@@ -78,7 +66,10 @@ Hot reload:
 
     uv run graphs-watch
 
-Watches graphs/ and examples/ for .py changes and re-renders the affected examples + comparisons.
+Watches graphs/ and examples/ for .py changes and re-renders the affected
+examples + comparisons. Tests: `uv run --with pytest pytest -q`. Reference
+images for the replica examples: `uv run examples/fetch_refs.py`, then
+`uv run examples/build_comparisons.py`.
 
 ## License
 

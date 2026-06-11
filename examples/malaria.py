@@ -39,6 +39,7 @@ from graphs import (
     footnotes,
     highlight_panel,
     inset_tick_labels,
+    save_chart,
     set_theme,
 )
 
@@ -145,7 +146,4 @@ footnotes(
     max_width_frac=0.78,
 )
 
-out = Path(__file__).resolve().parent / "malaria.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved malaria chart")
+save_chart(__file__)

@@ -20,7 +20,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch, Rectangle
 
-from graphs import C_GRID, C_LABEL, C_RED_BRAND, C_SPINE, finalize, footnotes, set_theme, top_legend
+from graphs import (
+    C_GRID,
+    C_LABEL,
+    C_RED_BRAND,
+    C_SPINE,
+    finalize,
+    footnotes,
+    save_chart,
+    set_theme,
+    top_legend,
+    x_axis_top,
+)
 
 set_theme()
 
@@ -147,12 +158,9 @@ finalize(
     auto_layout=False,
 )
 
-# Economist convention for horizontal bars: x-axis on top. Applied after
-# finalize() — it pins the title directly above any top-mounted tick labels,
-# which would leave no room for the legend row between title and axis.
-ax.xaxis.tick_top()
-ax.xaxis.set_tick_params(labelsize=9, length=3.5, direction="out")
-ax.spines["bottom"].set_visible(False)
+# Applied after finalize() — it pins the title directly above any top-mounted
+# tick labels, which would leave no room for the legend row between title and axis.
+x_axis_top(ax)
 
 handles = [
     Patch(facecolor=C_DEPLOYED, label="Deployed"),
@@ -171,7 +179,4 @@ footnotes(
     y=0.035,
 )
 
-out = Path(__file__).resolve().parent / "nuclear_warheads.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved nuclear-warheads chart")
+save_chart(__file__)

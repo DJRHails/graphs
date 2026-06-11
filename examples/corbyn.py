@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import bar_h, finalize, set_theme, style_labels
+from graphs import bar_h, finalize, save_chart, set_theme, style_labels
 
 set_theme()
 
@@ -61,7 +61,4 @@ finalize(
     autoscale_y=False,
 )
 
-out = Path(__file__).resolve().parent / "corbyn.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Corbyn chart")
+save_chart(__file__)

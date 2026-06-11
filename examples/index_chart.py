@@ -20,6 +20,7 @@ from graphs import (
     highlight_panel,
     index_marker,
     label_lines,
+    save_chart,
     set_theme,
 )
 
@@ -60,7 +61,4 @@ finalize(
     source="Sources: [IMF](https://www.imf.org/); [World Bank](https://www.worldbank.org/)",
 )
 
-out = Path(__file__).resolve().parent / "index_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved index chart")
+save_chart(__file__)

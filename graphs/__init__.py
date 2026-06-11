@@ -54,10 +54,13 @@ from graphs._finalize import (
     finalize,
     footnotes,
     panel_label,
+    save_chart,
     verify_layout,
     x_axis_label,
+    x_axis_top,
     y_axis_label,
     year_axis,
+    year_ticks,
 )
 from graphs._fonts import _get_font as get_font
 from graphs._fonts import _get_font_condensed as get_font_condensed
@@ -103,10 +106,13 @@ __all__ = [
     "finalize",
     "footnotes",
     "panel_label",
+    "save_chart",
     "verify_layout",
     "x_axis_label",
+    "x_axis_top",
     "y_axis_label",
     "year_axis",
+    "year_ticks",
     # palette
     "PALETTE",
     "colors",

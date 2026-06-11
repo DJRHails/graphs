@@ -23,7 +23,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
 from examples._data import load_csv_lines
-from graphs import C_LABEL, C_SPINE, PALETTE, finalize, set_theme, y_axis_label
+from graphs import C_LABEL, C_SPINE, PALETTE, finalize, save_chart, set_theme, y_axis_label
 
 set_theme()
 
@@ -105,7 +105,4 @@ finalize(
     y_start=0.050,
 )
 
-out = Path(__file__).resolve().parent / "pensions.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Pensions chart")
+save_chart(__file__)

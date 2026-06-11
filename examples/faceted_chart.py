@@ -21,6 +21,7 @@ from graphs import (
     finalize,
     panel_label,
     right_axis,
+    save_chart,
     set_theme,
 )
 
@@ -76,7 +77,4 @@ finalize(
     auto_layout=False,  # 1×3 facet needs explicit wspace
 )
 
-out = Path(__file__).resolve().parent / "faceted_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved facet chart")
+save_chart(__file__)

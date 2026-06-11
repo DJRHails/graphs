@@ -32,6 +32,7 @@ from graphs import (
     direction_label,
     finalize,
     footnotes,
+    save_chart,
     set_theme,
     snapshot_palette,
 )
@@ -248,7 +249,4 @@ footnotes(
     x=0.62,
 )
 
-out = Path(__file__).resolve().parent / "age_gap_chart.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved age gap chart")
+save_chart(__file__)

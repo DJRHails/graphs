@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, C_SPINE, bar_v, finalize, inset_tick_labels, set_theme
+from graphs import C_RED, C_SPINE, bar_v, finalize, save_chart, set_theme, year_ticks
 
 set_theme()
 
@@ -53,9 +53,7 @@ ax.set_yticks([-1.0, -0.5, 0, 0.5, 1.0, 1.5])
 ax.set_yticklabels(["-1.0", "-0.5", "0", "0.5", "1.0", "1.5"])
 
 ax.set_xlim(1949.2, 2019.8)
-ax.set_xticks([1950, 1960, 1970, 1980, 1990, 2000, 2010, 2019])
-ax.set_xticklabels(["1950", "60", "70", "80", "90", "2000", "10", "19"])
-inset_tick_labels(ax)
+year_ticks(ax, [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2019])
 
 # Original marks every fifth year with a small dark tick below the axis
 # (bar_v zeroes x-tick length, so re-enable it here).
@@ -70,7 +68,4 @@ finalize(
     autoscale_y=False,
 )
 
-out = Path(__file__).resolve().parent / "australia_heat.png"
-plt.savefig(out, bbox_inches="tight", dpi=150)
-plt.close()
-print("Saved Australia heat chart")
+save_chart(__file__)
