@@ -75,3 +75,57 @@ def test_finalize_wraps_long_title_to_figure_width(fig):
     ]
     assert title_artists, "title text artist not found"
     assert "\n" in title_artists[0].get_text()
+
+
+def _descriptor_artists(fig, fragment: str):
+    return [t for t in fig.texts if fragment in t.get_text().replace("\n", " ")]
+
+
+def test_autowrapped_descriptor_stays_normal_weight(fig):
+    ax = fig.add_subplot()
+    ax.plot([0, 1], [0, 1])
+    finalize(
+        ax,
+        title="Short",
+        descriptor=(
+            "Estimated nuclear-warhead inventories across all declared "
+            "and undeclared states, October 2025"
+        ),
+    )
+    artists = _descriptor_artists(fig, "inventories")
+    assert artists, "descriptor text artist not found"
+    assert "\n" in artists[0].get_text(), "expected the descriptor to wrap"
+    for t in artists:
+        assert t.get_fontproperties().get_weight() == "normal"
+
+
+def test_explicit_break_descriptor_gets_semibold_lead(fig):
+    ax = fig.add_subplot()
+    ax.plot([0, 1], [0, 1])
+    finalize(
+        ax,
+        title="Short",
+        descriptor="World Christian population\n% of total",
+    )
+    (lead,) = _descriptor_artists(fig, "World Christian population")
+    (rest,) = _descriptor_artists(fig, "% of total")
+    assert lead.get_fontproperties().get_weight() == "semibold"
+    assert rest.get_fontproperties().get_weight() == "normal"
+
+
+def test_wrapped_lead_segment_is_fully_semibold(fig):
+    ax = fig.add_subplot()
+    ax.plot([0, 1], [0, 1])
+    finalize(
+        ax,
+        title="Short",
+        descriptor=(
+            "Estimated nuclear-warhead inventories across all declared "
+            "and undeclared states\n% of total"
+        ),
+    )
+    (lead,) = _descriptor_artists(fig, "inventories")
+    (rest,) = _descriptor_artists(fig, "% of total")
+    assert "\n" in lead.get_text(), "expected the lead segment to wrap"
+    assert lead.get_fontproperties().get_weight() == "semibold"
+    assert rest.get_fontproperties().get_weight() == "normal"
