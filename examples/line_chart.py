@@ -27,7 +27,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.dates as mdates
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -41,6 +40,7 @@ from graphs import (
     save_chart,
     set_theme,
     smoothed_line,
+    subplots,
     year_axis,
 )
 
@@ -66,7 +66,7 @@ deaths_trend = 0.34 * (1 - np.exp(-2.4 * t))
 y_deaths = deaths_trend + np.random.normal(0, 0.025, n_points)
 y_deaths = np.clip(y_deaths, 0, None)
 
-fig, ax = plt.subplots(figsize=(8, 4.8))
+fig, ax = subplots("wide", height=4.2)
 
 smoothed_line(
     ax, xs, y_casualties,
@@ -170,17 +170,22 @@ finalize(
     y_axis_right=True,
     autoscale_y=False,
     title_x=0.02,
-    footnote_lines=4,  # meta-estimate note wraps + multi-line source
+    footnote_lines=3,  # meta-estimate note + two-line source
 )
 footnotes(
     fig,
-    "*Meta-estimate based on trends in war intensity, territory shifts "
-    "and credible open-source and intelligence assessments of losses",
+    # The caveat rides as line one of the source block: at the 7.0in wide
+    # format the fraction-based notes/source stack gap is shorter than a
+    # text line, so a separate note would collide with the source. Explicit
+    # "\n" breaks keep each line inside the 7.0in width (footnotes() does
+    # not wrap the source).
     source=(
+        "*Meta-estimate based on trends in war intensity, territory shifts "
+        "and credible open-source and intelligence assessments of losses\n"
         "Sources: [DMSP Nighttime Lights](https://eogdata.mines.edu/products/dmsp/); "
         "[European Space Agency](https://www.esa.int/); "
         "[EUMETSAT](https://www.eumetsat.int/); "
-        "[Institute for the Study of War](https://www.understandingwar.org/); "
+        "[Institute for the Study of War](https://www.understandingwar.org/);\n"
         "[AEI's Critical Threats Project](https://www.criticalthreats.org/); "
         "[NASA](https://www.nasa.gov/); "
         "[WorldPop](https://www.worldpop.org/); "

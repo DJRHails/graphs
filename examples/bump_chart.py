@@ -31,10 +31,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from examples._data import load_csv_text
-from graphs import PALETTE, bump_chart, finalize, save_chart, set_theme
+from graphs import PALETTE, bump_chart, finalize, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -81,7 +79,7 @@ if missing:
 # top-10 (blues / greys).
 colors_override: dict[str, str] = {name: PALETTE["red"] for name in eng_names}
 
-fig, ax = plt.subplots(figsize=(7.5, 8.5))
+fig, ax = subplots("wide", height=7.9)
 # Bump chart needs explicit right-margin room for the rank labels (~20% of
 # figure width) and a tall figure-relative bottom for tick labels on top
 # and bottom; opt out of auto-layout so those margins stick.

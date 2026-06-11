@@ -23,7 +23,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import (
@@ -36,6 +35,7 @@ from graphs import (
     footnotes,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -116,7 +116,7 @@ def lighten(color, frac=0.35):
     return "#" + "".join(f"{round(c + (255 - c) * frac):02x}" for c in rgb)
 
 
-fig, ax = plt.subplots(figsize=(6.1, 5.7))
+fig, ax = subplots("daily", height=4.3)
 
 line_specs = [
     ("genx", C_GENX, 1.9),

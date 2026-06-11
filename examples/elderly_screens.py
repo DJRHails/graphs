@@ -16,10 +16,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_LABEL, C_RED_BRAND, finalize, footnotes, right_axis, save_chart, set_theme
+from graphs import (
+    C_LABEL,
+    C_RED_BRAND,
+    finalize,
+    footnotes,
+    right_axis,
+    save_chart,
+    set_theme,
+    subplots,
+)
 
 set_theme()
 
@@ -45,8 +53,8 @@ PANELS = [
     ),
 ]
 
-fig, axes = plt.subplots(1, 2, figsize=(5.2, 4.9), sharey=True)
-fig.subplots_adjust(top=0.70, bottom=0.13, left=0.03, right=0.92, wspace=0.55)
+fig, axes = subplots("daily", height=4.3, ncols=2, sharey=True)
+fig.subplots_adjust(top=0.70, bottom=0.15, left=0.03, right=0.92, wspace=0.55)
 
 for ax, (heading, tv, phone, computer) in zip(axes, PANELS):
     ax.stackplot(

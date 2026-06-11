@@ -15,10 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from examples._data import load_csv_lines
-from graphs import bar_h, finalize, save_chart, set_theme, style_labels
+from graphs import bar_h, finalize, save_chart, set_theme, style_labels, subplots
 
 set_theme()
 
@@ -36,7 +34,7 @@ rows.sort(key=lambda r: r[1])
 labels = [r[0] for r in rows]
 values = [r[1] for r in rows]
 
-fig, ax = plt.subplots(figsize=(7, 3.6))
+fig, ax = subplots("wide", height=3.6)
 
 bar_h(ax, labels, [v / 1000 for v in values], highlight_max=True)
 

@@ -96,13 +96,15 @@ from graphs._palette import (
     cycle_for,
     snapshot_palette,
 )
-from graphs._theme import set_theme
+from graphs._theme import FORMATS, set_theme, subplots
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     # theme + finalize
     "set_theme",
+    "subplots",
+    "FORMATS",
     "finalize",
     "footnotes",
     "panel_label",

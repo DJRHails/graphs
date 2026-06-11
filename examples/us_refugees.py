@@ -15,9 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import C_RED, finalize, footnotes, save_chart, set_theme, year_ticks
+from graphs import C_RED, finalize, footnotes, save_chart, set_theme, subplots, year_ticks
 
 set_theme()
 
@@ -52,7 +50,7 @@ CAPS = {
 # keeps the bars recessive so the red cap line carries the story.
 C_BAR = "#C4C4C4"
 
-fig, ax = plt.subplots(figsize=(6.0, 5.2))
+fig, ax = subplots("daily", height=4.0)
 
 ax.bar(list(ADMISSIONS), list(ADMISSIONS.values()), width=0.78, color=C_BAR, zorder=2)
 ax.plot(list(CAPS), list(CAPS.values()), color=C_RED, linewidth=2.2, zorder=3)
@@ -74,6 +72,8 @@ finalize(
     descriptor="United States, refugee resettlement, ’000",
     footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
+# Narrow figure: widen the right margin so the right-hand y-tick labels fit.
+fig.subplots_adjust(right=0.94)
 footnotes(fig, source="Source: Refugee Processing Centre")
 
 save_chart(__file__)

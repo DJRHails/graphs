@@ -16,10 +16,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_RED, C_TEXT, finalize, scatter_standard, save_chart, set_theme
+from graphs import C_RED, C_TEXT, finalize, save_chart, scatter_standard, set_theme, subplots
 
 set_theme()
 
@@ -62,7 +61,7 @@ y_hi = np.array([108, 99, 82, 94])
 x = np.concatenate([x, x_hi])
 y = np.concatenate([y, y_hi])
 
-fig, ax = plt.subplots(figsize=(6.2, 5.2))
+fig, ax = subplots("daily", height=3.9)
 
 # Firmer dots than the scatter_standard default 50% — the published chart's
 # cloud reads more solid — with the trend curve drawn last so it stays on top.
@@ -103,5 +102,8 @@ with warnings.catch_warnings():
         source="Source: Department of Education",
         autoscale_y=False,
     )
+
+# Narrow figure: widen the right margin so the right-hand y-tick labels fit.
+fig.subplots_adjust(right=0.94)
 
 save_chart(__file__)

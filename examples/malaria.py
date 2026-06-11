@@ -28,7 +28,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import json
 
-import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -41,6 +40,7 @@ from graphs import (
     inset_tick_labels,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -84,7 +84,7 @@ t_tg = np.linspace(0.0, 1.0, 61)
 years_tg = 2015 + t_tg * (X_MAX - 2015)
 target = target_2030 + (cases_hist[2015 - 2000] - target_2030) * (1 - t_tg) ** 1.6
 
-fig, ax = plt.subplots(figsize=(5.2, 5.6))
+fig, ax = subplots("daily", height=5.0)
 
 highlight_panel(ax, FORECAST_START, X_MAX, color=C_BAND)
 
@@ -136,14 +136,13 @@ finalize(
     autoscale_y=False,
     footnote_lines=2,
 )
-# Small max_width_frac forces the stacked footer: notes on their own
-# left-aligned row above the source line, matching the original.
+# At the 4.6in daily width, source + notes can never share a row, so the
+# stacked footer (notes above the source line) happens naturally.
 footnotes(
     fig,
     "*Global Technical Strategy for Malaria 2016-30",
     "†At peak rate, 2000-07",
     source="Source: [WHO Global Health Observatory](https://www.who.int/data/gho)",
-    max_width_frac=0.78,
 )
 
 save_chart(__file__)

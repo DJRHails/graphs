@@ -16,10 +16,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from graphs import C_GRID, C_LABEL, C_RED_BRAND, PALETTE, finalize, footnotes, save_chart, set_theme
+from graphs import (
+    C_GRID,
+    C_LABEL,
+    C_RED_BRAND,
+    PALETTE,
+    finalize,
+    footnotes,
+    save_chart,
+    set_theme,
+    subplots,
+)
 
 set_theme()
 
@@ -82,7 +91,7 @@ def bottle(ax, cx, y0, w=1.5, h=0.075):
     ax.add_patch(Polygon(verts, closed=True, facecolor=C_ICON, edgecolor="none"))
 
 
-fig, ax = plt.subplots(figsize=(6.4, 6.4))
+fig, ax = subplots("daily", height=4.6)
 
 ax.set_xlim(0, 100)
 ax.set_ylim(0, 1)

@@ -23,7 +23,7 @@ footnote-plus-source row — the conventions the library is built for.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import finalize, footnotes, label_lines, save_chart, set_theme
+from graphs import finalize, footnotes, label_lines, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -31,7 +31,7 @@ months = np.arange(24)
 us = 2.0 + 4.0 * np.exp(-months / 9) + np.random.default_rng(0).normal(0, 0.25, 24)
 eu = 1.8 + 4.5 * np.exp(-months / 11) + np.random.default_rng(7).normal(0, 0.30, 24)
 
-fig, ax = plt.subplots(figsize=(7, 4.4))
+fig, ax = subplots("wide")
 ax.plot(months, us, label="America")
 ax.plot(months, eu, label="Euro area")
 label_lines(ax)
@@ -63,6 +63,14 @@ standard epilogue: tight bbox, 150 dpi, close, one-line confirmation.
 
 Behaviour that's automatic unless you override it:
 
+- **Charts come in two widths.** Create figures with
+  `subplots("daily")` (4.6in column, portrait-leaning) or
+  `subplots("wide")` (7.0in article format) — like a newspaper's column
+  formats, the width is fixed by the medium and only the height is the
+  per-chart choice (`height=`). Fixed widths keep the type-to-chart
+  ratio consistent across a set; ad-hoc `figsize=` widths are what make
+  a gallery look ragged. Extra `plt.subplots` kwargs pass through
+  (`ncols=`, `sharex=`, …).
 - **Title marker is the favicon triangle** (`marker="delta"`). The hollow
   red triangle is drawn inline at the first title line's baseline, sized
   to the cap height. Pass `marker="rule"` for the legacy short red rule
@@ -283,6 +291,7 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
+| `subplots(format="daily", *, height=None, **kwargs)`                | `plt.subplots` at a standard chart width — `"daily"` 4.6in / `"wide"` 7.0in; height is the per-chart choice. |
 | `finalize(ax, title, descriptor, source, *, marker="delta", auto_layout=True, y_labels="on_grid", …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes margins. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |

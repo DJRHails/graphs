@@ -10,7 +10,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import (
@@ -22,6 +21,7 @@ from graphs import (
     label_lines,
     save_chart,
     set_theme,
+    subplots,
 )
 
 set_theme()
@@ -33,7 +33,7 @@ us = np.array(
 )
 eu = np.array([90, 92, 94, 96, 98, 100, 101, 103, 104, 105, 92, 99, 103, 105, 107, 109])
 
-fig, ax = plt.subplots(figsize=(7.2, 4.6))
+fig, ax = subplots("wide")
 
 # Pandemic shock band — main message of the chart, but the styleguide
 # reserves red emphasis; for web use the subtle tint instead.

@@ -16,10 +16,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from examples._data import load_csv_lines
-from graphs import PALETTE, finalize, footnotes, inset_tick_labels, panel_label, right_axis, save_chart, set_theme
+from graphs import (
+    PALETTE,
+    finalize,
+    footnotes,
+    inset_tick_labels,
+    panel_label,
+    right_axis,
+    save_chart,
+    set_theme,
+    subplots,
+)
 
 set_theme()
 
@@ -34,7 +42,7 @@ for row in reader:
     deficit.append(float(row[1]))
     manuf.append(float(row[2]))
 
-fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(7, 5.4), sharex=True)
+fig, (ax_top, ax_bottom) = subplots("wide", height=5.4, nrows=2, sharex=True)
 fig.subplots_adjust(top=0.82, bottom=0.08, left=0.02, right=0.98, hspace=0.28)
 
 ax_top.fill_between(years, deficit, 0, color=PALETTE["red"], alpha=0.85, linewidth=0)

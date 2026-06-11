@@ -100,3 +100,43 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
             "patch.edgecolor": "none",
         }
     )
+
+
+# Standard chart widths, inches. Like a newspaper's column formats: the
+# width is fixed by the medium, depth varies by content. Fixed widths keep
+# the type-to-chart ratio consistent across a set — at 150 dpi with 12pt
+# titles, a 4.6in and a 6.4in chart scaled to the same display width differ
+# ~40% in apparent type size, which is what makes a gallery look ragged.
+FORMATS: dict[str, float] = {
+    "daily": 4.6,  # daily-chart / mobile column (portrait-leaning)
+    "wide": 7.0,  # article / landscape format
+}
+_DEFAULT_HEIGHTS: dict[str, float] = {"daily": 5.2, "wide": 4.4}
+
+
+def subplots(format: str = "wide", *, height: float | None = None, **kwargs):
+    """``plt.subplots`` at a standard chart width.
+
+    Standardises the width (the format); height stays the per-chart
+    editorial choice. Defaults: ``daily`` 4.6x5.2in, ``wide`` 7.0x4.4in.
+
+        fig, ax = subplots("daily", height=5.6)
+        fig, axes = subplots("wide", ncols=3, sharey=True)
+
+    Args:
+        format: ``"daily"`` (4.6in column) or ``"wide"`` (7.0in article).
+        height: Figure height in inches; per-format default when omitted.
+        **kwargs: Forwarded to ``plt.subplots`` (nrows, ncols, sharex, …).
+
+    Returns:
+        ``(fig, ax)`` exactly as ``plt.subplots``.
+    """
+    if format not in FORMATS:
+        raise ValueError(f"format must be one of {sorted(FORMATS)}, got {format!r}")
+    if "figsize" in kwargs:
+        raise TypeError(
+            "subplots() fixes the width via `format`; pass height= instead of figsize="
+        )
+    width = FORMATS[format]
+    h = height if height is not None else _DEFAULT_HEIGHTS[format]
+    return plt.subplots(figsize=(width, h), **kwargs)

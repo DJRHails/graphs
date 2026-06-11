@@ -19,8 +19,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
 from graphs import (
     C_GRID,
     C_LABEL,
@@ -29,6 +27,7 @@ from graphs import (
     save_chart,
     set_theme,
     snapshot_palette,
+    subplots,
 )
 
 set_theme()
@@ -45,7 +44,7 @@ colors = dict(zip([name for name, _, _ in series], snapshot_palette(len(series))
 colors["Silent"] = "#63615b"
 colors["Baby-boomer"] = "#c0bfb6"
 
-fig, ax = plt.subplots(figsize=(4.0, 5.2))
+fig, ax = subplots("daily", height=6.0)
 
 for name, ages, minutes in series:
     is_accent = name == "Millennial"

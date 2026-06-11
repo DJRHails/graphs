@@ -26,6 +26,7 @@ from graphs import (
     get_font,
     save_chart,
     set_theme,
+    subplots,
     top_legend,
 )
 from graphs._superscript import render_text_with_superscripts
@@ -47,7 +48,7 @@ PANELS = [
     ("Market\ncapitalisation†", 47.0, 4.5, "47‡", "4.5"),
 ]
 
-fig, axes = plt.subplots(4, 1, figsize=(4.6, 4.7))
+fig, axes = subplots("daily", height=4.7, nrows=4)
 fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
 
 

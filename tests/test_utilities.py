@@ -43,3 +43,31 @@ def test_x_axis_top_moves_ticks_and_hides_bottom(ax):
     assert all(t.tick2line.get_visible() for t in ax.xaxis.get_major_ticks())
     assert not ax.spines["bottom"].get_visible()
     assert not ax.spines["top"].get_visible()
+
+
+def test_subplots_fixes_width_per_format():
+    from graphs import FORMATS, subplots
+
+    fig, _ = subplots("daily")
+    assert tuple(fig.get_size_inches()) == (FORMATS["daily"], 5.2)
+    plt.close(fig)
+    fig, _ = subplots("wide", height=5.0)
+    assert tuple(fig.get_size_inches()) == (FORMATS["wide"], 5.0)
+    plt.close(fig)
+
+
+def test_subplots_rejects_figsize_and_unknown_format():
+    from graphs import subplots
+
+    with pytest.raises(TypeError):
+        subplots("daily", figsize=(3, 3))
+    with pytest.raises(ValueError):
+        subplots("a4")
+
+
+def test_subplots_defaults_to_wide():
+    from graphs import FORMATS, subplots
+
+    fig, _ = subplots()
+    assert tuple(fig.get_size_inches()) == (FORMATS["wide"], 4.4)
+    plt.close(fig)

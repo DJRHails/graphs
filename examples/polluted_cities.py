@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme
+from graphs import C_LABEL, C_SPINE, finalize, footnotes, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -58,7 +58,8 @@ _RAMP = [
 ]
 
 ROW_BAND = "#E8EEF0"  # pale blue-grey banding, Indian cities only
-ROW_FS = 13  # rank, city and chip numbers share one enlarged size
+ROW_FS = 10  # rank, city and chip numbers share one enlarged size
+HEADER_FS = 8.5
 
 
 def chip_color(value: float) -> tuple[float, float, float]:
@@ -72,7 +73,7 @@ def chip_color(value: float) -> tuple[float, float, float]:
     return tuple(c / 255 for c in _RAMP[-1][1])
 
 
-fig, ax = plt.subplots(figsize=(6.0, 5.5))
+fig, ax = subplots("daily", height=4.2)
 
 ax.set_xlim(0, 1)
 ax.set_ylim(8.05, -1.55)  # inverted: header band above row 0
@@ -82,8 +83,8 @@ ax.set_xticks([])
 ax.set_yticks([])
 ax.set_axis_off()
 
-BLOCKS = [((0.0, 0.455), LEFT), ((0.545, 1.0), RIGHT)]
-CHIP_W = 0.10
+BLOCKS = [((0.0, 0.465), LEFT), ((0.535, 1.0), RIGHT)]
+CHIP_W = 0.095
 BAND_PAD = 0.05  # white gap between row bands, in row units
 
 
@@ -95,14 +96,14 @@ CITY_SUFFIXES: list[tuple[plt.Text, str]] = []
 def draw_block(x0: float, x1: float, rows: list[tuple[int, str, int]]) -> None:
     """Draw one table column: header, header rule, banded rows, value chips."""
     rank_x = x0 + 0.012
-    city_x = x0 + 0.072
+    city_x = x0 + 0.085
     chip_x = x1 - CHIP_W
 
-    ax.text(rank_x, -0.35, "Rank", fontsize=10, fontweight="bold",
+    ax.text(rank_x, -0.35, "Rank", fontsize=HEADER_FS, fontweight="bold",
             color=C_SPINE, ha="left", va="bottom")
-    ax.text(city_x, -0.35, "City", fontsize=10, fontweight="bold",
+    ax.text(city_x, -0.35, "City", fontsize=HEADER_FS, fontweight="bold",
             color=C_SPINE, ha="left", va="bottom")
-    ax.text(chip_x + CHIP_W / 2, -0.35, "Average\nPollution", fontsize=10,
+    ax.text(chip_x + CHIP_W / 2, -0.35, "Average\nPollution", fontsize=HEADER_FS,
             fontweight="bold", color=C_SPINE, ha="center", va="bottom",
             linespacing=1.15)
     ax.plot([x0, x1], [-0.15, -0.15], color=C_SPINE, linewidth=0.8,

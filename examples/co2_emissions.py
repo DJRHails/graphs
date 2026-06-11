@@ -15,9 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib.pyplot as plt
-
-from graphs import finalize, footnotes, save_chart, set_theme
+from graphs import finalize, footnotes, save_chart, set_theme, subplots
 
 set_theme()
 
@@ -39,7 +37,7 @@ REGIONS = [
 GLOBAL_AVG = 4.6
 X_MAX = 7.6
 
-fig, ax = plt.subplots(figsize=(5.2, 5.5))
+fig, ax = subplots("daily", height=4.9)
 
 lefts = []
 edge = 0.0
