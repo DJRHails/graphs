@@ -24,7 +24,6 @@ from graphs import (
     inset_tick_labels,
     set_theme,
     top_legend,
-    y_labels_on_grid,
 )
 
 set_theme()
@@ -69,7 +68,6 @@ finalize(
     source="",  # owned by footnotes() below so the note packs alongside it
     footnote_lines=3,  # note row + blank spacer row above the source
 )
-y_labels_on_grid(ax)
 top_legend(fig, [bars_left, bars_right], ["Left wing", "Right wing"], fontsize=9)
 footnotes(
     fig,

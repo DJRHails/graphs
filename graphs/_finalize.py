@@ -395,6 +395,7 @@ def finalize(
     marker: str = "delta",
     auto_layout: bool = True,
     footnote_lines: int = 0,
+    y_labels: str = "on_grid",
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -431,9 +432,15 @@ def finalize(
             Auto-layout reserves an additional ~7pt-line per footnote row so
             wrapped notes don't clip. Pass the count when calling
             ``footnotes(fig, ...)`` after ``finalize`` with multi-line notes.
+        y_labels: ``"on_grid"`` (default) sits numeric y tick labels on
+            gridlines that extend under them (``y_labels_on_grid``); applied
+            only when the axes has visible y gridlines, so categorical
+            charts are unaffected. ``"ticks"`` keeps native tick labels.
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
+    if y_labels not in ("on_grid", "ticks"):
+        raise ValueError(f"y_labels must be 'on_grid' or 'ticks', got {y_labels!r}")
     fig = ax.get_figure()
 
     # Wrap the title stack to the figure's own width BEFORE pad computation
@@ -708,6 +715,14 @@ def finalize(
     # the clearance calculation above.
     _superscript_axis_label(ax, "x")
     _superscript_axis_label(ax, "y")
+
+    # House default: numeric y labels sit on gridlines that extend under
+    # them. Gated on visible y gridlines so categorical axes (bar_h rows,
+    # thermometer categories) keep their native labels.
+    if y_labels == "on_grid" and any(g.get_visible() for g in ax.get_ygridlines()):
+        from graphs._labels import y_labels_on_grid
+
+        y_labels_on_grid(ax)
 
     return fig, ax
 

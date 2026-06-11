@@ -27,7 +27,6 @@ from graphs import (
     finalize,
     set_theme,
     x_axis_label,
-    y_labels_on_grid,
 )
 
 set_theme()
@@ -86,7 +85,6 @@ finalize(
     autoscale_y=False,
     footnote_lines=1,  # the source wraps to a second line
 )
-y_labels_on_grid(ax)
 # finalize's bottom-spine recolour assumes the house dark spine; restore the
 # reference's lighter axis line after the title stack is laid out.
 ax.spines["bottom"].set_color("#b3b3b3")

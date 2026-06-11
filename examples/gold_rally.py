@@ -159,6 +159,10 @@ ax.set_xlim(gold_x[0] - 5, gold_x[-1] + 3)
 ax.set_ylim(80, 202)
 ax.set_yticks(range(80, 201, 20))
 
+# The spine doubles as the 80 line: drop the duplicate gridline before
+# finalize so its on-grid "80" label continues the dark baseline instead.
+ax.yaxis.get_gridlines()[0].set_visible(False)
+
 finalize(
     ax,
     title="What is driving gold’s relentless rally?",
@@ -166,11 +170,6 @@ finalize(
     source="Source: LSEG Workspace",
     autoscale_y=False,
 )
-
-# The spine doubles as the 80 line: drop the duplicate gridline and sit
-# the "80" tick label just above the baseline, as in the reference.
-ax.yaxis.get_gridlines()[0].set_visible(False)
-ax.get_yticklabels()[0].set_verticalalignment("bottom")
 
 out = Path(__file__).resolve().parent / "gold_rally.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

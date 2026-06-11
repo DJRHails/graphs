@@ -35,7 +35,6 @@ from graphs import (
     finalize,
     footnotes,
     set_theme,
-    y_labels_on_grid,
 )
 
 set_theme()
@@ -250,7 +249,6 @@ footnotes(
         "[The Economist](https://www.economist.com/)"
     ),
 )
-y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "generational_politics.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

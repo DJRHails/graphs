@@ -28,7 +28,6 @@ from graphs import (
     finalize,
     set_theme,
     top_legend,
-    y_labels_on_grid,
 )
 
 set_theme()
@@ -138,7 +137,6 @@ finalize(
     auto_layout=False,
 )
 
-y_labels_on_grid(ax)
 
 # "Latitude" column header, level with the x tick labels.
 fig.canvas.draw()

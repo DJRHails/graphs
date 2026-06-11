@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import C_RED, C_TEXT, finalize, scatter_standard, set_theme, y_labels_on_grid
+from graphs import C_RED, C_TEXT, finalize, scatter_standard, set_theme
 
 set_theme()
 
@@ -103,7 +103,6 @@ with warnings.catch_warnings():
         source="Source: Department of Education",
         autoscale_y=False,
     )
-y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "graduate_pay.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, C_SPINE, bar_v, finalize, inset_tick_labels, set_theme, y_labels_on_grid
+from graphs import C_RED, C_SPINE, bar_v, finalize, inset_tick_labels, set_theme
 
 set_theme()
 
@@ -69,7 +69,6 @@ finalize(
     source="Source: Australian Bureau of Meteorology",
     autoscale_y=False,
 )
-y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "australia_heat.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

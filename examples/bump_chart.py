@@ -98,6 +98,9 @@ bump_chart(
     right_labels=True,
     right_label_fontsize=8.5,
     aspect=0.85,
+    # The 2025 WHR revision has 135 fully-covered countries; without a rank
+    # window the top-of-table story compresses into the top third.
+    max_rank=40,
 )
 
 # Red annotation calling out the English-speaking trend.

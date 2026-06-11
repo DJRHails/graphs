@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme, y_labels_on_grid
+from graphs import C_RED, finalize, footnotes, inset_tick_labels, set_theme
 
 set_theme()
 
@@ -76,7 +76,6 @@ finalize(
     descriptor="United States, refugee resettlement, ’000",
     footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
-y_labels_on_grid(ax)
 footnotes(fig, source="Source: Refugee Processing Centre")
 
 out = Path(__file__).resolve().parent / "us_refugees.png"

@@ -15,7 +15,9 @@ def finalized_ax():
     set_theme()
     fig, ax = plt.subplots(figsize=(4.0, 3.0))
     ax.plot([2000, 2010, 2020], [0, 50, 100])
-    finalize(ax, title="Test", descriptor="Things, %")
+    # Opt out of the finalize default so the manual helper path is what's
+    # under test (test_finalize_applies_on_grid_default covers the default).
+    finalize(ax, title="Test", descriptor="Things, %", y_labels="ticks")
     yield ax
     plt.close(fig)
 
@@ -55,6 +57,25 @@ def test_idempotent_recall(finalized_ax):
     first = len(_gid_artists(ax))
     y_labels_on_grid(ax)
     assert len(_gid_artists(ax)) == first
+
+
+def test_finalize_applies_on_grid_default():
+    set_theme()
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    ax.plot([2000, 2010, 2020], [0, 50, 100])
+    finalize(ax, title="Test", descriptor="Things, %")
+    assert _gid_artists(ax), "finalize default should apply y_labels_on_grid"
+    plt.close(fig)
+
+
+def test_finalize_skips_on_grid_for_categorical_axes():
+    set_theme()
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    ax.barh(["a", "b", "c"], [1, 2, 3])
+    ax.grid(axis="y", visible=False)
+    finalize(ax, title="Test", descriptor="Things, %")
+    assert not _gid_artists(ax), "categorical axes must keep native labels"
+    plt.close(fig)
 
 
 def test_left_side_labels_extend_leftward():

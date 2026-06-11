@@ -40,7 +40,6 @@ from graphs import (
     highlight_panel,
     inset_tick_labels,
     set_theme,
-    y_labels_on_grid,
 )
 
 set_theme()
@@ -145,7 +144,6 @@ footnotes(
     source="Source: [WHO Global Health Observatory](https://www.who.int/data/gho)",
     max_width_frac=0.78,
 )
-y_labels_on_grid(ax)
 
 out = Path(__file__).resolve().parent / "malaria.png"
 plt.savefig(out, bbox_inches="tight", dpi=150)

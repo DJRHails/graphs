@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 
-from graphs import finalize, footnotes, set_theme, y_labels_on_grid
+from graphs import finalize, footnotes, set_theme
 
 set_theme()
 
@@ -115,7 +115,6 @@ finalize(
     autoscale_y=False,
     footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
-y_labels_on_grid(ax)
 footnotes(fig, source="Sources: GCP; CDIAC; UN")
 
 out = Path(__file__).resolve().parent / "co2_emissions.png"
