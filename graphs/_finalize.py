@@ -107,42 +107,42 @@ DESCRIPTOR_LINESPACING = 1.20
 Y_AXIS_LABEL_LINESPACING = 1.2
 
 # --- Layout gaps (typographic points) ---
-DESCRIPTOR_LINE_BOX_PT = 11.4   # DESCRIPTOR_SIZE_PT × DESCRIPTOR_LINESPACING
-TITLE_LINE_BOX_PT = 14.0        # TITLE_SIZE_PT × TITLE_LINESPACING
-INTER_BLOCK_GAP_PT = 3.5        # gap between title and descriptor blocks
-RULE_GAP_PT = 2.0               # gap between title and red rule (marker="rule")
-TOP_TICK_CLEARANCE_PT = 6.0     # padding above top-axis tick labels
+DESCRIPTOR_LINE_BOX_PT = 11.4  # DESCRIPTOR_SIZE_PT × DESCRIPTOR_LINESPACING
+TITLE_LINE_BOX_PT = 14.0  # TITLE_SIZE_PT × TITLE_LINESPACING
+INTER_BLOCK_GAP_PT = 3.5  # gap between title and descriptor blocks
+RULE_GAP_PT = 2.0  # gap between title and red rule (marker="rule")
+TOP_TICK_CLEARANCE_PT = 6.0  # padding above top-axis tick labels
 
 # --- Marker (delta / favicon triangle) ---
-MARKER_SIZE_RATIO = 0.80        # marker_size / title_size
-MARKER_GAP_PT = 4.0             # horizontal gap between marker and inline title
-RULE_WIDTH_PX = 80              # short red rule width in device pixels
-RULE_LINEWIDTH = 3.5            # short red rule stroke width
+MARKER_SIZE_RATIO = 0.80  # marker_size / title_size
+MARKER_GAP_PT = 4.0  # horizontal gap between marker and inline title
+RULE_WIDTH_PX = 80  # short red rule width in device pixels
+RULE_LINEWIDTH = 3.5  # short red rule stroke width
 
 # --- Tick-pad fallback ---
-TICK_PAD_MIN = 4                # default y-tick pad (override if charts ask for more)
+TICK_PAD_MIN = 4  # default y-tick pad (override if charts ask for more)
 
 # --- Font weights ---
-TITLE_WEIGHT = 700              # bold
+TITLE_WEIGHT = 700  # bold
 
 # --- Panel label ---
-PANEL_RULE_WIDTH_PX = 35        # short dark rule width above panel label
+PANEL_RULE_WIDTH_PX = 35  # short dark rule width above panel label
 PANEL_RULE_LINEWIDTH = 1.2
-PANEL_RULE_Y_OFFSET = 0.052     # rule offset above axes top (figure coords)
-PANEL_LABEL_Y_OFFSET = 0.010    # label offset above axes top (figure coords)
+PANEL_RULE_Y_OFFSET = 0.052  # rule offset above axes top (figure coords)
+PANEL_LABEL_Y_OFFSET = 0.010  # label offset above axes top (figure coords)
 
 # --- Source / footnotes vertical positions (figure coords) ---
-SOURCE_Y_OFFSET = 0.06          # source line offset below bbox.y0
-SOURCE_TICK_CLEARANCE = 0.015   # extra clearance below lowest tick label/xlabel
-Y_AXIS_LABEL_MARGIN = 0.005     # y-axis label offset above bbox.y1
+SOURCE_Y_OFFSET = 0.06  # source line offset below bbox.y0
+SOURCE_TICK_CLEARANCE = 0.015  # extra clearance below lowest tick label/xlabel
+Y_AXIS_LABEL_MARGIN = 0.005  # y-axis label offset above bbox.y1
 FOOTNOTES_LEGACY_Y_OFFSET = 0.045  # legacy notes-only position below base
-FOOTNOTES_STACK_GAP = 0.022     # gap when notes wrap above source line
-FOOTNOTES_PACK_GAP = 0.02       # horizontal gap between source and inline notes
+FOOTNOTES_STACK_GAP = 0.022  # gap when notes wrap above source line
+FOOTNOTES_PACK_GAP = 0.02  # horizontal gap between source and inline notes
 
 # --- Auto-layout (subplots_adjust) ---
-AUTO_LAYOUT_LEFT = 0.02         # default left margin for finalize(auto_layout=True)
-AUTO_LAYOUT_RIGHT = 0.96        # default right margin
-AUTO_LAYOUT_TOP_PAD_PT = 6.0    # breathing room above the title-stack
+AUTO_LAYOUT_LEFT = 0.02  # default left margin for finalize(auto_layout=True)
+AUTO_LAYOUT_RIGHT = 0.96  # default right margin
+AUTO_LAYOUT_TOP_PAD_PT = 6.0  # breathing room above the title-stack
 AUTO_LAYOUT_BOTTOM_MARGIN = 0.020  # breathing room below the source baseline
 AUTO_LAYOUT_TICK_RESERVE_PT = 16.0  # reserve for a single row of x-tick labels
 AUTO_LAYOUT_MARKER_RESERVE_PT = 2.0  # marker overhang above title cap-height
@@ -300,7 +300,9 @@ def _compute_auto_pads(
     has_source_band = bool(source) or footnote_lines > 0
     if has_source_band:
         bottom_pad = (
-            max(SOURCE_Y_OFFSET, tick_reserve) + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
+            max(SOURCE_Y_OFFSET, tick_reserve)
+            + source_h_fig
+            + AUTO_LAYOUT_BOTTOM_MARGIN
         )
     else:
         bottom_pad = tick_reserve + AUTO_LAYOUT_BOTTOM_MARGIN
@@ -393,6 +395,7 @@ def finalize(
     marker: str = "delta",
     auto_layout: bool = True,
     footnote_lines: int = 0,
+    y_labels: str = "on_grid",
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -403,8 +406,10 @@ def finalize(
         Descriptor  IBM Plex Sans Regular
 
     Args:
-        title: Chart headline.
-        descriptor: Subtitle line (country, metric, unit).
+        title: Chart headline. Auto-wrapped to the figure width — pass it
+            as one line; explicit ``\\n`` still forces a break.
+        descriptor: Subtitle line (country, metric, unit). Auto-wrapped like
+            the title; use ``\\n`` only for semantic breaks (subject / unit).
         source: Attribution line below the chart.
         y_axis_right: Move y-axis labels to the right.
         title_x: Override x anchor in figure coords.
@@ -427,10 +432,80 @@ def finalize(
             Auto-layout reserves an additional ~7pt-line per footnote row so
             wrapped notes don't clip. Pass the count when calling
             ``footnotes(fig, ...)`` after ``finalize`` with multi-line notes.
+        y_labels: ``"on_grid"`` (default) sits numeric y tick labels on
+            gridlines that extend under them (``y_labels_on_grid``); applied
+            only when the axes has visible y gridlines, so categorical
+            charts are unaffected. ``"ticks"`` keeps native tick labels.
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
+    if y_labels not in ("on_grid", "ticks"):
+        raise ValueError(f"y_labels must be 'on_grid' or 'ticks', got {y_labels!r}")
     fig = ax.get_figure()
+
+    # Wrap the title stack to the figure's own width BEFORE pad computation
+    # (which counts lines). Explicit "\n" survives — only overflowing lines
+    # gain breaks — so the wrap is owned by this figure's geometry, never
+    # copied from a reference layout.
+    wrap_x0 = (
+        title_x
+        if title_x is not None
+        else (AUTO_LAYOUT_LEFT if auto_layout else ax.get_position().x0)
+    )
+    if title:
+        title_indent = 0.0
+        if marker == "delta":
+            marker_w_fig = (
+                (TITLE_SIZE_PT * MARKER_SIZE_RATIO) / 72.0 / fig.get_figwidth()
+            )
+            marker_gap_fig = MARKER_GAP_PT / 72.0 / fig.get_figwidth()
+            title_indent = marker_w_fig + marker_gap_fig
+        fp_title_wrap = fm.FontProperties(
+            family=_get_font(), weight=TITLE_WEIGHT, size=TITLE_SIZE_PT
+        )
+        title = _wrap_to_fig_width(
+            fig,
+            title,
+            fontproperties=fp_title_wrap,
+            avail_fig_w=AUTO_LAYOUT_RIGHT - wrap_x0 - title_indent,
+        )
+    # The semibold descriptor lead is keyed to the EXPLICIT "\n" (the
+    # semantic subject / unit split), never to breaks added by the wrap —
+    # so capture the boundary before wrapping. The lead wraps measured at
+    # its rendered (semibold) width.
+    desc_lead = ""
+    if descriptor:
+        fp_desc_wrap = fm.FontProperties(
+            family=_get_font_condensed(), weight="normal", size=DESCRIPTOR_SIZE_PT
+        )
+        desc_avail_w = AUTO_LAYOUT_RIGHT - wrap_x0
+        if "\n" in descriptor:
+            lead_raw, rest_raw = descriptor.split("\n", 1)
+            fp_desc_lead_wrap = fm.FontProperties(
+                family=_get_font_condensed(),
+                weight="semibold",
+                size=DESCRIPTOR_SIZE_PT,
+            )
+            desc_lead = _wrap_to_fig_width(
+                fig,
+                lead_raw,
+                fontproperties=fp_desc_lead_wrap,
+                avail_fig_w=desc_avail_w,
+            )
+            desc_rest = _wrap_to_fig_width(
+                fig,
+                rest_raw,
+                fontproperties=fp_desc_wrap,
+                avail_fig_w=desc_avail_w,
+            )
+            descriptor = f"{desc_lead}\n{desc_rest}"
+        else:
+            descriptor = _wrap_to_fig_width(
+                fig,
+                descriptor,
+                fontproperties=fp_desc_wrap,
+                avail_fig_w=desc_avail_w,
+            )
 
     _check_x_monotonic(ax)
     if autoscale_y:
@@ -465,7 +540,9 @@ def finalize(
     current_pad = (
         ax.yaxis.get_major_ticks()[0].get_pad() if ax.yaxis.get_major_ticks() else 0
     )
-    ax.yaxis.set_tick_params(pad=max(current_pad, TICK_PAD_MIN), labelsize=TICK_LABEL_SIZE_PT)
+    ax.yaxis.set_tick_params(
+        pad=max(current_pad, TICK_PAD_MIN), labelsize=TICK_LABEL_SIZE_PT
+    )
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
@@ -510,20 +587,56 @@ def finalize(
         pass
 
     if descriptor:
-        n_desc_lines = descriptor.count("\n") + 1
+        desc_lines = descriptor.split("\n")
+        n_desc_lines = len(desc_lines)
         fp_desc = fm.FontProperties(family=_get_font_condensed(), weight="normal")
-        render_text_with_superscripts(
-            fig,
-            tx,
-            y_cursor,
-            descriptor,
-            fontsize=DESCRIPTOR_SIZE_PT,
-            fontproperties=fp_desc,
-            color=C_SPINE,
-            va="bottom",
-            ha="left",
-            linespacing=DESCRIPTOR_LINESPACING,
-        )
+        if desc_lead:
+            # An explicit "\n" splits the descriptor into a semibold lead
+            # (the subject — every line it wrapped to) over regular
+            # continuation lines (scope/units). Auto-wrap breaks alone
+            # never trigger the lead styling.
+            n_lead_lines = desc_lead.count("\n") + 1
+            n_rest_lines = n_desc_lines - n_lead_lines
+            fp_desc_lead = fm.FontProperties(
+                family=_get_font_condensed(), weight="semibold"
+            )
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor,
+                "\n".join(desc_lines[n_lead_lines:]),
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor + DESCRIPTOR_LINE_BOX_PT * pt2fig * n_rest_lines,
+                desc_lead,
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc_lead,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
+        else:
+            render_text_with_superscripts(
+                fig,
+                tx,
+                y_cursor,
+                descriptor,
+                fontsize=DESCRIPTOR_SIZE_PT,
+                fontproperties=fp_desc,
+                color=C_SPINE,
+                va="bottom",
+                ha="left",
+                linespacing=DESCRIPTOR_LINESPACING,
+            )
         # Descriptor line box ≈ 9.5pt × 1.20 ≈ 11.4pt for each line.
         y_cursor += DESCRIPTOR_LINE_BOX_PT * pt2fig * n_desc_lines + line_gap
 
@@ -540,9 +653,16 @@ def finalize(
             # triangle visually lines up with the bottom of "B".
             marker_size_pt = title_size_pt * MARKER_SIZE_RATIO
             marker_w_fig = marker_size_pt / 72.0 / fig.get_figwidth()
-            marker_gap_fig = (MARKER_GAP_PT * pt2fig) * (fig.get_figheight() / fig.get_figwidth())
+            marker_gap_fig = (MARKER_GAP_PT * pt2fig) * (
+                fig.get_figheight() / fig.get_figwidth()
+            )
             title_x_inline = tx + marker_w_fig + marker_gap_fig
-            _draw_logo_triangle(fig, tx, y_cursor, size_pt=marker_size_pt)
+            # Multi-line text with va="baseline" anchors the LAST line's
+            # baseline at y_cursor; the triangle belongs on the FIRST line.
+            first_baseline = y_cursor + (
+                (n_title_lines - 1) * title_size_pt * TITLE_LINESPACING * pt2fig
+            )
+            _draw_logo_triangle(fig, tx, first_baseline, size_pt=marker_size_pt)
             render_text_with_superscripts(
                 fig,
                 title_x_inline,
@@ -626,6 +746,14 @@ def finalize(
     # the clearance calculation above.
     _superscript_axis_label(ax, "x")
     _superscript_axis_label(ax, "y")
+
+    # House default: numeric y labels sit on gridlines that extend under
+    # them. Gated on visible y gridlines so categorical axes (bar_h rows,
+    # thermometer categories) keep their native labels.
+    if y_labels == "on_grid" and any(g.get_visible() for g in ax.get_ygridlines()):
+        from graphs._labels import y_labels_on_grid
+
+        y_labels_on_grid(ax)
 
     return fig, ax
 
@@ -816,6 +944,64 @@ def year_axis(ax, *, abbreviate: bool = True, set_locator: bool = True) -> None:
     ax.xaxis.set_major_formatter(plt.FuncFormatter(_fmt))
 
 
+def _text_width_fig(fig, text: str, fontproperties: fm.FontProperties) -> float:
+    """Measure rendered width of ``text`` in figure-x fraction (Agg renderer)."""
+    artist = fig.text(0, 0, text, fontproperties=fontproperties)
+    try:
+        renderer = fig.canvas.get_renderer()
+        width_px = artist.get_window_extent(renderer=renderer).width
+    finally:
+        artist.remove()
+    return width_px / (fig.get_figwidth() * fig.dpi)
+
+
+def _wrap_to_fig_width(
+    fig,
+    text: str,
+    *,
+    fontproperties: fm.FontProperties,
+    avail_fig_w: float,
+) -> str:
+    """Greedy word-wrap ``text`` so each line fits ``avail_fig_w`` (figure-x fraction).
+
+    Explicit newlines are preserved: each ``\\n``-separated segment wraps
+    independently, so callers can still force semantic breaks (e.g. a
+    descriptor's subject / unit split). Words wider than the available
+    width are left intact. A single-word last line (a widow) pulls one
+    word down from the line above when it still fits. Returns ``text``
+    unchanged when the renderer can't measure (non-Agg backends).
+    """
+    if not text or avail_fig_w <= 0:
+        return text
+    try:
+        fig.canvas.get_renderer()
+    except AttributeError:
+        # Non-Agg backends can't measure text without drawing — skip the
+        # wrap rather than guess. Anything else raising below is a real
+        # bug and must surface, not silently disable wrapping.
+        return text
+    out_lines: list[str] = []
+    for segment in text.split("\n"):
+        words = segment.split(" ")
+        lines: list[str] = []
+        line = ""
+        for word in words:
+            candidate = f"{line} {word}" if line else word
+            if line and _text_width_fig(fig, candidate, fontproperties) > avail_fig_w:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        lines.append(line)
+        if len(lines) >= 2 and " " not in lines[-1] and " " in lines[-2]:
+            head, _, pulled = lines[-2].rpartition(" ")
+            rebalanced = f"{pulled} {lines[-1]}"
+            if _text_width_fig(fig, rebalanced, fontproperties) <= avail_fig_w:
+                lines[-2], lines[-1] = head, rebalanced
+        out_lines.extend(lines)
+    return "\n".join(out_lines)
+
+
 def _wrap_preserve_offsets(text: str, max_chars: int) -> str:
     """Greedy word-wrap that converts inter-word spaces into newlines.
 
@@ -931,7 +1117,7 @@ def verify_layout(fig, *, tolerance: float = 0.005) -> list[str]:
         msg = (
             f"graphs.verify_layout: text {snippet!r} extends past the "
             f"figure bounds ({', '.join(overflows)}). "
-            f"`savefig(bbox_inches=\"tight\")` will silently expand the "
+            f'`savefig(bbox_inches="tight")` will silently expand the '
             f"saved canvas to include it. Fix by wrapping the text, "
             f"shrinking the figure margins, or removing the artist."
         )
@@ -1090,7 +1276,11 @@ def footnotes(
         t.remove()
         return bb.width / (fig.get_figwidth() * fig.dpi)
 
-    notes_w = _text_width_frac(notes_clean, fp_notes, FOOTNOTE_SIZE_PT) if notes_clean else 0.0
+    notes_w = (
+        _text_width_frac(notes_clean, fp_notes, FOOTNOTE_SIZE_PT)
+        if notes_clean
+        else 0.0
+    )
     line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
 
     def _draw_wrapped(text: str, urls, anchor_y: float, avail_frac: float) -> None:
@@ -1118,7 +1308,9 @@ def footnotes(
         if not notes_str:
             return
         y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
-        _draw_wrapped(notes_clean, notes_urls, y_pos, max(0.0, min(max_width_frac, 1.0) - 2 * x))
+        _draw_wrapped(
+            notes_clean, notes_urls, y_pos, max(0.0, min(max_width_frac, 1.0) - 2 * x)
+        )
         if verify:
             verify_layout(fig)
         return

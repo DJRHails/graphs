@@ -8,6 +8,7 @@ from typing import Iterable
 
 import matplotlib.font_manager as fm
 import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
 
 from graphs._fonts import _get_font
 
@@ -226,6 +227,123 @@ def inset_tick_labels(ax, *, axis: str = "x") -> None:
         return
     labels[0].set_ha("left")
     labels[-1].set_ha("right")
+
+
+def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
+    """Sit y tick labels on top of gridlines that extend under them.
+
+    Standard Economist daily-chart convention: each gridline continues past
+    the axes edge into the label gutter, ending flush with the labels'
+    common outer edge; the label rests on its line (bottom-aligned, flush
+    with the line's outer end). Works on whichever side the labels sit —
+    right-side labels get rightward extensions, left-side labels leftward
+    (e.g. a latitude axis). The bottom tick's extension inherits the dark
+    spine / zero-rule stroke when it coincides with one, so "0" sits on
+    the rule.
+
+    Call AFTER ``finalize()`` (labels and limits must be final). Native
+    tick labels are replaced by figure-stable text artists; the series
+    stay clipped at the axes edge — only grid strokes cross into the
+    gutter.
+
+    Args:
+        ax: Axes styled with the theme's y labels (either side).
+        pad_pt: Gap between the axes edge and the labels' near extent,
+            in points.
+    """
+    fig = ax.get_figure()
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+
+    ticks = [
+        (loc, label)
+        for loc, label in zip(ax.get_yticks(), ax.get_yticklabels())
+        if label.get_text() and label.get_visible()
+    ]
+    y_lo, y_hi = sorted(ax.get_ylim())
+    ticks = [(loc, label) for loc, label in ticks if y_lo <= loc <= y_hi]
+    if not ticks:
+        return
+
+    # Clear any previous application (idempotent re-styling).
+    for artist in list(ax.lines) + list(ax.texts):
+        if artist.get_gid() == "y-labels-on-grid":
+            artist.remove()
+
+    # Which side do the labels sit on? Compare label centres to the axes.
+    ax_bbox = ax.get_window_extent(renderer=renderer)
+    centres = [
+        label.get_window_extent(renderer=renderer).x0
+        + label.get_window_extent(renderer=renderer).width / 2
+        for _, label in ticks
+    ]
+    side = (
+        "left"
+        if sum(centres) / len(centres) < (ax_bbox.x0 + ax_bbox.x1) / 2
+        else "right"
+    )
+
+    # Common outer edge: pad + widest label, converted to axes-x fraction.
+    axes_w_px = ax_bbox.width
+    pad_px = pad_pt / 72.0 * fig.dpi
+    max_w_px = max(
+        label.get_window_extent(renderer=renderer).width for _, label in ticks
+    )
+    gutter_frac = (pad_px + max_w_px) / axes_w_px
+    if side == "right":
+        edge_frac, near_frac, text_ha = 1.0 + gutter_frac, 1.0, "right"
+    else:
+        edge_frac, near_frac, text_ha = -gutter_frac, 0.0, "left"
+
+    gridlines = ax.get_ygridlines()
+    grid_by_loc = dict(zip(ax.get_yticks(), gridlines))
+    bottom_spine = ax.spines["bottom"]
+    trans = ax.get_yaxis_transform(which="grid")
+
+    for loc, label in ticks:
+        # Stroke style: continue the gridline; at the axes floor, continue
+        # the dark baseline instead so "0" sits on the rule. Hidden
+        # gridlines (e.g. suppressed edge rules) get no extension.
+        grid = grid_by_loc.get(loc)
+        if grid is not None and not grid.get_visible():
+            grid = None
+        color = grid.get_color() if grid is not None else "0.85"
+        lw = grid.get_linewidth() if grid is not None else 0.6
+        on_baseline = bottom_spine.get_visible() and abs(loc - y_lo) <= 1e-9 * max(
+            1.0, abs(y_hi - y_lo)
+        )
+        if on_baseline:
+            color = bottom_spine.get_edgecolor()
+            lw = bottom_spine.get_linewidth()
+        if grid is not None or on_baseline:
+            ax.add_line(
+                plt.Line2D(
+                    [near_frac, edge_frac],
+                    [loc, loc],
+                    transform=trans,
+                    color=color,
+                    linewidth=lw,
+                    solid_capstyle="butt",
+                    clip_on=False,
+                    zorder=grid.get_zorder() if grid is not None else 0.5,
+                    gid="y-labels-on-grid",
+                )
+            )
+        text = ax.text(
+            edge_frac,
+            loc,
+            label.get_text(),
+            transform=trans,
+            ha=text_ha,
+            va="bottom",
+            fontsize=label.get_fontsize(),
+            color=label.get_color(),
+            fontfamily=label.get_fontfamily(),
+            gid="y-labels-on-grid",
+        )
+        text.set_clip_on(False)
+
+    ax.tick_params(axis="y", labelright=False, labelleft=False)
 
 
 def italicize_labels(

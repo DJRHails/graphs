@@ -693,6 +693,7 @@ def bump_chart(
     highlight_halo_color: str = "white",
     highlight_halo_extra_width: float = 2.0,
     aspect: float | None = None,
+    max_rank: int | None = None,
 ) -> dict[str, str]:
     """Bump chart — smooth-curve movement of rankings across columns.
 
@@ -740,6 +741,13 @@ def bump_chart(
         highlight_halo_color: Halo colour (default white).
         highlight_halo_extra_width: Pixels added to the line's linewidth to
             form the halo stroke.
+        max_rank: Crop the rank axis at this rank instead of the series
+            count. With a large backdrop (say 135 countries) the story's
+            top-of-table band would otherwise compress into a sliver;
+            ``max_rank=40`` shows ranks 1-40 full height. Backdrop series
+            that never enter the window are dropped; ones that dip out are
+            clipped at the axes edge. Highlighted series should stay inside
+            the window or their terminal dots/labels will sit off-canvas.
         aspect: Optional width/height ratio. When provided, sets the axes
             box aspect via :meth:`Axes.set_box_aspect` (``height/width``).
             E.g. ``aspect=0.85`` makes the chart slightly taller than wide,
@@ -759,6 +767,15 @@ def bump_chart(
     n_cols = len(next(iter(ranks.values())))
     if any(len(v) != n_cols for v in ranks.values()):
         raise ValueError("All rank sequences must share the same length")
+
+    if max_rank is not None:
+        # Drop backdrop series that never enter the visible rank window;
+        # everything else clips at the axes edge.
+        ranks = {
+            name: series
+            for name, series in ranks.items()
+            if min(series) <= max_rank
+        }
 
     n_series = len(ranks)
     half = n_series // 2
@@ -840,7 +857,8 @@ def bump_chart(
     # Pad x-limits when right-edge labels are on, to make room for the text.
     right_pad = 0.18 if right_labels else 0.05
     ax.set_xlim(-0.05, n_cols - 1 + right_pad)
-    ax.set_ylim(n_series + 0.5, 0.5)  # inverted: rank 1 at top
+    rank_floor = max_rank if max_rank is not None else n_series
+    ax.set_ylim(rank_floor + 0.5, 0.5)  # inverted: rank 1 at top
     ax.set_xticks(x_grid)
     if x_labels is not None:
         if len(x_labels) != n_cols:
@@ -848,7 +866,7 @@ def bump_chart(
                 f"x_labels length {len(x_labels)} does not match n_cols {n_cols}"
             )
         ax.set_xticklabels(list(x_labels))
-    ax.set_yticks(range(1, n_series + 1))
+    ax.set_yticks(range(1, rank_floor + 1))
     ax.set_yticklabels([])
     ax.tick_params(axis="y", length=0)
     ax.tick_params(axis="x", labelsize=9, length=3.5, direction="out", color=C_SPINE)
@@ -1003,7 +1021,10 @@ def _spread_annotations_y(ax, annotations) -> None:
         return
 
     inv = ax.transData.inverted()
-    for _ in range(8):
+    # Iterate until stable: a long chain of crammed labels (15 labels in a
+    # ~10px-per-rank band) needs the push to propagate through the whole
+    # stack, which a fixed small iteration count never finishes.
+    for _ in range(50):
         bboxes = sorted(
             ((a.get_window_extent(renderer=renderer), a) for a in annotations),
             key=lambda b: b[0].y0,

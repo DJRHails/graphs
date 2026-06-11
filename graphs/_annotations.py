@@ -29,16 +29,17 @@ def callout(
     text: str,
     *,
     xytext: tuple[float, float] | None = None,
-    fontsize: float = 7.5,
+    fontsize: float = 9.0,
     fill: str = C_BOX_FILL,
     edgecolor: str = "none",
     arrow: bool = True,
 ):
     """Pale-fill text callout box with optional arrow to the data point.
 
-    Styleguide spec: Econ Sans Cnd reg 7.5/9.5pt, fill ``c22.5 k15`` at 100%
-    multiply (we use the flat ``#E9EDF0`` web equivalent), 6pt horizontal
-    padding, arrow centred on the box edge.
+    Styleguide spec: Econ Sans Cnd, fill ``c22.5 k15`` at 100% multiply
+    (we use the flat ``#E9EDF0`` web equivalent), 6pt horizontal padding,
+    arrow centred on the box edge. Default size is 9pt to match direct
+    labels (the print spec's 7.5pt reads too small at daily-chart scale).
 
     Args:
         xy: Data-coordinate point being annotated.
@@ -103,7 +104,7 @@ def highlight_panel(
             transform=ax.get_xaxis_transform(),
             ha="center",
             va="top",
-            fontsize=7.5,
+            fontsize=9.0,
             color=C_LABEL_MUTED,
             family=_get_font_condensed(),
         )
@@ -133,7 +134,7 @@ def highlight_label(
             xytext=offset,
             textcoords="offset points",
             color=C_LABEL_MUTED,
-            fontsize=6.5,
+            fontsize=7.5,
             family=_get_font_condensed(),
             fontweight="light",
             ha="left",
@@ -146,7 +147,7 @@ def highlight_label(
             xytext=offset,
             textcoords="offset points",
             color=color or C_RED,
-            fontsize=8.5,
+            fontsize=9.0,
             family=_get_font_condensed(),
             fontweight="medium",
             ha="left",
@@ -453,7 +454,7 @@ def direction_label(
     *,
     arrow: str = "↑",
     color: str | None = None,
-    fontsize: float = 8.5,
+    fontsize: float = 9.0,
     bold: bool = True,
     placement: str = "before",
 ) -> None:
@@ -500,7 +501,7 @@ def threshold_arrows(
     right_color: str | None = None,
     y: float | None = None,
     axis: str = "x",
-    fontsize: float = 8.5,
+    fontsize: float = 9.0,
     gap: float = 0.005,
     pad: float = 0.040,
     bold: bool = True,
