@@ -67,14 +67,39 @@ DejaVu Sans.
 
 ## Development
 
-Hot reload:
+Hot reload during chart iteration:
 
     uv run graphs-watch
 
-Watches graphs/ and examples/ for .py changes and re-renders the affected
-examples + comparisons. Tests: `uv run --with pytest pytest -q`. Reference
-images for the replica examples: `uv run examples/fetch_refs.py`, then
-`uv run examples/build_comparisons.py`.
+Watches `graphs/` and `examples/` for `.py` changes and re-renders the
+affected examples + the comparison strip in parallel. The watcher routes
+by path:
+
+- `graphs/**/*.py` or `examples/_data.py` → regen all examples + comparisons
+- `examples/build_comparisons.py` → comparisons only
+- `examples/<name>.py` → that one example + comparisons
+
+### Comparison harness
+
+`examples/build_comparisons.py` composes side-by-side images for visual
+review:
+
+- `url`-kind entries download a Medium-hosted PNG and stack it above our
+  replica (used for the "Mistakes, we've drawn a few" redesigns).
+- `local_ref`-kind entries use a local reference image (e.g. the styleguide
+  page for the thermometer chart).
+
+Generated comparisons land in `examples/comparisons/<name>.png` (gitignored —
+the reference images aren't ours to redistribute).
+
+`examples/fetch_refs.py` populates `examples/comparisons/_originals/` for the
+daily-chart replicas: it downloads the Economist "2019 daily charts" grid and
+cuts it into per-chart reference cells (rows are located via the red Economist
+tag that tops every chart — blank-gap heuristics misfire on detached
+titles/footnotes).
+
+CSVs fetched at runtime by example scripts are cached under
+`examples/.data/` via `examples/_data.py::load_csv_text(url)`.
 
 ## License
 
