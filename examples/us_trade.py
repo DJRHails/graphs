@@ -43,16 +43,12 @@ for row in reader:
     manuf.append(float(row[2]))
 
 fig, (ax_top, ax_bottom) = subplots("wide", height=5.4, nrows=2, sharex=True)
-fig.subplots_adjust(top=0.82, bottom=0.08, left=0.02, right=0.98, hspace=0.28)
 
 ax_top.fill_between(years, deficit, 0, color=PALETTE["red"], alpha=0.85, linewidth=0)
 ax_bottom.plot(years, manuf, color=PALETTE["blue"], linewidth=2.0)
 
 ax_top.set_ylim(-400, 0)
 ax_bottom.set_ylim(11, 18)
-
-panel_label(ax_top, "Trade deficit with China, $bn")
-panel_label(ax_bottom, "Manufacturing employment, m")
 
 for axis in (ax_top, ax_bottom):
     right_axis(axis)
@@ -62,7 +58,9 @@ ax_bottom.set_xlim(years[0], years[-1])
 ax_bottom.set_xticks(list(range(1995, 2017, 3)))
 inset_tick_labels(ax_bottom, axis="x")
 
-# Title stack on the top axes; source line drawn manually below the bottom.
+# Title stack on the top axes; finalize auto-layouts the outer margins. Restore
+# the inter-panel hspace afterwards, then draw the panel labels anchored to the
+# final axes positions and the source line manually below the bottom panel.
 finalize(
     ax_top,
     title="Free markets and free workers",
@@ -71,8 +69,16 @@ finalize(
     title_x=0.02,
     y_start=0.060,
     autoscale_y=False,
-    auto_layout=False,  # stacked panels need explicit hspace
 )
+# Restore the inter-panel hspace and lift the bottom margin: finalize anchors
+# on ax_top and only reserves for its (empty) tick band, so the bottom panel's
+# year labels need explicit room below them for the source line. The wider
+# right edge keeps the right-axis "0" label inside the figure.
+fig.subplots_adjust(bottom=0.10, right=0.98, hspace=0.28)
+
+panel_label(ax_top, "Trade deficit with China, $bn")
+panel_label(ax_bottom, "Manufacturing employment, m")
+
 footnotes(fig, source="Sources: [US Census Bureau](https://www.census.gov/); [US Bureau of Labor Statistics](https://www.bls.gov/)")
 
 save_chart(__file__)

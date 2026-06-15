@@ -69,7 +69,7 @@ def split(d: dict[str, list[float]]) -> tuple[dict, list[float]]:
     return featured, others
 
 
-def stacked(ax, d: dict[str, list[float]], title: str) -> None:
+def stacked(ax, d: dict[str, list[float]]) -> None:
     featured, others = split(d)
     width = 0.7
 
@@ -95,21 +95,22 @@ def stacked(ax, d: dict[str, list[float]], title: str) -> None:
     ax.plot(years, total, color="#1A1A1A", linewidth=1.5, marker="o",
             markersize=4, zorder=3, label="Euro-area total")
 
-    panel_label(ax, title)
     ax.axhline(0, color="#1A1A1A", linewidth=0.8, zorder=1)
     ax.set_xticks(years)
 
 
 fig, (ax_bb, ax_ca) = subplots("wide", height=3.7, ncols=2, sharey=False)
-fig.subplots_adjust(top=0.62, bottom=0.16, left=0.02, right=0.95, wspace=0.18)
 
-stacked(ax_bb, bb, "Budget balance, € bn")
-stacked(ax_ca, ca, "Current-account balance, € bn")
+stacked(ax_bb, bb)
+stacked(ax_ca, ca)
 
 # Right-axis convention applied per panel.
 for axis in (ax_bb, ax_ca):
     right_axis(axis)
 
+# finalize auto-layouts the outer margins (y_start reserves the title-stack +
+# legend band); restore the inter-panel wspace afterwards, then draw the panel
+# labels and legend anchored to the final axes positions.
 finalize(
     ax_bb,
     title="Surfeit of surpluses",
@@ -118,8 +119,14 @@ finalize(
     title_x=0.02,
     y_start=0.24,
     autoscale_y=False,
-    auto_layout=False,  # side-by-side panels need explicit wspace
 )
+# Lift the bottom margin so the source line clears the year ticks (finalize
+# anchors on ax_bb and sizes the bottom only to its tick band); the narrower
+# right edge keeps the right-axis labels inside the figure.
+fig.subplots_adjust(bottom=0.16, right=0.95, wspace=0.18)
+
+panel_label(ax_bb, "Budget balance, € bn")
+panel_label(ax_ca, "Current-account balance, € bn")
 
 # Single legend just below the title/descriptor, above both panels.
 handles, labels = ax_bb.get_legend_handles_labels()

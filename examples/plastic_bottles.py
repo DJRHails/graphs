@@ -88,7 +88,6 @@ SERIES = [
 ]
 
 fig, ax = subplots("daily", height=4.6)
-fig.subplots_adjust(top=0.72, bottom=0.16, left=0.33, right=0.93)
 
 bottom = np.zeros(len(YEARS))
 for name, color, shares in SERIES:
@@ -114,8 +113,11 @@ finalize(
     source="",
     title_x=0.02,
     autoscale_y=False,
-    auto_layout=False,
 )
+# Restore the bespoke left/right/bottom margins after finalize (the wide left
+# column carries the vertical category legend + locator globe); let finalize
+# keep its auto top so the title-stack anchor stays attached.
+fig.subplots_adjust(bottom=0.16, left=0.33, right=0.93)
 
 # Vertical category key in the left column, flush with the chart top.
 handles, labels = ax.get_legend_handles_labels()
@@ -126,7 +128,8 @@ top_legend(fig, handles, labels, x=0.02, ncol=1, anchor_to=ax, fontsize=9)
 ISLAND_LON, ISLAND_LAT = -12.68, -37.30
 VIEW_LON, VIEW_LAT = -14.0, -42.0
 
-ax_map = fig.add_axes((0.015, 0.16, 0.26, 0.26))
+map_y0 = ax.get_position().y0  # anchor the inset to the final axes baseline
+ax_map = fig.add_axes((0.015, map_y0, 0.26, 0.26))
 ax_map.set_xlim(-1.02, 1.02)
 ax_map.set_ylim(-1.02, 1.02)
 ax_map.set_aspect("equal")

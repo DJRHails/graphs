@@ -52,7 +52,6 @@ CMAP = ListedColormap(BIN_COLORS)
 NORM = BoundaryNorm(BOUNDS, CMAP.N)
 
 fig, ax = subplots("daily", height=4.3)
-fig.subplots_adjust(top=0.625, bottom=0.125, left=0.085, right=0.96)
 
 ax.pcolormesh(
     np.arange(25),
@@ -119,8 +118,11 @@ finalize(
     autoscale_y=False,
     y_start=0.135,
     title_x=0.02,
-    auto_layout=False,  # left day labels + manual top band need explicit margins
 )
+# Restore the bespoke left/right/bottom margins after finalize (left day labels
+# need the wide left gutter; the manual top band rides finalize's auto top, so
+# leave top to finalize to keep the title-stack attached).
+fig.subplots_adjust(bottom=0.125, left=0.085, right=0.96)
 ax.spines["bottom"].set_visible(False)
 
 # Discrete colour-scale legend, top right, aligned with the descriptor block.

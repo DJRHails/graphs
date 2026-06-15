@@ -38,9 +38,6 @@ panels = {
 }
 
 fig, axes = subplots("wide", height=3.9, ncols=3, sharey=False)
-fig.subplots_adjust(
-    top=0.72, bottom=0.16, left=0.04, right=0.97, wspace=0.35
-)
 
 for ax, (panel_name, y) in zip(axes, panels.items()):
     ci = np.abs(np.random.randn(len(x))) * 0.025 + 0.01
@@ -58,8 +55,10 @@ for ax, (panel_name, y) in zip(axes, panels.items()):
         fontsize=8,
         color=C_LABEL,
     )
-    panel_label(ax, panel_name)
 
+# finalize auto-layouts the outer margins (and reserves the title-stack via
+# y_start); restore the inter-panel wspace afterwards, then draw panel labels
+# anchored to the final axes positions.
 finalize(
     axes[0],
     title=(
@@ -74,7 +73,10 @@ finalize(
     y_axis_right=False,
     title_x=0.04,
     y_start=0.075,
-    auto_layout=False,  # 1×3 facet needs explicit wspace
 )
+fig.subplots_adjust(wspace=0.35)
+
+for ax, panel_name in zip(axes, panels.keys()):
+    panel_label(ax, panel_name)
 
 save_chart(__file__)

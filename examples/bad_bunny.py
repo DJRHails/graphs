@@ -28,10 +28,6 @@ values = [34, 28, 27, 11][::-1]
 
 FIG_H_IN = 6.6
 fig, ax = subplots("daily", height=FIG_H_IN)
-# Manual margins: auto-layout's left edge would clip the category labels
-# (bar_h hangs them left of the axes), and the top-mounted x-ticks need
-# extra headroom under the title stack.
-fig.subplots_adjust(top=0.725, bottom=0.15, left=0.27, right=0.96)
 
 bar_h(ax, categories, values, color=BAR_RED, highlight_max=False)
 
@@ -56,8 +52,12 @@ finalize(
     y_axis_right=False,
     title_x=0.02,
     autoscale_y=False,
-    auto_layout=False,
+    y_start=0.025,  # breathing room above the title on this tall figure
 )
+# finalize auto-layouts the title-stack room at the top; restore the bespoke
+# left margin (bar_h hangs the category labels left of the axes) and the wider
+# bottom band after finalize, so the labels aren't clipped.
+fig.subplots_adjust(bottom=0.15, left=0.27, right=0.96)
 
 # The original sets the survey question in bold; finalize renders the
 # descriptor in one weight, so bold those two lines after the fact.

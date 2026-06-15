@@ -80,10 +80,6 @@ if missing:
 colors_override: dict[str, str] = {name: PALETTE["red"] for name in eng_names}
 
 fig, ax = subplots("wide", height=7.9)
-# Bump chart needs explicit right-margin room for the rank labels (~20% of
-# figure width) and a tall figure-relative bottom for tick labels on top
-# and bottom; opt out of auto-layout so those margins stick.
-fig.subplots_adjust(top=0.86, bottom=0.08, left=0.04, right=0.80)
 
 bump_chart(
     ax,
@@ -121,7 +117,11 @@ finalize(
     source="Source: [World Happiness Report 2025](https://worldhappiness.report/)",
     y_axis_right=False,
     title_x=0.04,
-    auto_layout=False,
+    y_start=0.02,
 )
+# finalize owns the auto top (the title-stack is anchored there); restore the
+# bespoke left/bottom and the narrow right that reserves ~20% for the
+# right-edge rank labels (without it they clip off the figure's right edge).
+fig.subplots_adjust(bottom=0.08, left=0.04, right=0.80)
 
 save_chart(__file__)

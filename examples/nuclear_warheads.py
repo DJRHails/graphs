@@ -58,9 +58,6 @@ retired = np.array([1150, 1477, 0, 0, 0, 0, 0, 0, 0])
 # Narrow portrait canvas to match the original daily-chart proportions
 # (~0.77 w/h), so typography and bar thickness read at the same scale.
 fig, ax = subplots("daily", height=6.0)
-# Top-mounted x-ticks plus a top_legend sit between the title and the chart,
-# so the standard auto_layout doesn't fit (same pattern as thermometer_chart).
-fig.subplots_adjust(top=0.74, bottom=0.065, left=0.24, right=0.96)
 
 y = np.arange(len(countries))
 ax.barh(y, deployed, height=0.68, color=C_DEPLOYED, label="Deployed", zorder=2)
@@ -153,10 +150,14 @@ finalize(
     source="",
     y_axis_right=False,
     title_x=0.02,
-    y_start=0.10,
+    y_start=0.13,
     autoscale_y=False,
-    auto_layout=False,
 )
+
+# finalize's auto-layout overwrites top/bottom/left/right; restore the bespoke
+# wide-left margin (for the country labels) and tight bottom here, leaving the
+# auto top untouched so the title-stack anchor stays put.
+fig.subplots_adjust(left=0.24, right=0.96, bottom=0.065)
 
 # Applied after finalize() — it pins the title directly above any top-mounted
 # tick labels, which would leave no room for the legend row between title and axis.
@@ -167,8 +168,18 @@ handles = [
     Patch(facecolor=C_RESERVE, label="Reserve"),
     Patch(facecolor=C_RETIRED, label="Retired"),
 ]
+# Sit the legend in the band between the descriptor and the top-mounted x-ticks.
+# Re-read the axes top AFTER the subplots_adjust above so it tracks the auto top;
+# the offset clears the top-mounted x-tick labels (~0.036 above the axes top).
+fig.canvas.draw()
+legend_top = ax.get_position().y1 + 0.085
 top_legend(
-    fig, handles, [h.get_label() for h in handles], y=0.815, ncol=3, handlelength=0.9
+    fig,
+    handles,
+    [h.get_label() for h in handles],
+    y=legend_top,
+    ncol=3,
+    handlelength=0.9,
 )
 
 # Pin the source-line top explicitly: the default (axes y0 - 0.06) would

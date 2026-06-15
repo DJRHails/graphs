@@ -146,3 +146,82 @@ def test_category_chart_reserves_more_bottom_than_line_chart():
     # Category labels are taller than single-row numeric ticks -> axes sits
     # at least as high (larger reserved bottom margin).
     assert bar_y0 >= line_y0 - 1e-3
+
+
+def test_finalize_has_no_auto_layout_param():
+    """The auto_layout escape hatch is gone — passing it must error."""
+    import inspect
+
+    assert "auto_layout" not in inspect.signature(finalize).parameters
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1], [0, 1])
+    with pytest.raises(TypeError):
+        finalize(ax, title="T", auto_layout=False)
+    plt.close(fig)
+
+
+def test_auto_layout_runs_unconditionally():
+    """finalize always overwrites a caller's pre-set subplots_adjust margins.
+
+    Previously ``auto_layout=False`` left the caller's margins untouched; now
+    auto-layout always runs, so the pinned standard left margin wins over the
+    bespoke one the caller set before ``finalize``.
+    """
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1], [0, 1])
+    fig.subplots_adjust(left=0.40, right=0.55)  # deliberately odd pre-set
+    finalize(ax, title="A title", descriptor="A descriptor", source="S")
+    pos = ax.get_position()
+    # finalize pins left=AUTO_LAYOUT_LEFT (0.02) / right=AUTO_LAYOUT_RIGHT (0.96).
+    assert pos.x0 == pytest.approx(0.02, abs=1e-6)
+    assert pos.x1 == pytest.approx(0.96, abs=1e-6)
+    plt.close(fig)
+
+
+def _title_top_y1(fig, fragment: str) -> float:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    return max(
+        t.get_window_extent(renderer=renderer).transformed(inv).y1
+        for t in fig.texts
+        if fragment in t.get_text()
+    )
+
+
+def test_faceted_override_after_finalize_restores_wspace_and_keeps_title():
+    """The faceted pattern: finalize() then subplots_adjust(wspace=) after.
+
+    The override must (a) widen the inter-panel gap and (b) leave the title
+    attached just above the first panel — overriding wspace/left/right/bottom
+    after finalize does not move the anchor panel's top-left corner.
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(7.0, 3.9))
+    for ax in axes:
+        ax.plot([0, 1, 2], [0, 1, 0])
+
+    finalize(
+        axes[0],
+        title="A faceted chart title",
+        descriptor="Across three panels",
+        source="Source: test",
+        title_x=0.04,
+        y_start=0.075,
+    )
+    top_before = axes[0].get_position().y1
+    gap_before = axes[1].get_position().x0 - axes[0].get_position().x1
+    title_y1_before = _title_top_y1(fig, "faceted chart title")
+
+    fig.subplots_adjust(wspace=0.35)
+    gap_after = axes[1].get_position().x0 - axes[0].get_position().x1
+    top_after = axes[0].get_position().y1
+    title_y1_after = _title_top_y1(fig, "faceted chart title")
+
+    # Inter-panel spacing widened.
+    assert gap_after > gap_before
+    # The anchor panel's top is unchanged, so the title stays attached.
+    assert top_after == pytest.approx(top_before, abs=1e-9)
+    assert title_y1_after == pytest.approx(title_y1_before, abs=1e-9)
+    # Title sits within the figure, just above the first panel.
+    assert title_y1_after <= 1.0
+    plt.close(fig)

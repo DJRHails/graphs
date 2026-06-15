@@ -140,7 +140,7 @@ FOOTNOTES_STACK_GAP = 0.022  # gap when notes wrap above source line
 FOOTNOTES_PACK_GAP = 0.02  # horizontal gap between source and inline notes
 
 # --- Auto-layout (subplots_adjust) ---
-AUTO_LAYOUT_LEFT = 0.02  # default left margin for finalize(auto_layout=True)
+AUTO_LAYOUT_LEFT = 0.02  # default left margin set by finalize's auto-layout
 AUTO_LAYOUT_RIGHT = 0.96  # default right margin
 AUTO_LAYOUT_TOP_PAD_PT = 6.0  # breathing room above the title-stack
 AUTO_LAYOUT_BOTTOM_MARGIN = 0.020  # breathing room below the source baseline
@@ -469,7 +469,6 @@ def finalize(
     y_start: float = 0.010,
     autoscale_y: bool = True,
     marker: str = "delta",
-    auto_layout: bool = True,
     footnote_lines: int = 0,
     y_labels: str = "on_grid",
 ):
@@ -480,6 +479,16 @@ def finalize(
         Δ           red delta glyph (or short red rule when marker="rule")
         Title       IBM Plex Sans Bold
         Descriptor  IBM Plex Sans Regular
+
+    Auto-layout always runs: ``finalize`` calls ``fig.subplots_adjust`` with
+    top/bottom margins sized to fit the title-stack and source line and the
+    standard ``left``/``right`` margins. Any ``subplots_adjust`` the caller set
+    *before* ``finalize`` is therefore overwritten — charts that need bespoke
+    inter-panel spacing (faceted ``hspace``/``wspace``, custom left/right
+    margins) must re-apply it *after* ``finalize`` returns::
+
+        finalize(axes[0], title=..., descriptor=..., y_start=0.075)
+        fig.subplots_adjust(wspace=0.35)  # restore inter-panel spacing
 
     Args:
         title: Chart headline. Auto-wrapped to the figure width — pass it
@@ -499,11 +508,6 @@ def finalize(
         marker: Top-of-stack anchor. ``"delta"`` (default) renders a red Δ
             glyph; ``"rule"`` draws the legacy short red horizontal line;
             ``"none"`` skips the marker entirely.
-        auto_layout: If True (default), call ``fig.subplots_adjust`` with
-            top/bottom/left/right margins sized to fit the title-stack and
-            source line. Set False when the caller has already configured
-            ``subplots_adjust`` (faceted charts that need explicit
-            ``hspace``/``wspace`` control).
         footnote_lines: Extra lines of ``footnotes()`` text below the chart.
             Auto-layout reserves an additional ~7pt-line per footnote row so
             wrapped notes don't clip. Pass the count when calling
@@ -523,11 +527,7 @@ def finalize(
     # (which counts lines). Explicit "\n" survives — only overflowing lines
     # gain breaks — so the wrap is owned by this figure's geometry, never
     # copied from a reference layout.
-    wrap_x0 = (
-        title_x
-        if title_x is not None
-        else (AUTO_LAYOUT_LEFT if auto_layout else ax.get_position().x0)
-    )
+    wrap_x0 = title_x if title_x is not None else AUTO_LAYOUT_LEFT
     if title:
         title_indent = 0.0
         if marker == "delta":
@@ -587,23 +587,25 @@ def finalize(
     if autoscale_y:
         _autoscale_y(ax)
 
-    if auto_layout:
-        top_pad, bottom_pad = _compute_auto_pads(
-            fig,
-            ax,
-            title=title,
-            descriptor=descriptor,
-            source=source,
-            marker=marker,
-            y_start=y_start,
-            footnote_lines=footnote_lines,
-        )
-        fig.subplots_adjust(
-            top=1.0 - top_pad,
-            bottom=bottom_pad,
-            left=AUTO_LAYOUT_LEFT,
-            right=AUTO_LAYOUT_RIGHT,
-        )
+    # Auto-layout always runs — size the top/bottom margins to the title-stack
+    # and source band, and pin the standard left/right margins. Callers that
+    # need bespoke inter-panel spacing re-apply ``subplots_adjust`` afterwards.
+    top_pad, bottom_pad = _compute_auto_pads(
+        fig,
+        ax,
+        title=title,
+        descriptor=descriptor,
+        source=source,
+        marker=marker,
+        y_start=y_start,
+        footnote_lines=footnote_lines,
+    )
+    fig.subplots_adjust(
+        top=1.0 - top_pad,
+        bottom=bottom_pad,
+        left=AUTO_LAYOUT_LEFT,
+        right=AUTO_LAYOUT_RIGHT,
+    )
 
     if y_axis_right:
         ax.yaxis.set_label_position("right")

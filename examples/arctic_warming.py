@@ -49,9 +49,6 @@ LO = [2.15, 0.55, -0.25, 0.20, 0.30, 0.40, 0.35, 0.15, 0.25, -0.25, -0.25, 0.15]
 HI = [4.80, 3.60, 2.35, 1.90, 1.75, 1.55, 1.60, 1.45, 1.30, 1.15, 1.95, 1.15]
 
 fig, ax = subplots("daily", height=3.8)
-# Top-mounted x-ticks plus a top_legend sit between the title and the chart,
-# so the standard auto_layout doesn't fit (same pattern as nuclear_warheads).
-fig.subplots_adjust(top=0.62, bottom=0.155, left=0.095, right=0.965)
 
 # Pale blue Arctic / Antarctic panels, run across the full figure width like
 # the original (under the latitude labels in the left margin).
@@ -135,9 +132,15 @@ finalize(
     source="Source: [Carbon Brief](https://www.carbonbrief.org/)",
     y_axis_right=False,
     title_x=0.02,
+    y_start=0.17,
     autoscale_y=False,
-    auto_layout=False,
 )
+
+# finalize's auto-layout overwrites top/bottom/left/right; restore the bespoke
+# margins here (leaving the auto top untouched so the title-stack anchor stays
+# put). The header + legend below read bbox AFTER this, so they track the
+# auto axes top and sit cleanly above the top-mounted x-ticks.
+fig.subplots_adjust(left=0.095, right=0.965, bottom=0.155)
 
 
 # "Latitude" column header, level with the x tick labels.
@@ -157,7 +160,7 @@ top_legend(
     ["Average", "Range‡"],
     align="right",
     x=bbox.x1,
-    y=bbox.y1 + 0.12,
+    y=bbox.y1 + 0.155,
     fontsize=9,
 )
 

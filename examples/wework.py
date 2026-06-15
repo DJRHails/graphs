@@ -49,6 +49,9 @@ PANELS = [
 ]
 
 fig, axes = subplots("daily", height=4.7, nrows=4)
+# Pre-size the panel band (wide left margin) so value_label's data-unit pad is
+# computed against roughly the final axes width; finalize re-applies the auto
+# outer margins, and the bespoke margins are restored after it (below).
 fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
 
 
@@ -106,8 +109,11 @@ finalize(
     title_x=0.02,
     y_start=0.035,
     autoscale_y=False,
-    auto_layout=False,  # stacked bands need explicit hspace
 )
+# Restore the bespoke margins (wide left for the band labels) + inter-panel
+# hspace after finalize, so the band rectangles and legend below anchor to the
+# final axes positions.
+fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
 
 # Category labels sit on the pale band, which extends left of each bar pair.
 BAND_X0 = 0.02  # flush with the title's left edge

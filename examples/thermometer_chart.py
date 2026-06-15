@@ -48,9 +48,6 @@ values = [
 ]
 
 fig, ax = subplots("wide", height=5.0)
-# Custom layout: top-mounted x-ticks + a top_legend at y=0.72 sit between
-# the title-stack and the chart, so the standard auto_layout doesn't fit.
-fig.subplots_adjust(top=0.66, bottom=0.10, left=0.22, right=0.94)
 
 thermometer(
     ax,
@@ -74,13 +71,19 @@ finalize(
     source="Source: [Ben Schmidt](https://benschmidt.org/), Northeastern University",
     y_axis_right=False,
     title_x=0.02,
-    y_start=0.22,
-    auto_layout=False,
+    y_start=0.16,
 )
+# The x-ticks are top-mounted, so finalize pins the title-stack directly above
+# them with no room for the legend row. Lower the axes top to open a band for
+# the legend between the descriptor and the top x-ticks (the title anchors to
+# the ticks, so it tracks down with them rather than detaching). Restore the
+# wide left for the category names, plus right/bottom.
+fig.subplots_adjust(top=0.62, bottom=0.10, left=0.22, right=0.94)
 
 # Single inline legend top-left, aligned with title-stack — same pattern as
-# the EU-balance chart. Frameless, compact.
+# the EU-balance chart. Frameless, compact. It sits between the descriptor and
+# the top-mounted x-ticks (0/100/200/300/400).
 handles, labels = ax.get_legend_handles_labels()
-top_legend(fig, handles, labels, y=0.72, ncol=3)
+top_legend(fig, handles, labels, y=0.74, ncol=3)
 
 save_chart(__file__)

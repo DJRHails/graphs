@@ -97,15 +97,11 @@ def ridgeline(ax, langs, xlim, fill):
 
 
 fig, (ax_syl, ax_bit) = subplots("wide", height=6.6, ncols=2)
-fig.subplots_adjust(top=0.80, bottom=0.12, left=0.02, right=0.98, wspace=0.22)
 
 ridgeline(ax_syl, SYLLABLES, (3.3, 9.6), RED_FILL)
 ax_syl.set_xticks([4, 6, 8])
 ridgeline(ax_bit, INFO_RATE, (25, 63), BLUE_FILL)
 ax_bit.set_xticks([30, 40, 50, 60])
-
-panel_label(ax_syl, "Syllables per second")
-panel_label(ax_bit, "Information rate, bits per second")
 
 cue_y = 6.02 / Y_TOP
 direction_label(
@@ -120,6 +116,9 @@ direction_label(
     color=BLUE_FILL,
 )
 
+# finalize auto-layouts the outer margins (y_start reserves the title-stack);
+# restore the inter-panel wspace afterwards, then draw the panel labels anchored
+# to the final axes positions.
 finalize(
     ax_syl,
     title="Why are some languages spoken faster than others?",
@@ -129,8 +128,12 @@ finalize(
     y_start=0.10,
     y_axis_right=False,
     autoscale_y=False,
-    auto_layout=False,  # side-by-side panels need explicit wspace
 )
+fig.subplots_adjust(bottom=0.12, wspace=0.22)
+
+panel_label(ax_syl, "Syllables per second")
+panel_label(ax_bit, "Information rate, bits per second")
+
 footnotes(
     fig,
     source=(
