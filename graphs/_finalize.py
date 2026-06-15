@@ -471,6 +471,7 @@ def finalize(
     marker: str = "delta",
     footnote_lines: int = 0,
     y_labels: str = "on_grid",
+    auto_layout: bool = True,
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -489,6 +490,10 @@ def finalize(
 
         finalize(axes[0], title=..., descriptor=..., y_start=0.075)
         fig.subplots_adjust(wspace=0.35)  # restore inter-panel spacing
+
+    The ``auto_layout`` keyword is accepted but **ignored** (deprecated): it
+    used to gate this behaviour and is kept only so existing callers passing
+    ``auto_layout=False`` keep working — auto-layout now always runs.
 
     Args:
         title: Chart headline. Auto-wrapped to the figure width — pass it

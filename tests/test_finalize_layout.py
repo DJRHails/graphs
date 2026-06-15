@@ -148,16 +148,28 @@ def test_category_chart_reserves_more_bottom_than_line_chart():
     assert bar_y0 >= line_y0 - 1e-3
 
 
-def test_finalize_has_no_auto_layout_param():
-    """The auto_layout escape hatch is gone — passing it must error."""
+def test_auto_layout_param_accepted_but_ignored():
+    """auto_layout is a deprecated no-op kept for back-compat — accepted, never gates."""
     import inspect
 
-    assert "auto_layout" not in inspect.signature(finalize).parameters
-    fig, ax = plt.subplots(figsize=(5.0, 3.4))
-    ax.plot([0, 1], [0, 1])
-    with pytest.raises(TypeError):
-        finalize(ax, title="T", auto_layout=False)
-    plt.close(fig)
+    assert "auto_layout" in inspect.signature(finalize).parameters
+
+    # The legacy escape hatch must not error...
+    fig_off, ax_off = plt.subplots(figsize=(5.0, 3.4))
+    ax_off.plot([0, 1], [0, 1])
+    finalize(ax_off, title="T", auto_layout=False)
+    off = ax_off.get_position()
+    plt.close(fig_off)
+
+    # ...and must produce the same auto-laid-out margins as the default (ignored).
+    fig_on, ax_on = plt.subplots(figsize=(5.0, 3.4))
+    ax_on.plot([0, 1], [0, 1])
+    finalize(ax_on, title="T")
+    on = ax_on.get_position()
+    plt.close(fig_on)
+
+    assert off.x0 == pytest.approx(on.x0, abs=1e-6)
+    assert off.y0 == pytest.approx(on.y0, abs=1e-6)
 
 
 def test_auto_layout_runs_unconditionally():
