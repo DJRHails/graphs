@@ -113,14 +113,22 @@ Behaviour that's automatic unless you override it:
 - **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
   75% black) — darker than the muted `C_LABEL_MUTED` grey, so
   attribution stays legible while reading as metadata.
-- **`finalize` always auto-layouts.** It sizes `subplots_adjust` margins to
-  fit the title-stack and source line — there is no opt-out. Charts that need
-  bespoke spacing (faceted `hspace`/`wspace`, a wider left margin for hanging
-  labels) call `fig.subplots_adjust(...)` *after* `finalize` to override the
-  specific margins. Don't restore `top=` after finalize — it anchors the
-  title to its own auto top, so overriding `top` detaches the title; raise
-  `y_start` instead to reserve more headroom. Restoring `left`/`right`/
-  `bottom`/`hspace`/`wspace` after finalize is safe.
+- **`finalize` always auto-layouts every margin.** It sizes all four
+  `subplots_adjust` margins AND the inter-panel `wspace`/`hspace` from the
+  renderer — there is no opt-out and, in the common cases, nothing to set by
+  hand. Top/bottom fit the title-stack and the source/footnote band over the
+  measured x-tick labels; **left/right are measured from the actual y-axis
+  text** (a chart with long left-hung category labels gets a wide left, a plain
+  right-axis chart keeps a tight left + a measured right); **`wspace`/`hspace`
+  size a grid of panels** (wspace from the inter-column y-label width, hspace
+  from the x-tick band + `panel_label` height — pass `finalize(panel_labels=True)`
+  for a multi-row faceted layout that adds `panel_label` headings after
+  finalize). On a non-Agg backend the side margins and spacing fall back to
+  fixed constants. A caller may still `fig.subplots_adjust(...)` *after*
+  `finalize` to override a specific value, but the everyday faceted / wide-left
+  charts no longer need to. Don't restore `top=` after finalize — it anchors
+  the title to its own auto top, so overriding `top` detaches the title; raise
+  `y_start` instead to reserve more headroom.
 - **Long footnotes word-wrap automatically.** `footnotes(wrap=True)` is the
   default — overflowing notes break to multiple lines that stack above the
   source line, and the chart shifts up to reserve room. No need to hand-
@@ -235,7 +243,7 @@ Style overrides to apply on top:
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
 | `subplots(format="daily", *, height=None, **kwargs)`                | `plt.subplots` at a standard chart width — `"daily"` 4.6in / `"wide"` 7.0in; height is the per-chart choice. |
-| `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Always auto-sizes margins (override specific spacing with `subplots_adjust` after). |
+| `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
@@ -320,11 +328,12 @@ Style overrides to apply on top:
 5. Direct label — `label_lines(ax)` over `smart_legend(ax)` for line charts.
 6. `finalize(ax, title, descriptor, source)` last — auto-sizes margins.
 7. Faceted: `finalize()` on the first axes with `title_x` pinned and
-   `y_start≈0.075` (reserves the title-stack room); then
-   `fig.subplots_adjust(hspace=…, wspace=…)` to restore the inter-panel
-   spacing; then `panel_label()` per axes (so they anchor to the final
-   positions). `finalize` always auto-layouts, so the post-`finalize`
-   `subplots_adjust` is what owns the spacing — never set it before.
+   `y_start≈0.075` (reserves the title-stack room) — it auto-sizes the
+   inter-panel `wspace`/`hspace` from the panels' y-labels and x-tick band,
+   so you usually set NO `subplots_adjust`. Pass `panel_labels=True` for a
+   multi-row layout, then call `panel_label()` per axes (they anchor to the
+   final positions). Only reach for a post-`finalize` `subplots_adjust` if a
+   bespoke layout (hand-placed gutter artists) still needs one.
 
 ### Review
 
@@ -380,7 +389,7 @@ pattern.
 
 - [`bar_chart.py`](./examples/bar_chart.py) — **Load when:** one value per category, ranked, and the biggest (or one chosen) value is the point. Minimal `bar_h` demo with the default `highlight_max=True`.
 - [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — **Load when:** each category has a before and an after value and the change is the message. `dumbbell` plus a right-aligned `top_legend` fed from `ax._dumbbell_handles`.
-- [`faceted_chart.py`](./examples/faceted_chart.py) — **Load when:** several series share an axis but overlap so badly that one panel buries the story — split into small multiples. The faceting workflow: `right_axis` + `ci_fill` per axes, `finalize(y_start=0.075)`, then `fig.subplots_adjust(wspace=…)` to restore inter-panel spacing, then `panel_label` per axes (anchored to the final positions).
+- [`faceted_chart.py`](./examples/faceted_chart.py) — **Load when:** several series share an axis but overlap so badly that one panel buries the story — split into small multiples. The faceting workflow: `right_axis` + `ci_fill` per axes, `finalize(y_start=0.075)` (auto-sizes the inter-panel `wspace` from the per-panel labels — no manual `subplots_adjust`), then `panel_label` per axes (anchored to the final positions).
 - [`scatter_chart.py`](./examples/scatter_chart.py) — **Load when:** a relationship cloud where a few named outliers carry the story. `scatter_standard` + `scatter_highlight` two-layer treatment, `trend_line`, `callout` on the outliers.
 - [`thermometer_chart.py`](./examples/thermometer_chart.py) — **Load when:** 2–4 series compared across the same ranked categories, where grouped bars would clutter. `thermometer(dot=False)` three-series variant, x-axis on top, frameless `top_legend`.
 - [`index_chart.py`](./examples/index_chart.py) — **Load when:** series of different magnitudes must be compared as growth since a common moment, with an event window to flag. `index_marker` + `highlight_panel` band + secondary `highlight_label` + `broken_axis` + `label_lines`.

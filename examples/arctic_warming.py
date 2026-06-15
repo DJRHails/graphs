@@ -136,11 +136,9 @@ finalize(
     autoscale_y=False,
 )
 
-# finalize's auto-layout overwrites top/bottom/left/right; restore the bespoke
-# margins here (leaving the auto top untouched so the title-stack anchor stays
-# put). The header + legend below read bbox AFTER this, so they track the
-# auto axes top and sit cleanly above the top-mounted x-ticks.
-fig.subplots_adjust(left=0.095, right=0.965, bottom=0.155)
+# finalize auto-layouts the left margin from the measured latitude labels
+# (90°N … 90°S). The header + legend below read bbox AFTER finalize, so they
+# track the auto axes top and sit cleanly above the top-mounted x-ticks.
 
 
 # "Latitude" column header, level with the x tick labels.

@@ -172,7 +172,7 @@ wheels = [
 
 [[package]]
 name = "djrhails-graphs"
-version = "0.5.0"
+version = "0.5.3"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },

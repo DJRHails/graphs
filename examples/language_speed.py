@@ -116,9 +116,9 @@ direction_label(
     color=BLUE_FILL,
 )
 
-# finalize auto-layouts the outer margins (y_start reserves the title-stack);
-# restore the inter-panel wspace afterwards, then draw the panel labels anchored
-# to the final axes positions.
+# finalize auto-layouts every margin plus the inter-panel wspace; y_start
+# reserves the title-stack. The panel labels are then drawn against the final
+# axes positions.
 finalize(
     ax_syl,
     title="Why are some languages spoken faster than others?",
@@ -129,7 +129,6 @@ finalize(
     y_axis_right=False,
     autoscale_y=False,
 )
-fig.subplots_adjust(bottom=0.12, wspace=0.22)
 
 panel_label(ax_syl, "Syllables per second")
 panel_label(ax_bit, "Information rate, bits per second")

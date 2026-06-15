@@ -103,7 +103,7 @@ with warnings.catch_warnings():
         autoscale_y=False,
     )
 
-# Narrow figure: widen the right margin so the right-hand y-tick labels fit.
-fig.subplots_adjust(right=0.94)
+# finalize auto-layouts the right margin from the measured right-hand y-tick
+# labels, so they fit on this narrow figure — no manual subplots_adjust needed.
 
 save_chart(__file__)

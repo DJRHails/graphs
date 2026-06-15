@@ -119,9 +119,8 @@ finalize(
     title_x=0.04,
     y_start=0.02,
 )
-# finalize owns the auto top (the title-stack is anchored there); restore the
-# bespoke left/bottom and the narrow right that reserves ~20% for the
-# right-edge rank labels (without it they clip off the figure's right edge).
-fig.subplots_adjust(bottom=0.08, left=0.04, right=0.80)
+# finalize auto-layouts the right margin from the measured right-edge rank
+# labels (the ``right_labels=True`` country names past the last column), so they
+# no longer clip off the figure's right edge — no manual subplots_adjust needed.
 
 save_chart(__file__)

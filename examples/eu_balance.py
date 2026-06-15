@@ -108,9 +108,9 @@ stacked(ax_ca, ca)
 for axis in (ax_bb, ax_ca):
     right_axis(axis)
 
-# finalize auto-layouts the outer margins (y_start reserves the title-stack +
-# legend band); restore the inter-panel wspace afterwards, then draw the panel
-# labels and legend anchored to the final axes positions.
+# finalize auto-layouts every margin plus the inter-panel wspace (measured from
+# the per-panel right-axis labels); y_start reserves the title-stack + legend
+# band. The panel labels and legend are then drawn against the final positions.
 finalize(
     ax_bb,
     title="Surfeit of surpluses",
@@ -120,10 +120,6 @@ finalize(
     y_start=0.24,
     autoscale_y=False,
 )
-# Lift the bottom margin so the source line clears the year ticks (finalize
-# anchors on ax_bb and sizes the bottom only to its tick band); the narrower
-# right edge keeps the right-axis labels inside the figure.
-fig.subplots_adjust(bottom=0.16, right=0.95, wspace=0.18)
 
 panel_label(ax_bb, "Budget balance, € bn")
 panel_label(ax_ca, "Current-account balance, € bn")

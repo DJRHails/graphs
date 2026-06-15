@@ -58,9 +58,10 @@ ax_bottom.set_xlim(years[0], years[-1])
 ax_bottom.set_xticks(list(range(1995, 2017, 3)))
 inset_tick_labels(ax_bottom, axis="x")
 
-# Title stack on the top axes; finalize auto-layouts the outer margins. Restore
-# the inter-panel hspace afterwards, then draw the panel labels anchored to the
-# final axes positions and the source line manually below the bottom panel.
+# Title stack on the top axes; finalize auto-layouts every margin plus the
+# inter-row hspace (panel_labels=True reserves the heading height between the
+# two rows) and measures the right margin from the right-axis labels. The
+# source line is drawn by footnotes() below the bottom panel.
 finalize(
     ax_top,
     title="Free markets and free workers",
@@ -69,12 +70,8 @@ finalize(
     title_x=0.02,
     y_start=0.060,
     autoscale_y=False,
+    panel_labels=True,
 )
-# Restore the inter-panel hspace and lift the bottom margin: finalize anchors
-# on ax_top and only reserves for its (empty) tick band, so the bottom panel's
-# year labels need explicit room below them for the source line. The wider
-# right edge keeps the right-axis "0" label inside the figure.
-fig.subplots_adjust(bottom=0.10, right=0.98, hspace=0.28)
 
 panel_label(ax_top, "Trade deficit with China, $bn")
 panel_label(ax_bottom, "Manufacturing employment, m")

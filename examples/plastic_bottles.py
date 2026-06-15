@@ -114,9 +114,12 @@ finalize(
     title_x=0.02,
     autoscale_y=False,
 )
-# Restore the bespoke left/right/bottom margins after finalize (the wide left
-# column carries the vertical category legend + locator globe); let finalize
-# keep its auto top so the title-stack anchor stays attached.
+# REMAINING EDGE CASE — a manual subplots_adjust survives here on purpose.
+# The wide left column carries a vertical category legend + a locator-globe
+# inset, and the globe is anchored to the axes baseline AFTER finalize; none of
+# that is y-axis text finalize can measure, and the inset would detach if
+# footnotes grew the bottom. Pin the bespoke left gutter + bottom; finalize
+# keeps its auto top so the title-stack anchor stays attached.
 fig.subplots_adjust(bottom=0.16, left=0.33, right=0.93)
 
 # Vertical category key in the left column, flush with the chart top.

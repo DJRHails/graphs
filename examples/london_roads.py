@@ -119,10 +119,9 @@ finalize(
     y_start=0.135,
     title_x=0.02,
 )
-# Restore the bespoke left/right/bottom margins after finalize (left day labels
-# need the wide left gutter; the manual top band rides finalize's auto top, so
-# leave top to finalize to keep the title-stack attached).
-fig.subplots_adjust(bottom=0.125, left=0.085, right=0.96)
+# finalize auto-layouts the left margin from the measured day labels (Mon…Sun,
+# hung flush-left in a wide gutter via a large y-tick pad) — no manual
+# subplots_adjust needed. The manual top band rides finalize's auto top.
 ax.spines["bottom"].set_visible(False)
 
 # Discrete colour-scale legend, top right, aligned with the descriptor block.

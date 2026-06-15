@@ -73,12 +73,12 @@ finalize(
     title_x=0.02,
     y_start=0.16,
 )
+# finalize auto-layouts the wide left margin from the measured category names.
 # The x-ticks are top-mounted, so finalize pins the title-stack directly above
-# them with no room for the legend row. Lower the axes top to open a band for
-# the legend between the descriptor and the top x-ticks (the title anchors to
-# the ticks, so it tracks down with them rather than detaching). Restore the
-# wide left for the category names, plus right/bottom.
-fig.subplots_adjust(top=0.62, bottom=0.10, left=0.22, right=0.94)
+# them; lower only the axes top to open a band for the legend row between the
+# descriptor and the top x-ticks (the title anchors to the ticks, so it tracks
+# down with them rather than detaching).
+fig.subplots_adjust(top=0.62)
 
 # Single inline legend top-left, aligned with title-stack — same pattern as
 # the EU-balance chart. Frameless, compact. It sits between the descriptor and

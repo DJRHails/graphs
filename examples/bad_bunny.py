@@ -54,10 +54,9 @@ finalize(
     autoscale_y=False,
     y_start=0.025,  # breathing room above the title on this tall figure
 )
-# finalize auto-layouts the title-stack room at the top; restore the bespoke
-# left margin (bar_h hangs the category labels left of the axes) and the wider
-# bottom band after finalize, so the labels aren't clipped.
-fig.subplots_adjust(bottom=0.15, left=0.27, right=0.96)
+# finalize auto-layouts the wide left margin from the measured ``bar_h`` category
+# labels (which hang left of the axes), so they aren't clipped — no manual
+# subplots_adjust needed.
 
 # The original sets the survey question in bold; finalize renders the
 # descriptor in one weight, so bold those two lines after the fact.

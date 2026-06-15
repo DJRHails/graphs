@@ -110,9 +110,12 @@ finalize(
     y_start=0.035,
     autoscale_y=False,
 )
-# Restore the bespoke margins (wide left for the band labels) + inter-panel
-# hspace after finalize, so the band rectangles and legend below anchor to the
-# final axes positions.
+# REMAINING EDGE CASE — a manual subplots_adjust survives here on purpose.
+# This chart hangs its category labels in a hand-sized left gutter and writes
+# the bar value labels in data coords (value_label), both AFTER finalize, so
+# finalize can't measure them: there are no y-tick labels to widen the left
+# from, and the value labels don't exist yet when the right is measured. Pin
+# the bespoke wide-left band + hspace so those post-finalize artists land right.
 fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
 
 # Category labels sit on the pale band, which extends left of each bar pair.

@@ -146,6 +146,10 @@ AUTO_LAYOUT_TOP_PAD_PT = 6.0  # breathing room above the title-stack
 AUTO_LAYOUT_BOTTOM_MARGIN = 0.020  # breathing room below the source baseline
 AUTO_LAYOUT_TICK_RESERVE_PT = 16.0  # reserve for a single row of x-tick labels
 AUTO_LAYOUT_MARKER_RESERVE_PT = 2.0  # marker overhang above title cap-height
+AUTO_LAYOUT_SIDE_GUTTER_PT = 4.0  # gutter between a measured side label and the edge
+AUTO_LAYOUT_WSPACE_GUTTER_PT = 10.0  # gutter added to inter-column label width
+AUTO_LAYOUT_PANEL_LABEL_PT = 22.0  # rule + bold panel_label height between rows
+AUTO_LAYOUT_HSPACE_GUTTER_PT = 6.0  # breathing room between stacked-row bands
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -293,6 +297,389 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
     return max(0.0, baseline_y0 - lowest_y0)
 
 
+def _get_renderer(fig):
+    """Return the figure's Agg renderer, drawing once if it isn't realised yet.
+
+    Mirrors the no-renderer-yet handling the title-stack and x-tick
+    measurements already use. Returns ``None`` on a backend that can't hand
+    back a renderer even after a draw (non-Agg) so callers fall back to fixed
+    constants instead of guessing.
+    """
+    try:
+        return fig.canvas.get_renderer()
+    except AttributeError:
+        fig.canvas.draw()
+        try:
+            return fig.canvas.get_renderer()
+        except AttributeError:
+            return None
+
+
+def _side_protrusions_fig(fig, ax) -> tuple[float, float] | None:
+    """Measure how far axis-side text spills past ``ax``'s left/right edges.
+
+    Returns ``(left, right)`` figure-fractions: the left value is how far the
+    text on the left of the axes extends *to the left of* ``ax.x0`` (0.0 when
+    nothing protrudes), the right value how far the text on the right extends
+    *to the right of* ``ax.x1``. Measured artists are the y-tick labels, the
+    in-axes ``ax.yaxis.label``, and end-of-line direct labels (``label_lines``,
+    when run before ``finalize``).
+
+    Only *horizontally shift-invariant* text is measured: a y-tick label's gap
+    to the axis edge is fixed in *points* (the tick ``pad``), so it doesn't
+    change when ``subplots_adjust`` shifts the axes — measuring the protrusion
+    once and reserving it is exact, no iteration. (x-tick labels are excluded:
+    their horizontal reach depends on the data-to-axes mapping, which the margin
+    shift itself changes, so they aren't a stable basis for the margin.)
+
+    Returns ``None`` when the renderer is unavailable (non-Agg backend), so
+    the caller keeps today's fixed side margins.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
+
+    inv = fig.transFigure.inverted()
+    pos = ax.get_position()
+    left = 0.0
+    right = 0.0
+
+    artists = list(ax.get_yticklabels())
+    if ax.yaxis.label.get_text():
+        artists.append(ax.yaxis.label)
+    # End-of-line direct labels (label_lines) sit to the right of the data,
+    # often past x1; in-chart annotations stay inside the box and don't count.
+    artists.extend(ax.texts)
+
+    for art in artists:
+        if not art.get_visible() or not (getattr(art, "get_text", lambda: "")()):
+            continue
+        try:
+            bb = art.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        if bb.width <= 0:
+            continue
+        left = max(left, pos.x0 - bb.x0)
+        right = max(right, bb.x1 - pos.x1)
+    return max(0.0, left), max(0.0, right)
+
+
+def _xtick_side_spill(fig) -> tuple[float, float] | None:
+    """Measure outer x-tick labels that spill past the figure's left/right edges.
+
+    The leftmost column's leftmost x-tick (and the rightmost column's rightmost)
+    is centred on its data position, so half of it can hang past the panel edge
+    and off the figure. Unlike y-tick protrusion this is *not* shift-invariant
+    (it tracks the axes width), so it's measured AFTER the main margins are set
+    and corrected in a single bounded pass. Only ticks whose mark sits *inside*
+    the panel's x-span count — autoscale-margin ticks that fall outside the data
+    box aren't drawn against the spine and shouldn't drive the margin. Returns
+    ``(left_spill, right_spill)`` as figure-fractions below 0 / above 1, or
+    ``None`` (non-Agg).
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
+    inv = fig.transFigure.inverted()
+    columns = _gridspec_columns(fig)
+    outer = (
+        [columns[min(columns)], columns[max(columns)]]
+        if columns
+        else [fig.axes, fig.axes]
+    )
+
+    def _edge_spills(axes_list, *, side: str) -> float:
+        spill = 0.0
+        for axes in axes_list:
+            x_lo, x_hi = axes.get_xlim()
+            for tick, tl in zip(axes.get_xticks(), axes.get_xticklabels()):
+                if not tl.get_text() or not tl.get_visible():
+                    continue
+                if not (x_lo <= tick <= x_hi):
+                    continue  # tick mark is off the data box; not against a spine
+                bb = tl.get_window_extent(renderer=renderer).transformed(inv)
+                spill = max(spill, -bb.x0 if side == "left" else bb.x1 - 1.0)
+        return spill
+
+    return max(0.0, _edge_spills(outer[0], side="left")), max(
+        0.0, _edge_spills(outer[1], side="right")
+    )
+
+
+def _gridspec_columns(fig):
+    """Group ``fig.axes`` by gridspec column index → list of axes in that column.
+
+    Only axes laid out through a shared :class:`~matplotlib.gridspec.GridSpec`
+    (the ``subplots``/``subplots_adjust`` family) are grouped; inset axes added
+    via ``fig.add_axes`` carry no subplotspec and are skipped. Returns an
+    ordered ``{col_index: [axes, …]}`` mapping (empty when nothing is on a
+    gridspec).
+    """
+    columns: dict[int, list] = {}
+    for axes in fig.axes:
+        spec = axes.get_subplotspec()
+        if spec is None:
+            continue
+        col = spec.colspan.start
+        columns.setdefault(col, []).append(axes)
+    return dict(sorted(columns.items()))
+
+
+def _gridspec_shape(fig) -> tuple[int, int]:
+    """Return the ``(nrows, ncols)`` of the figure's primary gridspec.
+
+    Reads the geometry off the first axes that carries a subplotspec; returns
+    ``(1, 1)`` when no axes is on a gridspec (a lone ``add_axes`` figure).
+    """
+    for axes in fig.axes:
+        spec = axes.get_subplotspec()
+        if spec is None:
+            continue
+        gs = spec.get_gridspec()
+        return gs.nrows, gs.ncols
+    return 1, 1
+
+
+def _compute_wspace(fig) -> float | None:
+    """Inter-column ``wspace`` so neighbouring panels' y-labels don't collide.
+
+    ``wspace`` is matplotlib's inter-column gap expressed as a fraction of the
+    *average axes width*. The physical gap a column boundary must hold is the
+    right-side y-tick/label protrusion of the left panel plus the left-side
+    protrusion of the right panel (plus a small gutter). Independent-y panels
+    (each carrying its own labelled axis, e.g. ``right_axis`` per panel) need a
+    wide gap; shared-y panels (only the outer axis labelled) need almost none.
+
+    Returns the ``wspace`` fraction, or ``None`` when there's a single column or
+    the renderer can't measure (non-Agg) — the caller then leaves ``wspace``
+    untouched.
+    """
+    columns = _gridspec_columns(fig)
+    if len(columns) < 2:
+        return None
+
+    fig_w_in = fig.get_figwidth()
+    pt2fig_w = 1.0 / 72.0 / fig_w_in
+    gutter = AUTO_LAYOUT_WSPACE_GUTTER_PT * pt2fig_w
+
+    col_items = list(columns.items())
+    max_gap = 0.0
+    avg_w = 0.0
+    n_axes = 0
+    for _, axes_list in col_items:
+        for axes in axes_list:
+            avg_w += axes.get_position().width
+            n_axes += 1
+    if n_axes == 0:
+        return None
+    avg_w /= n_axes
+
+    # Pair adjacent columns: left column's right protrusion + right column's
+    # left protrusion must fit in the boundary between them.
+    for (_, left_axes), (_, right_axes) in zip(col_items, col_items[1:]):
+        right_of_left = 0.0
+        for axes in left_axes:
+            measured = _side_protrusions_fig(fig, axes)
+            if measured is not None:
+                right_of_left = max(right_of_left, measured[1])
+        left_of_right = 0.0
+        for axes in right_axes:
+            measured = _side_protrusions_fig(fig, axes)
+            if measured is not None:
+                left_of_right = max(left_of_right, measured[0])
+        max_gap = max(max_gap, right_of_left + left_of_right + gutter)
+
+    if avg_w <= 0:
+        return None
+    return max_gap / avg_w
+
+
+def _compute_hspace(fig, *, has_panel_labels: bool) -> float | None:
+    """Inter-row ``hspace`` so a row's x-ticks (and panel label) clear the next.
+
+    ``hspace`` is matplotlib's inter-row gap as a fraction of the *average axes
+    height*. A row boundary must hold the upper row's bottom x-tick band plus,
+    when panels carry ``panel_label`` headings, the rule-and-label height that
+    sits above the lower row. Returns ``None`` for a single row or a non-Agg
+    backend (caller leaves ``hspace`` untouched).
+    """
+    nrows, _ = _gridspec_shape(fig)
+    if nrows < 2:
+        return None
+
+    fig_h_in = fig.get_figheight()
+    pt2fig_h = 1.0 / 72.0 / fig_h_in
+
+    band = 0.0
+    avg_h = 0.0
+    n_axes = 0
+    for axes in fig.axes:
+        if axes.get_subplotspec() is None:
+            continue
+        avg_h += axes.get_position().height
+        n_axes += 1
+        measured = _xtick_band_height_fig(fig, axes)
+        if measured is not None:
+            band = max(band, measured)
+    if n_axes == 0 or avg_h <= 0:
+        return None
+    avg_h /= n_axes
+
+    gap = band + AUTO_LAYOUT_HSPACE_GUTTER_PT * pt2fig_h
+    if has_panel_labels:
+        gap += AUTO_LAYOUT_PANEL_LABEL_PT * pt2fig_h
+    return gap / avg_h
+
+
+def _lowest_row_axes(fig) -> list:
+    """Return the gridspec axes on the bottom row (highest ``rowspan.stop``).
+
+    The bottom margin of a multi-row grid must clear the *lowest* row's x-tick
+    band, not the row ``finalize`` was anchored on (usually the top). Returns
+    ``[]`` when no axes is on a gridspec.
+    """
+    rows: dict[int, list] = {}
+    for axes in fig.axes:
+        spec = axes.get_subplotspec()
+        if spec is None:
+            continue
+        rows.setdefault(spec.rowspan.stop, []).append(axes)
+    if not rows:
+        return []
+    return rows[max(rows)]
+
+
+def _compute_side_margins(fig) -> tuple[float, float]:
+    """Compute ``(left, right)`` figure-fraction margins from the y-axis text.
+
+    Reserves the *outer* sides of the whole figure: the left margin holds the
+    leftmost column's left-protruding y-axis text (long category labels on a
+    horizontal bar / heatmap row, a left-mounted ``y_axis_label``), the right
+    margin holds the rightmost column's right-protruding text (right-axis
+    numeric labels, end-of-line ``label_lines``). A side with nothing
+    protruding keeps the small default (``AUTO_LAYOUT_LEFT`` /
+    ``1 - AUTO_LAYOUT_RIGHT``), so a plain right-axis line chart is unchanged
+    on the left.
+
+    The label-to-axis-edge gap is fixed in points (the tick ``pad``), so it is
+    invariant under the horizontal shift ``subplots_adjust`` then applies —
+    measuring the protrusion once and reserving it is exact.
+
+    Falls back to the fixed ``(AUTO_LAYOUT_LEFT, AUTO_LAYOUT_RIGHT)`` when the
+    renderer can't measure (non-Agg backend).
+    """
+    default_left = AUTO_LAYOUT_LEFT
+    default_right = AUTO_LAYOUT_RIGHT
+
+    fig_w_in = fig.get_figwidth()
+    gutter = AUTO_LAYOUT_SIDE_GUTTER_PT / 72.0 / fig_w_in
+
+    columns = _gridspec_columns(fig)
+    measured_any = False
+    left_protrusion = 0.0
+    right_protrusion = 0.0
+
+    if columns:
+        # Grid: reserve the outer sides only — leftmost column's left protrusion
+        # and rightmost column's right protrusion (inter-column gaps are wspace).
+        col_items = list(columns.items())
+        left_axes, right_axes = col_items[0][1], col_items[-1][1]
+    else:
+        # Single column (one axes, or a 1-col grid): each axes contributes both
+        # sides.
+        left_axes = right_axes = list(fig.axes)
+
+    for axes in left_axes:
+        measured = _side_protrusions_fig(fig, axes)
+        if measured is not None:
+            measured_any = True
+            left_protrusion = max(left_protrusion, measured[0])
+    for axes in right_axes:
+        measured = _side_protrusions_fig(fig, axes)
+        if measured is not None:
+            measured_any = True
+            right_protrusion = max(right_protrusion, measured[1])
+
+    if not measured_any:
+        return default_left, default_right
+
+    left = max(default_left, left_protrusion + gutter)
+    right = min(default_right, 1.0 - (right_protrusion + gutter))
+    return left, right
+
+
+def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
+    """Raise the panels so a band ``depth_below_panels`` deep stays on-figure.
+
+    ``footnotes`` draws the source/notes band below the lowest panel's x-tick
+    labels; on a faceted figure (or one that draws its source via ``footnotes``
+    rather than ``finalize``) the band can fall off the bottom because
+    ``finalize`` — told ``source=""`` — reserved no source room. This grows the
+    figure's bottom margin (which only moves the lower axes edge up, leaving the
+    axes *top* and anything anchored to it untouched) so the band's lowest point
+    lands at ``AUTO_LAYOUT_BOTTOM_MARGIN`` above the figure floor.
+
+    ``depth_below_panels`` is the band's full reach below the lowest panel
+    baseline (x-tick band + source offset + block height). Returns ``True`` and
+    redraws when it grew the margin, ``False`` when the current margin already
+    cleared the band (so callers skip the redraw).
+
+    Skips multi-row grids: there, growing the bottom margin moves the lower
+    row's *top* (a fraction of the redistributed height), which would detach an
+    already-drawn ``panel_label`` — so ``finalize`` reserves their source band
+    up front instead and this stays a no-op.
+    """
+    nrows, _ = _gridspec_shape(fig)
+    if nrows > 1:
+        return False
+    panel_y0s = [
+        a.get_position().y0 for a in fig.axes if a.get_subplotspec() is not None
+    ]
+    if not panel_y0s:
+        return False
+    lowest_panel_y0 = min(panel_y0s)
+
+    needed_y0 = depth_below_panels + AUTO_LAYOUT_BOTTOM_MARGIN
+    if lowest_panel_y0 >= needed_y0 - 1e-6:
+        return False
+
+    # Grow the bottom margin by the shortfall. subplots_adjust(bottom=) keeps
+    # the axes top fixed, so the title stack / panel labels stay put.
+    grow = needed_y0 - lowest_panel_y0
+    fig.subplots_adjust(bottom=fig.subplotpars.bottom + grow)
+    fig.canvas.draw()
+    return True
+
+
+def _footnotes_band_depth(fig, notes: tuple[str, ...], source: str | None) -> float:
+    """Reach below the lowest panel baseline of the source/notes band.
+
+    The band sits an x-tick band plus ``SOURCE_Y_OFFSET`` below the baseline,
+    then the source line itself, plus one extra line box per note row that has
+    to wrap above the source. A conservative single extra row covers the common
+    "notes stack above source" case (``footnotes`` re-measures the exact wrap
+    once the panels are high enough). Returns a figure-fraction depth.
+    """
+    fig_h_in = fig.get_figheight()
+    pt2fig = 1.0 / 72.0 / fig_h_in
+
+    band = 0.0
+    for a in fig.axes:
+        if a.get_subplotspec() is None:
+            continue
+        measured = _xtick_band_height_fig(fig, a)
+        if measured is not None:
+            band = max(band, measured)
+
+    depth = band + SOURCE_Y_OFFSET + SOURCE_SIZE_PT * 1.2 * pt2fig
+    if notes:
+        # Notes that can't pack on the source row wrap above it — reserve one
+        # line box plus the stack gap so the climbed-back block still clears.
+        depth += FOOTNOTES_STACK_GAP + FOOTNOTE_SIZE_PT * 1.2 * pt2fig
+    return depth
+
+
 def _compute_auto_pads(
     fig,
     ax,
@@ -355,14 +742,31 @@ def _compute_auto_pads(
     # bottom labels (line/scatter charts, top-mounted ticks) — reserve nothing
     # so those charts are unaffected. Only fall back to the fixed single-row
     # reserve when the renderer couldn't measure at all (``None``, non-Agg).
-    measured_band = _xtick_band_height_fig(fig, ax)
-    tick_band = (
-        measured_band
-        if measured_band is not None
-        else AUTO_LAYOUT_TICK_RESERVE_PT * pt2fig
-    )
+    #
+    # On a multi-row grid the bottom margin governs the *lowest* row's baseline,
+    # so measure that row's x-tick band, not the (usually top) anchor row's.
+    band_axes = _lowest_row_axes(fig) or [ax]
+    measured_bands = [_xtick_band_height_fig(fig, a) for a in band_axes]
+    if all(b is None for b in measured_bands):
+        tick_band = AUTO_LAYOUT_TICK_RESERVE_PT * pt2fig
+    else:
+        tick_band = max(b for b in measured_bands if b is not None)
 
+    # Facets draw their source via a later ``footnotes(fig, source=…)`` call, so
+    # ``finalize`` is told ``source=""`` and would reserve no source room — yet
+    # a multi-row grid can't fix that after the fact (growing the bottom there
+    # moves the lower row's *top*, detaching its panel label). Reserve the
+    # source band up front whenever the figure is a multi-row grid, using the
+    # additive depth ``footnotes`` actually places at (tick band + offset +
+    # line), not finalize's own ``max(...)`` placement.
+    nrows, _ = _gridspec_shape(fig)
     source_h_fig = SOURCE_SIZE_PT * pt2fig
+    footnotes_source = nrows > 1 and not source and footnote_lines == 0
+    if footnotes_source:
+        return top_pad, _footnotes_band_depth(
+            fig, (), "src"
+        ) + AUTO_LAYOUT_BOTTOM_MARGIN
+
     has_source_band = bool(source) or footnote_lines > 0
     if not has_source_band:
         return top_pad, tick_band + AUTO_LAYOUT_BOTTOM_MARGIN
@@ -471,6 +875,7 @@ def finalize(
     marker: str = "delta",
     footnote_lines: int = 0,
     y_labels: str = "on_grid",
+    panel_labels: bool = False,
     auto_layout: bool = True,
 ):
     """Add Economist finishing touches to an axes object.
@@ -481,15 +886,30 @@ def finalize(
         Title       IBM Plex Sans Bold
         Descriptor  IBM Plex Sans Regular
 
-    Auto-layout always runs: ``finalize`` calls ``fig.subplots_adjust`` with
-    top/bottom margins sized to fit the title-stack and source line and the
-    standard ``left``/``right`` margins. Any ``subplots_adjust`` the caller set
-    *before* ``finalize`` is therefore overwritten — charts that need bespoke
-    inter-panel spacing (faceted ``hspace``/``wspace``, custom left/right
-    margins) must re-apply it *after* ``finalize`` returns::
+    Auto-layout always runs and sizes **all four margins plus inter-panel
+    spacing** with the renderer, so callers don't hand-set ``subplots_adjust``:
 
-        finalize(axes[0], title=..., descriptor=..., y_start=0.075)
-        fig.subplots_adjust(wspace=0.35)  # restore inter-panel spacing
+    * **Top / bottom** fit the title-stack and the source/footnote band over
+      the measured x-tick label height.
+    * **Left / right** are measured from the actual y-axis text — the side a
+      chart's y-tick labels (and ``y_axis_label`` / direct ``label_lines``)
+      land on gets a margin wide enough to hold them, the other side keeps the
+      small default. So a right-axis line chart keeps a tight left and a
+      measured right; a horizontal bar chart with long category labels on the
+      left gets a measured wide left.
+    * **Inter-panel ``wspace`` / ``hspace``** are sized for a grid of axes
+      (``len(fig.axes) > 1``): ``wspace`` from the inter-column y-label width
+      (independent-y panels get more than shared-y), ``hspace`` from the
+      x-tick band plus, when ``panel_labels=True``, the ``panel_label``
+      heading height between rows.
+
+    Any ``subplots_adjust`` the caller set *before* ``finalize`` is therefore
+    overwritten. A caller may still re-apply ``subplots_adjust`` *after*
+    ``finalize`` to override a specific value (the figures that anchor bespoke
+    artists into a hand-sized gutter, e.g. ``wework``'s band labels, do this).
+
+    On a non-Agg backend (no measurable renderer) the side margins and
+    inter-panel spacing fall back to today's fixed constants.
 
     The ``auto_layout`` keyword is accepted but **ignored** (deprecated): it
     used to gate this behaviour and is kept only so existing callers passing
@@ -521,6 +941,11 @@ def finalize(
             gridlines that extend under them (``y_labels_on_grid``); applied
             only when the axes has visible y gridlines, so categorical
             charts are unaffected. ``"ticks"`` keeps native tick labels.
+        panel_labels: Set ``True`` when a multi-row faceted layout adds a
+            ``panel_label`` heading to each panel *after* ``finalize`` — the
+            auto ``hspace`` then reserves the rule-and-label height between
+            rows so a heading can't collide with the row above it. Single-row
+            grids ignore this (panel labels there sit in the top margin).
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
@@ -592,26 +1017,9 @@ def finalize(
     if autoscale_y:
         _autoscale_y(ax)
 
-    # Auto-layout always runs — size the top/bottom margins to the title-stack
-    # and source band, and pin the standard left/right margins. Callers that
-    # need bespoke inter-panel spacing re-apply ``subplots_adjust`` afterwards.
-    top_pad, bottom_pad = _compute_auto_pads(
-        fig,
-        ax,
-        title=title,
-        descriptor=descriptor,
-        source=source,
-        marker=marker,
-        y_start=y_start,
-        footnote_lines=footnote_lines,
-    )
-    fig.subplots_adjust(
-        top=1.0 - top_pad,
-        bottom=bottom_pad,
-        left=AUTO_LAYOUT_LEFT,
-        right=AUTO_LAYOUT_RIGHT,
-    )
-
+    # Move the y-axis to the right (and set the final tick pad) BEFORE measuring
+    # side margins — the protrusion measurement reads the labels on whichever
+    # side they end up on, so the flip must happen first.
     if y_axis_right:
         ax.yaxis.set_label_position("right")
         ax.yaxis.tick_right()
@@ -630,7 +1038,47 @@ def finalize(
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
+    # Auto-layout always runs — size every margin and the inter-panel spacing
+    # from the renderer. Top/bottom fit the title-stack and source band;
+    # left/right are measured from the actual y-axis text; wspace/hspace size a
+    # grid of panels. Callers may still override a specific value afterwards.
+    top_pad, bottom_pad = _compute_auto_pads(
+        fig,
+        ax,
+        title=title,
+        descriptor=descriptor,
+        source=source,
+        marker=marker,
+        y_start=y_start,
+        footnote_lines=footnote_lines,
+    )
+    left, right = _compute_side_margins(fig)
+    adjust_kwargs = {
+        "top": 1.0 - top_pad,
+        "bottom": bottom_pad,
+        "left": left,
+        "right": right,
+    }
+    wspace = _compute_wspace(fig)
+    if wspace is not None:
+        adjust_kwargs["wspace"] = wspace
+    hspace = _compute_hspace(fig, has_panel_labels=panel_labels)
+    if hspace is not None:
+        adjust_kwargs["hspace"] = hspace
+    fig.subplots_adjust(**adjust_kwargs)
     fig.canvas.draw()
+
+    # One bounded corrective pass: a centred outer x-tick label can hang half
+    # its width past the figure edge (not shift-invariant, so it couldn't be
+    # folded into the y-based margins above). Nudge the affected side in once.
+    spill = _xtick_side_spill(fig)
+    if spill is not None and (spill[0] > 0 or spill[1] > 0):
+        new_left = adjust_kwargs["left"] + spill[0]
+        new_right = adjust_kwargs["right"] - spill[1]
+        if new_left < new_right:  # never invert the axes
+            fig.subplots_adjust(left=new_left, right=new_right)
+            fig.canvas.draw()
+
     bbox = ax.get_position()
     tx = title_x if title_x is not None else bbox.x0
 
@@ -1393,6 +1841,17 @@ def footnotes(
         _check_footnote_anchors(fig, notes)
 
     fig.canvas.draw()
+
+    # Make sure the panels sit high enough for the source/notes band to land
+    # on-figure. Facets (and any chart that draws its source via ``footnotes``)
+    # tell ``finalize`` ``source=""``, so its auto-layout reserved no source
+    # room; without this the band falls off the bottom. Skip when the caller
+    # pinned an explicit ``y`` (they own placement then).
+    if y is None:
+        _ensure_bottom_clearance(
+            fig, depth_below_panels=_footnotes_band_depth(fig, notes, source)
+        )
+
     axes_y0 = [a.get_position().y0 for a in fig.axes]
     axes_x1 = [a.get_position().x1 for a in fig.axes]
     base_y0 = min(axes_y0) if axes_y0 else 0.10

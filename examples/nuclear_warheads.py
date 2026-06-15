@@ -154,10 +154,9 @@ finalize(
     autoscale_y=False,
 )
 
-# finalize's auto-layout overwrites top/bottom/left/right; restore the bespoke
-# wide-left margin (for the country labels) and tight bottom here, leaving the
-# auto top untouched so the title-stack anchor stays put.
-fig.subplots_adjust(left=0.24, right=0.96, bottom=0.065)
+# finalize auto-layouts the wide left margin from the measured country labels
+# (set via a large y-tick pad to hang them flush-left of the bars), so they
+# aren't clipped — no manual subplots_adjust needed.
 
 # Applied after finalize() — it pins the title directly above any top-mounted
 # tick labels, which would leave no room for the legend row between title and axis.
@@ -169,8 +168,8 @@ handles = [
     Patch(facecolor=C_RETIRED, label="Retired"),
 ]
 # Sit the legend in the band between the descriptor and the top-mounted x-ticks.
-# Re-read the axes top AFTER the subplots_adjust above so it tracks the auto top;
-# the offset clears the top-mounted x-tick labels (~0.036 above the axes top).
+# Re-read the axes top after finalize so it tracks the auto top; the offset
+# clears the top-mounted x-tick labels (~0.036 above the axes top).
 fig.canvas.draw()
 legend_top = ax.get_position().y1 + 0.085
 top_legend(

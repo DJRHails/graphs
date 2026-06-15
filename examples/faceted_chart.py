@@ -56,9 +56,9 @@ for ax, (panel_name, y) in zip(axes, panels.items()):
         color=C_LABEL,
     )
 
-# finalize auto-layouts the outer margins (and reserves the title-stack via
-# y_start); restore the inter-panel wspace afterwards, then draw panel labels
-# anchored to the final axes positions.
+# finalize auto-layouts the outer margins AND the inter-panel wspace (measured
+# from the per-panel right-axis labels); the y_start reserves the title-stack.
+# Panel labels are then drawn anchored to the final axes positions.
 finalize(
     axes[0],
     title=(
@@ -74,7 +74,6 @@ finalize(
     title_x=0.04,
     y_start=0.075,
 )
-fig.subplots_adjust(wspace=0.35)
 
 for ax, panel_name in zip(axes, panels.keys()):
     panel_label(ax, panel_name)

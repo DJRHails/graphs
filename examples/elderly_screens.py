@@ -90,9 +90,9 @@ ax_young.text(2017, 4.8, "Smartphone", color="white", fontsize=12,
 ax_young.text(2017, 6.85, "Computer", color="#5E96B0", fontsize=12,
               fontweight="bold", ha="center", va="bottom", zorder=5)
 
-# finalize auto-layouts the outer margins (y_start leaves room for the panel
-# headings); restore the inter-panel wspace afterwards. The panel headings and
-# in-area labels are in axes/data coords, so they track the axes automatically.
+# finalize auto-layouts every margin plus the inter-panel wspace; y_start leaves
+# room for the panel headings. The panel headings and in-area labels are in
+# axes/data coords, so they track the axes automatically.
 finalize(
     axes[0],
     title="America's elderly seem more screen-obsessed than the young",
@@ -102,7 +102,6 @@ finalize(
     y_start=0.075,  # leave room for the panel headings
     autoscale_y=False,
 )
-fig.subplots_adjust(bottom=0.15, left=0.03, right=0.92, wspace=0.55)
 footnotes(fig, source="Source: Nielsen")
 
 save_chart(__file__)
