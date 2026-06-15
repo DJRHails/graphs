@@ -246,8 +246,56 @@ def _draw_delta(fig, tx: float, y_cursor: float) -> None:
     _draw_logo_triangle(fig, tx, y_cursor)
 
 
+def _xtick_band_height_fig(fig, ax) -> float | None:
+    """Measure the bottom x-tick labels' rendered height in figure fraction.
+
+    Returns the vertical extent the *bottom* x-axis tick labels occupy below
+    the axes baseline (``bbox.y0``), expressed as a fraction of the figure
+    height. Categorical bar charts put category names here (``forced`` /
+    ``calibrated`` / …); the auto-layout must reserve this band so a
+    ``footnotes()``/source line drawn below it can't overlap the labels.
+
+    Mirrors the renderer-based measurement the title-stack and source-line
+    placement already use (``get_window_extent`` transformed through
+    ``transFigure``). Tick labels that sit *above* the axes (``bar_h`` /
+    ``x_axis_top`` / a ``secondary_xaxis("top")``) are ignored — those are
+    handled by the top-stack clearance, not the bottom band.
+
+    Returns:
+        The band height as a figure fraction. ``0.0`` when there are no
+        visible bottom labels (line/scatter charts, top-mounted ticks) — the
+        caller then reserves nothing extra, so those charts are unaffected.
+        ``None`` when the renderer is unavailable after a draw attempt
+        (non-Agg backend), signalling the caller to fall back to a fixed
+        reserve since the labels couldn't be measured.
+    """
+    try:
+        renderer = fig.canvas.get_renderer()
+    except AttributeError:
+        fig.canvas.draw()
+        try:
+            renderer = fig.canvas.get_renderer()
+        except AttributeError:
+            return None
+
+    baseline_y0 = ax.get_position().y0
+    inv = fig.transFigure.inverted()
+    lowest_y0 = baseline_y0
+    for tl in ax.get_xticklabels():
+        if not tl.get_text() or not tl.get_visible():
+            continue
+        tl_bb = tl.get_window_extent(renderer=renderer).transformed(inv)
+        # Skip labels mounted above the axes (bar_h / x_axis_top); only the
+        # band below the baseline competes with the footnote/source line.
+        if tl_bb.y0 >= baseline_y0:
+            continue
+        lowest_y0 = min(lowest_y0, tl_bb.y0)
+    return max(0.0, baseline_y0 - lowest_y0)
+
+
 def _compute_auto_pads(
     fig,
+    ax,
     *,
     title: str,
     descriptor: str,
@@ -262,9 +310,16 @@ def _compute_auto_pads(
     above ``bbox.y1`` (descriptor lines, gap, title lines, marker
     overhang, ``y_start`` padding, plus a small breathing margin).
 
-    Bottom pad reserves room for one row of x-tick labels, the source
-    line at ``SOURCE_Y_OFFSET`` below ``bbox.y0``, and a breathing
-    margin below the source baseline.
+    Bottom pad reserves room for the source line at its true depth below the
+    axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
+    where ``tick_band`` is the *measured* height of the bottom x-tick labels
+    (``_xtick_band_height_fig`` — zero when there are none, so line/scatter
+    charts are unaffected). Short numeric ticks leave the ``SOURCE_Y_OFFSET``
+    term winning (charts unchanged); tall category labels make the tick term
+    win, lifting the source clear of them. Extra ``footnotes()`` rows that
+    stack above the source deepen the reservation further, so a categorical
+    chart with multi-line footnotes no longer collides its category labels
+    with the first footnote row. A breathing margin is added below.
     """
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
@@ -295,26 +350,47 @@ def _compute_auto_pads(
     stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
     top_pad = y_start + stack_pt * pt2fig + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
 
-    tick_reserve = AUTO_LAYOUT_TICK_RESERVE_PT * pt2fig
+    # Reserve the measured height of the bottom x-tick labels (category names
+    # on a vertical bar chart). A measured 0.0 means there are genuinely no
+    # bottom labels (line/scatter charts, top-mounted ticks) — reserve nothing
+    # so those charts are unaffected. Only fall back to the fixed single-row
+    # reserve when the renderer couldn't measure at all (``None``, non-Agg).
+    measured_band = _xtick_band_height_fig(fig, ax)
+    tick_band = (
+        measured_band
+        if measured_band is not None
+        else AUTO_LAYOUT_TICK_RESERVE_PT * pt2fig
+    )
+
     source_h_fig = SOURCE_SIZE_PT * pt2fig
     has_source_band = bool(source) or footnote_lines > 0
-    if has_source_band:
-        bottom_pad = (
-            max(SOURCE_Y_OFFSET, tick_reserve)
-            + source_h_fig
-            + AUTO_LAYOUT_BOTTOM_MARGIN
-        )
-    else:
-        bottom_pad = tick_reserve + AUTO_LAYOUT_BOTTOM_MARGIN
+    if not has_source_band:
+        return top_pad, tick_band + AUTO_LAYOUT_BOTTOM_MARGIN
 
-    # Each extra footnote line wraps above (or below) the source baseline at
-    # one ``FOOTNOTES_STACK_GAP`` + footnote line-box (~7pt × 1.2) per line.
+    # The source line is placed below the lowest of ``bbox.y0 - SOURCE_Y_OFFSET``
+    # and ``(bbox.y0 - tick_band) - SOURCE_TICK_CLEARANCE`` (see the source
+    # placement in ``finalize`` and ``footnotes``), i.e. its depth below the
+    # axes baseline is ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``.
+    # For short numeric ticks the ``SOURCE_Y_OFFSET`` term wins (so line/scatter
+    # charts are unchanged); for tall category labels the tick term wins, lifting
+    # the source clear of the labels.
+    source_depth = max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)
+
+    # Extra footnote rows stack ABOVE the source line. When they do,
+    # ``footnotes()`` drops the source baseline by the stack height so the whole
+    # block clears the tick labels — reserve that matching depth: the tick band,
+    # the clearance, the stack gap, and one footnote line box per row.
+    extra_line = max(FOOTNOTES_STACK_GAP, FOOTNOTE_SIZE_PT * 1.2 * pt2fig)
     if footnote_lines > 0:
-        extra_line = max(
-            FOOTNOTES_STACK_GAP,
-            FOOTNOTE_SIZE_PT * 1.2 * pt2fig,
+        wrap_depth = (
+            tick_band
+            + SOURCE_TICK_CLEARANCE
+            + FOOTNOTES_STACK_GAP
+            + extra_line * footnote_lines
         )
-        bottom_pad += extra_line * footnote_lines
+        source_depth = max(source_depth, wrap_depth)
+
+    bottom_pad = source_depth + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
 
     return top_pad, bottom_pad
 
@@ -514,6 +590,7 @@ def finalize(
     if auto_layout:
         top_pad, bottom_pad = _compute_auto_pads(
             fig,
+            ax,
             title=title,
             descriptor=descriptor,
             source=source,
@@ -1362,6 +1439,17 @@ def footnotes(
     )
     line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
 
+    def _wrap_lines(text: str, avail_frac: float, *, text_w: float) -> str:
+        """Word-wrap ``text`` to ``avail_frac`` of the figure width (no render).
+
+        ``text_w`` is the rendered single-line width of ``text`` (figure-x
+        fraction), used to estimate the per-character pitch. Returns the
+        wrapped string so callers can count rows before placing it.
+        """
+        per_char = text_w / len(text) if text else 0.0
+        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
+        return _wrap_preserve_offsets(text, max_chars) if wrap else text
+
     def _draw_wrapped(
         text: str,
         urls,
@@ -1380,9 +1468,7 @@ def footnotes(
         rendered lines so callers can advance their layout cursor past a
         multi-line block.
         """
-        per_char = text_w / len(text) if text else 0.0
-        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
-        wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
+        wrapped = _wrap_lines(text, avail_frac, text_w=text_w)
         n_lines = wrapped.count("\n") + 1
         render_text_with_superscripts(
             fig,
@@ -1436,6 +1522,28 @@ def footnotes(
         and not source_wraps
         and (src_right + gap + notes_w) <= min(right_x, max_width_frac)
     )
+
+    # When the notes wrap to rows ABOVE the source line, that stack climbs back
+    # up toward the x-tick labels. ``base_y0`` already sits just below the
+    # labels, so the source line's default ``SOURCE_Y_OFFSET`` gap leaves no
+    # room for the rows to stack without overlapping the category labels. Drop
+    # the source baseline by the wrapped block's height (notes rows + the wrapped
+    # source's own extra rows + the stack gap) so the TOP of the block lands a
+    # ``SOURCE_TICK_CLEARANCE`` below ``base_y0`` — clear of the labels — when ``y``
+    # is auto-chosen. An explicit ``y`` is honoured as-is.
+    notes_wrap_above = bool(notes_clean) and not notes_fits
+    if y is None and notes_wrap_above:
+        notes_avail_frac = max(0.0, min(right_x, max_width_frac) - x)
+        n_note_rows = (
+            _wrap_lines(notes_clean, notes_avail_frac, text_w=notes_w).count("\n") + 1
+        )
+        n_src_rows = (
+            _wrap_lines(source_clean, source_avail_frac, text_w=src_w).count("\n") + 1
+            if source_wraps
+            else 1
+        )
+        block_h = FOOTNOTES_STACK_GAP + (n_src_rows - 1 + n_note_rows) * line_h
+        source_y = min(source_y, base_y0 - SOURCE_TICK_CLEARANCE - block_h)
 
     # Always draw the source line — wrapped to the figure width when over-wide.
     n_source_lines = 1
