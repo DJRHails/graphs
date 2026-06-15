@@ -1362,10 +1362,25 @@ def footnotes(
     )
     line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
 
-    def _draw_wrapped(text: str, urls, anchor_y: float, avail_frac: float) -> None:
+    def _draw_wrapped(
+        text: str,
+        urls,
+        anchor_y: float,
+        avail_frac: float,
+        *,
+        text_w: float,
+        fontproperties=fp_notes,
+    ) -> int:
         """Word-wrap ``text`` to ``avail_frac`` of the figure width and stack the
-        lines upward, so the bottom line sits at ``anchor_y`` (va='top' baseline)."""
-        per_char = notes_w / len(text) if text else 0.0
+        lines upward, so the bottom line sits at ``anchor_y`` (va='top' baseline).
+
+        ``text_w`` is the rendered single-line width of ``text`` (figure-x
+        fraction), used to estimate the per-character pitch — pass the width
+        measured for the same font as ``fontproperties``. Returns the number of
+        rendered lines so callers can advance their layout cursor past a
+        multi-line block.
+        """
+        per_char = text_w / len(text) if text else 0.0
         max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
         wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
         n_lines = wrapped.count("\n") + 1
@@ -1375,12 +1390,13 @@ def footnotes(
             anchor_y + (n_lines - 1) * line_h,
             wrapped,
             fontsize=FOOTNOTE_SIZE_PT,
-            fontproperties=fp_notes,
+            fontproperties=fontproperties,
             color=C_SOURCE,
             va="top",
             ha="left",
             url_spans=urls,
         )
+        return n_lines
 
     if source is None:
         # Legacy mode — render notes only at the historical position, wrapped.
@@ -1388,7 +1404,11 @@ def footnotes(
             return
         y_pos = y if y is not None else base_y0 - FOOTNOTES_LEGACY_Y_OFFSET
         _draw_wrapped(
-            notes_clean, notes_urls, y_pos, max(0.0, min(max_width_frac, 1.0) - 2 * x)
+            notes_clean,
+            notes_urls,
+            y_pos,
+            max(0.0, min(max_width_frac, 1.0) - 2 * x),
+            text_w=notes_w,
         )
         if verify:
             verify_layout(fig)
@@ -1400,16 +1420,35 @@ def footnotes(
 
     src_w = _text_width_frac(source_clean, fp_src, SOURCE_MEASURE_SIZE_PT)
 
+    # An over-wide source overflows the figure edge just as an over-wide note
+    # would — word-wrap it to the chart width, exactly as the notes wrap. When
+    # it fits on one line, render it as-is and try to pack notes alongside.
+    source_avail_frac = max(0.0, min(right_x, max_width_frac) - x)
+    source_wraps = bool(source) and src_w > source_avail_frac
+
     # Available room between source's right edge and the chart's right edge,
-    # minus a small visual gap.
+    # minus a small visual gap. A wrapped (multi-line) source leaves no room to
+    # pack notes on its baseline.
     gap = FOOTNOTES_PACK_GAP
     src_right = x + src_w
-    notes_fits = notes_clean and (src_right + gap + notes_w) <= min(
-        right_x, max_width_frac
+    notes_fits = (
+        notes_clean
+        and not source_wraps
+        and (src_right + gap + notes_w) <= min(right_x, max_width_frac)
     )
 
-    # Always draw the source line.
-    if source:
+    # Always draw the source line — wrapped to the figure width when over-wide.
+    n_source_lines = 1
+    if source_wraps:
+        n_source_lines = _draw_wrapped(
+            source_clean,
+            source_urls,
+            source_y,
+            source_avail_frac,
+            text_w=src_w,
+            fontproperties=fp_src,
+        )
+    elif source:
         render_text_with_superscripts(
             fig,
             x,
@@ -1444,11 +1483,15 @@ def footnotes(
         )
     else:
         # Too wide for the source row — word-wrap and stack the lines above it.
+        # A wrapped source occupies extra lines stacking up from source_y, so
+        # lift the notes block clear of them.
+        notes_anchor_y = source_y + FOOTNOTES_STACK_GAP + (n_source_lines - 1) * line_h
         _draw_wrapped(
             notes_clean,
             notes_urls,
-            source_y + FOOTNOTES_STACK_GAP,
+            notes_anchor_y,
             max(0.0, min(right_x, max_width_frac) - x),
+            text_w=notes_w,
         )
 
     if verify:
