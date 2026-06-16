@@ -301,7 +301,7 @@ Style overrides to apply on top:
 | `color_axis(ax, side, color, *, spine=True, ticks=True)`            | Colour a spine + ticks + labels to match a series.     |
 | `right_axis(ax)`                                                    | Apply right-axis convention to a panel.                |
 | `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
-| `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack.   |
+| `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack. Call BEFORE `finalize` (auto-`y`) and it reserves its own band — no `subplots_adjust`. |
 
 ### Number formatting
 
@@ -390,6 +390,7 @@ pattern.
 - [`bar_chart.py`](./examples/bar_chart.py) — **Load when:** one value per category, ranked, and the biggest (or one chosen) value is the point. Minimal `bar_h` demo with the default `highlight_max=True`.
 - [`dumbbell_chart.py`](./examples/dumbbell_chart.py) — **Load when:** each category has a before and an after value and the change is the message. `dumbbell` plus a right-aligned `top_legend` fed from `ax._dumbbell_handles`.
 - [`faceted_chart.py`](./examples/faceted_chart.py) — **Load when:** several series share an axis but overlap so badly that one panel buries the story — split into small multiples. The faceting workflow: `right_axis` + `ci_fill` per axes, `finalize(y_start=0.075)` (auto-sizes the inter-panel `wspace` from the per-panel labels — no manual `subplots_adjust`), then `panel_label` per axes (anchored to the final positions).
+- [`faceted_top_legend.py`](./examples/faceted_top_legend.py) — **Load when:** faceted panels share a colour key that must sit above the row of panels, hands-off. `top_legend` is called BEFORE `finalize`; `finalize` measures it, reserves a band between the two-line descriptor and the panels, and re-anchors it to the final axes top — no `subplots_adjust`, no hand-tuned `y=` / `y_start` padding.
 - [`scatter_chart.py`](./examples/scatter_chart.py) — **Load when:** a relationship cloud where a few named outliers carry the story. `scatter_standard` + `scatter_highlight` two-layer treatment, `trend_line`, `callout` on the outliers.
 - [`thermometer_chart.py`](./examples/thermometer_chart.py) — **Load when:** 2–4 series compared across the same ranked categories, where grouped bars would clutter. `thermometer(dot=False)` three-series variant, x-axis on top, frameless `top_legend`.
 - [`index_chart.py`](./examples/index_chart.py) — **Load when:** series of different magnitudes must be compared as growth since a common moment, with an event window to flag. `index_marker` + `highlight_panel` band + secondary `highlight_label` + `broken_axis` + `label_lines`.

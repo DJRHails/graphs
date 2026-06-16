@@ -410,3 +410,138 @@ def test_side_margins_fall_back_without_renderer(monkeypatch):
     assert left == pytest.approx(AUTO_LAYOUT_LEFT)
     assert right == pytest.approx(AUTO_LAYOUT_RIGHT)
     plt.close(fig)
+
+
+# --- top_legend band reservation -------------------------------------------
+
+
+def _legend_bbox(fig) -> object:
+    """Figure-coord bbox of the figure's first legend (after a draw)."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    return fig.legends[0].get_window_extent(renderer=renderer).transformed(inv)
+
+
+def _descriptor_lowest_y0(fig, fragment: str) -> float:
+    """Lowest y0 of the descriptor text artist containing ``fragment``."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    return min(
+        t.get_window_extent(renderer=renderer).transformed(inv).y0
+        for t in fig.texts
+        if fragment in t.get_text()
+    )
+
+
+def test_top_legend_band_drops_axes_more_than_no_legend():
+    """An auto top_legend reserves a band: the axes top sits lower than without.
+
+    Two identical charts, one with a ``top_legend`` tagged before ``finalize``,
+    one without. The legend chart's axes must drop by at least the legend's
+    measured height — proof the band was reserved, not absorbed into the title
+    stack.
+    """
+    fig_no, ax_no = plt.subplots(figsize=(5.0, 3.4))
+    ax_no.plot([0, 1, 2], [0, 1, 0])
+    finalize(ax_no, title="T", descriptor="D one\nD two", source="S")
+    top_no = ax_no.get_position().y1
+    plt.close(fig_no)
+
+    fig_yes, ax_yes = plt.subplots(figsize=(5.0, 3.4))
+    (line,) = ax_yes.plot([0, 1, 2], [0, 1, 0], label="Series")
+    top_legend(fig_yes, [line], ["Series"])
+    legend_h = _legend_bbox(fig_yes).height
+    finalize(ax_yes, title="T", descriptor="D one\nD two", source="S")
+    top_yes = ax_yes.get_position().y1
+    plt.close(fig_yes)
+
+    # The legend chart's axes top is pushed down by ~the legend band.
+    assert top_yes < top_no - legend_h * 0.5
+
+
+def test_top_legend_does_not_overlap_descriptor_faceted():
+    """Faceted chart, top_legend BEFORE finalize, hands-off: legend clears the
+    descriptor and sits above the panels — no ``subplots_adjust``.
+    """
+    import numpy as np
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.9))
+    idx = np.arange(3)
+    for ax in axes:
+        b0 = ax.bar(idx, [5, 3, 4], width=0.5, label="One")
+        b1 = ax.bar(idx, [2, 1, 2], width=0.5, bottom=[5, 3, 4], label="Two")
+        ax.set_xticks(idx)
+        ax.set_xticklabels(["a", "b", "c"])
+        ax.set_ylim(0, 9)
+
+    top_legend(fig, [b0, b1], ["One", "Two"], ncol=2)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        finalize(
+            axes[0],
+            title="A faceted chart with a shared colour key",
+            descriptor="A two-line descriptor\n% of sampled traffic",
+            source="Source: test",
+            title_x=0.04,
+            y_start=0.075,
+        )
+        for ax in axes:
+            panel_label(ax, "Panel")
+        from graphs._finalize import verify_layout
+
+        verify_layout(fig)
+
+    leg = _legend_bbox(fig)
+    desc_y0 = _descriptor_lowest_y0(fig, "sampled traffic")
+    panel_top = max(ax.get_position().y1 for ax in axes)
+
+    # Legend below the descriptor's lowest line and above the panel row.
+    assert leg.y1 < desc_y0, (
+        f"legend top {leg.y1:.4f} overlaps descriptor (y0 {desc_y0:.4f})"
+    )
+    assert leg.y0 > panel_top, (
+        f"legend bottom {leg.y0:.4f} dips below the panel top ({panel_top:.4f})"
+    )
+    overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
+    assert not overflow, f"verify_layout flagged an overflow: {overflow}"
+    plt.close(fig)
+
+
+def test_top_legend_explicit_y_is_not_repositioned():
+    """A manual ``y=`` is an override — never tagged, never moved by finalize."""
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    (line,) = ax.plot([0, 1, 2], [0, 1, 0], label="Series")
+    leg = top_legend(fig, [line], ["Series"], y=0.82)
+    # An explicit-y legend carries no tag and isn't registered for repositioning.
+    assert not hasattr(leg, "_graphs_top_legend")
+    assert getattr(fig, "_graphs_top_legend", None) is None
+
+    before = tuple(leg.get_bbox_to_anchor().bounds)
+    finalize(ax, title="T", descriptor="D one\nD two", source="S")
+    after = tuple(leg.get_bbox_to_anchor().bounds)
+    assert before == pytest.approx(after)
+    plt.close(fig)
+
+
+def test_no_top_legend_leaves_top_margin_unchanged():
+    """A chart with no top_legend reserves no legend band (top margin unchanged).
+
+    Guards the no-regression promise: the band only opens when an auto
+    top_legend is present.
+    """
+    fig_a, ax_a = plt.subplots(figsize=(5.0, 3.4))
+    ax_a.plot([0, 1, 2], [0, 1, 0])
+    finalize(ax_a, title="T", descriptor="D one\nD two", source="S")
+    top_a = ax_a.get_position().y1
+    plt.close(fig_a)
+
+    # Same chart again — deterministic, no legend, identical top.
+    fig_b, ax_b = plt.subplots(figsize=(5.0, 3.4))
+    ax_b.plot([0, 1, 2], [0, 1, 0])
+    finalize(ax_b, title="T", descriptor="D one\nD two", source="S")
+    top_b = ax_b.get_position().y1
+    plt.close(fig_b)
+
+    assert top_a == pytest.approx(top_b, abs=1e-9)

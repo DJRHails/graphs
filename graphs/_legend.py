@@ -3,9 +3,30 @@
 from __future__ import annotations
 
 import warnings
+from dataclasses import dataclass
 from typing import Sequence
 
 from graphs._palette import C_SPINE
+
+
+@dataclass(frozen=True, kw_only=True)
+class TopLegendSpec:
+    """Placement parameters of an auto-positioned :func:`top_legend`.
+
+    Stashed on the legend (``legend._graphs_top_legend``) so ``finalize`` can
+    reserve a band for it and re-anchor it to the final axes top after
+    auto-layout shifts the axes. Only auto-positioned legends (no explicit
+    ``y=``) carry one — an explicit ``y`` is a manual override and is never
+    moved. The legend's horizontal alignment is already baked into its ``loc``
+    at creation, so only the x anchor needs preserving for the re-anchor.
+
+    Attributes:
+        x: Horizontal anchor in figure coords (left edge for ``align="left"``,
+            right edge for ``align="right"``).
+    """
+
+    x: float
+
 
 # Legend frame fill — white, not C_BG (which is "none" under the transparent
 # theme and would defeat the point of the frame).
@@ -173,6 +194,17 @@ def top_legend(
     of label swatches sitting just below the descriptor block, aligned to
     the ``title_x`` of the chart.
 
+    **Hands-off placement.** Call this BEFORE ``finalize`` with no explicit
+    ``y=`` (the auto path): the legend is tagged on the figure, and
+    ``finalize`` measures its height, reserves a band for it between the
+    title stack and the axes, and re-anchors it to the final axes top — so a
+    faceted chart with a shared key lays out with no ``subplots_adjust`` and
+    no hand-tuned ``y`` / ``y_start`` padding (see
+    ``examples/faceted_top_legend.py``). Passing an explicit ``y=`` is a
+    manual override: that exact ``y`` is kept and ``finalize`` never moves the
+    legend (use it for the call-after-``finalize`` patterns that read the
+    finalized axes position directly).
+
     Args:
         fig: Figure to attach the legend to.
         handles: Legend handles (artists).
@@ -195,7 +227,8 @@ def top_legend(
     """
     if align not in ("left", "right"):
         raise ValueError(f"align must be 'left' or 'right', got {align!r}")
-    if y is None:
+    auto_y = y is None
+    if auto_y:
         ref = anchor_to if anchor_to is not None else (fig.axes[0] if fig.axes else None)
         if ref is None:
             y = 0.82
@@ -205,7 +238,7 @@ def top_legend(
     if ncol is None:
         ncol = max(1, len(handles))
     loc = "upper left" if align == "left" else "upper right"
-    return fig.legend(
+    legend = fig.legend(
         handles,
         labels,
         loc=loc,
@@ -217,3 +250,12 @@ def top_legend(
         handletextpad=handletextpad,
         columnspacing=columnspacing,
     )
+    # Tag an auto-positioned legend so a later ``finalize`` can reserve a band
+    # for it under the title stack and re-anchor it to the final axes top. An
+    # explicit ``y=`` is a manual override — never tagged, never moved. The tag
+    # carries the x anchor ``finalize`` re-applies after auto-layout shifts the
+    # axes (the vertical anchor is recomputed from the final axes top).
+    if auto_y:
+        legend._graphs_top_legend = TopLegendSpec(x=x)
+        fig._graphs_top_legend = legend
+    return legend

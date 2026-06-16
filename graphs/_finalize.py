@@ -8,6 +8,7 @@ import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt
+import matplotlib.transforms as mtransforms
 
 from graphs._fonts import _get_font, _get_font_condensed
 from graphs._links import strip_links
@@ -150,6 +151,7 @@ AUTO_LAYOUT_SIDE_GUTTER_PT = 4.0  # gutter between a measured side label and the
 AUTO_LAYOUT_WSPACE_GUTTER_PT = 10.0  # gutter added to inter-column label width
 AUTO_LAYOUT_PANEL_LABEL_PT = 22.0  # rule + bold panel_label height between rows
 AUTO_LAYOUT_HSPACE_GUTTER_PT = 6.0  # breathing room between stacked-row bands
+AUTO_LAYOUT_TOP_LEGEND_GAP_PT = 5.0  # gap above an auto top_legend (legend↔descriptor)
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -313,6 +315,42 @@ def _get_renderer(fig):
             return fig.canvas.get_renderer()
         except AttributeError:
             return None
+
+
+def _top_legend(fig):
+    """Return the auto-positioned :func:`top_legend` tagged on ``fig``, or None.
+
+    ``top_legend`` stashes an auto-positioned legend (no explicit ``y=``) at
+    ``fig._graphs_top_legend`` so ``finalize`` can reserve a band for it and
+    re-anchor it. Returns ``None`` when no such legend exists (the common case —
+    most charts have no top legend) or when the tagged legend was since removed.
+    """
+    legend = getattr(fig, "_graphs_top_legend", None)
+    if legend is None:
+        return None
+    if legend not in getattr(fig, "legends", []):
+        return None  # removed since tagging
+    return legend
+
+
+def _top_legend_height_fig(fig, legend) -> float | None:
+    """Measure ``legend``'s rendered height as a fraction of the figure height.
+
+    Mirrors the renderer-based measurement the title-stack and x-tick code use
+    (``get_window_extent`` through ``transFigure``). Returns ``None`` when the
+    renderer is unavailable (non-Agg backend) so the caller falls back to
+    reserving nothing extra rather than guessing.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
+    try:
+        bb = legend.get_window_extent(renderer=renderer)
+    except Exception:
+        return None
+    if bb.height <= 0:
+        return 0.0
+    return bb.transformed(fig.transFigure.inverted()).height
 
 
 def _side_protrusions_fig(fig, ax) -> tuple[float, float] | None:
@@ -690,12 +728,16 @@ def _compute_auto_pads(
     marker: str,
     y_start: float,
     footnote_lines: int,
+    top_legend_band: float = 0.0,
 ) -> tuple[float, float]:
     """Compute (top_pad, bottom_pad) for ``fig.subplots_adjust``.
 
     Top pad reserves room for the title-stack drawn in figure coords
     above ``bbox.y1`` (descriptor lines, gap, title lines, marker
-    overhang, ``y_start`` padding, plus a small breathing margin).
+    overhang, ``y_start`` padding, plus a small breathing margin). When an
+    auto-positioned ``top_legend`` is present, ``top_legend_band`` (its measured
+    height plus a gap, in figure fraction) is added so the title-stack drops
+    enough to clear the legend row that sits between it and the axes.
 
     Bottom pad reserves room for the source line at its true depth below the
     axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
@@ -735,7 +777,12 @@ def _compute_auto_pads(
         marker_pt = AUTO_LAYOUT_MARKER_RESERVE_PT
 
     stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
-    top_pad = y_start + stack_pt * pt2fig + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
+    top_pad = (
+        y_start
+        + top_legend_band
+        + stack_pt * pt2fig
+        + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
+    )
 
     # Reserve the measured height of the bottom x-tick labels (category names
     # on a vertical bar chart). A measured 0.0 means there are genuinely no
@@ -1038,6 +1085,19 @@ def finalize(
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
+    # An auto-positioned ``top_legend`` (tagged by ``top_legend`` when called
+    # with no explicit ``y=``) sits in a band between the title-stack and the
+    # axes. Measure its height now so the top margin reserves room for it; the
+    # legend is re-anchored to the final axes top further below.
+    top_legend = _top_legend(fig)
+    fig_h_in = fig.get_figheight()
+    legend_gap = AUTO_LAYOUT_TOP_LEGEND_GAP_PT / 72.0 / fig_h_in
+    top_legend_band = 0.0
+    if top_legend is not None:
+        legend_h = _top_legend_height_fig(fig, top_legend)
+        if legend_h:
+            top_legend_band = legend_h + legend_gap
+
     # Auto-layout always runs — size every margin and the inter-panel spacing
     # from the renderer. Top/bottom fit the title-stack and source band;
     # left/right are measured from the actual y-axis text; wspace/hspace size a
@@ -1051,6 +1111,7 @@ def finalize(
         marker=marker,
         y_start=y_start,
         footnote_lines=footnote_lines,
+        top_legend_band=top_legend_band,
     )
     left, right = _compute_side_margins(fig)
     adjust_kwargs = {
@@ -1117,6 +1178,31 @@ def finalize(
             y_cursor = highest_fig_y + TOP_TICK_CLEARANCE_PT * pt2fig
     except Exception:
         pass
+
+    # Place an auto top_legend in the reserved band: its bottom sits at the
+    # current title-stack base (just above the axes / top-mounted ticks), so it
+    # spans above the row of panels on a faceted chart. ``finalize`` reserved
+    # ``top_legend_band`` (legend height + gap) above the axes for it; advance
+    # the title-stack cursor past the band so the descriptor lands above the
+    # legend, never on it. The legend's ``loc="upper *"`` puts the anchor at its
+    # TOP, so anchor at ``y_cursor + legend_h`` to seat the bottom at y_cursor.
+    #
+    # The anchor's y is bound in AXES-fraction (x stays figure-fraction) via a
+    # blended transform: ``savefig(bbox_inches="tight")`` shifts a pure
+    # ``transFigure`` legend independently of the ``fig.text`` title-stack
+    # (re-anchoring it against the cropped figure box), which re-opens the very
+    # collision this reserves against. An axes-relative y crops in lockstep with
+    # the axes and the descriptor, so the gap survives the tight save.
+    if top_legend is not None and top_legend_band > 0.0:
+        spec = top_legend._graphs_top_legend
+        legend_h = top_legend_band - legend_gap
+        anchor_fig_y = y_cursor + legend_h
+        anchor_axes_y = (anchor_fig_y - bbox.y0) / bbox.height
+        blended = mtransforms.blended_transform_factory(
+            fig.transFigure, ax.transAxes
+        )
+        top_legend.set_bbox_to_anchor((spec.x, anchor_axes_y), transform=blended)
+        y_cursor += top_legend_band
 
     if descriptor:
         desc_lines = descriptor.split("\n")
