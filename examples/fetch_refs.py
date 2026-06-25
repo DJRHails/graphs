@@ -62,6 +62,14 @@ MEDIUM_SLUGS: dict[tuple[int, int], str | None] = {
     (2, 7): "wework",
 }
 
+# Standalone references downloaded by direct URL (not part of any grid).
+DIRECT_REFS: dict[str, str] = {
+    "european_warming": (
+        "https://www.economist.com/cdn-cgi/image/width=600,quality=100,"
+        "format=auto/content-assets/images/20260627_STC320.png"
+    ),
+}
+
 DAILY_GRID = ORIG_DIR / "daily_2026_grid.png"
 DAILY_COLS = [(0, 386), (386, 784), (784, 1165)]
 DAILY_ROWS = [(0, 487), (487, 978)]
@@ -156,6 +164,22 @@ def fetch_medium() -> None:
         _save_cell(im, ink, (x0, edges[r], x1, edges[r + 1]), slug)
 
 
+def fetch_direct() -> None:
+    """Download standalone references (single charts, not grid cells)."""
+    for slug, url in DIRECT_REFS.items():
+        dest = ORIG_DIR / f"{slug}.png"
+        if dest.exists():
+            print(f"  ✓ {dest.name} (cached)")
+            continue
+        print(f"↓ {url}")
+        resp = requests.get(
+            url, timeout=60, headers={"User-Agent": "graphs-skill/0.3"}
+        )
+        resp.raise_for_status()
+        dest.write_bytes(resp.content)
+        print(f"  → {dest.name}")
+
+
 def fetch_daily_grid() -> None:
     if not DAILY_GRID.exists():
         print(f"skip daily 2026 grid: {DAILY_GRID} not present (clipboard-sourced)")
@@ -174,3 +198,4 @@ def fetch_daily_grid() -> None:
 if __name__ == "__main__":
     fetch_medium()
     fetch_daily_grid()
+    fetch_direct()
