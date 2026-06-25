@@ -21,6 +21,7 @@ from matplotlib.patches import Patch
 
 from graphs import (
     C_RED_BRAND,
+    C_SPINE,
     finalize,
     footnotes,
     get_font,
@@ -38,7 +39,7 @@ FP_VALUE = fm.FontProperties(family=get_font(), weight="bold")
 
 C_IWG = "#ef8d87"   # lighter companion tint for the paired series
 C_BAND = "#D9E6ED"  # pale blue row band sampled from the original
-C_ZERO = "#1A1A1A"  # dark zero baseline at the start of each bar pair
+C_ZERO = C_SPINE  # dark zero baseline at the start of each bar pair
 
 # (category label, WeWork value, IWG value, WeWork label, IWG label)
 PANELS = [
@@ -133,7 +134,7 @@ for ax, (label, *_rest) in zip(axes, PANELS, strict=True):
         label,
         fontsize=9,
         fontproperties=FP_LABEL,
-        color="#1A1A1A",
+        color=C_SPINE,
         va="center",
         ha="left",
     )

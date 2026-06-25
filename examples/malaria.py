@@ -47,7 +47,7 @@ set_theme()
 
 C_HISTORY = PALETTE["red"]
 C_WORST = "#8e3a46"  # claret — worst-case scenario
-C_EXPECTED = "#2da4bf"  # cyan — expected trend (and FORECAST tag)
+C_EXPECTED = PALETTE["cyan"]  # expected trend (and FORECAST tag)
 C_TARGET = "#5cb8a7"  # pale teal — global target
 C_BAND = "#d9e6f0"  # forecast panel tint
 

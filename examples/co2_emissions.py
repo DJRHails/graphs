@@ -15,12 +15,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from graphs import finalize, footnotes, save_chart, set_theme, subplots
+from graphs import C_SPINE, finalize, footnotes, save_chart, set_theme, subplots
 
 set_theme()
 
 C_AVG = "#5E9CAE"  # global-average dashed line + label
-C_DARK = "#1A1A1A"  # in-bar labels on light fills
+C_DARK = C_SPINE  # in-bar labels on light fills
 
 # (name, population bn, tonnes CO2 per person, fill) — heights/widths measured
 # off the original; printed numbers are each region's total emissions, Gt.

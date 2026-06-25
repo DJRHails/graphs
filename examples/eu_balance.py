@@ -24,6 +24,7 @@ import numpy as np
 
 from examples._data import load_csv_lines
 from graphs import (
+    C_SPINE,
     PALETTE,
     finalize,
     footnotes,
@@ -92,10 +93,10 @@ def stacked(ax, d: dict[str, list[float]]) -> None:
 
     # Net line — sum across all featured + others.
     total = pos_base + neg_base
-    ax.plot(years, total, color="#1A1A1A", linewidth=1.5, marker="o",
+    ax.plot(years, total, color=C_SPINE, linewidth=1.5, marker="o",
             markersize=4, zorder=3, label="Euro-area total")
 
-    ax.axhline(0, color="#1A1A1A", linewidth=0.8, zorder=1)
+    ax.axhline(0, color=C_SPINE, linewidth=0.8, zorder=1)
     ax.set_xticks(years)
 
 
