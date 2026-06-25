@@ -42,3 +42,6 @@ push = true
 "graphs/__init__.py" = [
     '__version__ = "{version}"',
 ]
+"SKILL.md" = [
+    'version: {version}',
+]
