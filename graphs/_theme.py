@@ -89,7 +89,10 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
             "font.family": "sans-serif",
             "font.sans-serif": cond_chain,
             "text.color": C_TEXT,
-            "font.weight": "light",
+            # Regular (not light): keeps the tick/label characters from reading
+            # too thin against the axis rule — matches the Economist's
+            # axis-to-text weight ratio (~1.2x).
+            "font.weight": "regular",
             # Legend
             "legend.frameon": False,
             "legend.fontsize": 8.5,
