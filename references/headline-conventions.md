@@ -19,21 +19,49 @@ as a draft.
   workers" (`pensions.py`).
 - **No units, no dates, no geography.** That's the descriptor's job.
 
-### Descriptor — the meat, in one breath
+### Descriptor — label the y-axis, in one breath
 
-State exactly what's plotted. Include:
+The descriptor's first duty is to **name what's plotted: the measured
+quantity and its units** — in effect, it is the y-axis label written out.
+Read the title and descriptor *together*: between them they must answer
+"what is this number?" Because the title is usually a wink (it states the
+finding, not the metric), the descriptor is where the metric actually
+gets named. A descriptor that gives only scope and period — leaving the
+quantity itself unnamed — sends the reader hunting. This is the single
+most common descriptor failure.
 
-- **Subject** (what's measured)
+State, in order:
+
+- **Subject — the measured quantity** (what the y-axis *is*). The part a
+  wink title can't supply.
 - **Geography or scope** (where / which subset)
 - **Period or year** (when)
-- **Units** (%, $bn, log scale, m)
+- **Units** (%, $bn, °C, years, log scale, m)
 
-Wrapping is automatic; you can also force a break with `\n`. Examples:
+Wrapping is automatic; force a semantic break with `\n` (a semibold
+subject lead over the scope/unit line). Examples — each names the
+quantity:
 
-- `"Selected European cities, 2025, log scale"`
-- `"Russia-Ukraine war, February 24th 2022 to May 14th 2026, m"`
+- `"Average temperature anomalies by continent\nRelative to the 1991-2020 average, °C"`
+  (`european_warming.py`; wink title "The Great European Bake Off")
 - `"Average age gap of married couples*, by income of wife, years"`
+- `"Eastern European economies, real GDP growth, 2010–2024, % year on year"`
 - `"United States, CPI, % year on year"`
+
+**Exception — when the title already names the metric.** If the title is
+*literally descriptive* of the y-axis, the descriptor may drop the
+quantity and carry only scope, period and scale. Only then is a
+scope-only descriptor correct:
+
+| Title | Descriptor | Why it works |
+|---|---|---|
+| `"Average wage* relative to renters' wage†"` | `"Selected European cities, 2025, log scale"` | The title *is* the y-axis label; the descriptor only adds the missing scope / period / scale. |
+| `"Priced out"` (a wink) | `"Average wage relative to renters' wage, selected European cities, 2025, log scale"` | The wink says nothing about the metric, so the descriptor must name it. |
+
+Same chart, different descriptors — driven by whether the title carries
+the metric. Taken alone, `"Selected European cities, 2025, log scale"` is
+**not** a model descriptor: it names where and when but never *what*, and
+only reads correctly beneath a title that already does.
 
 Footnote markers (`*`, `†`, `‡`, `§`) auto-superscript anywhere in the
 title or descriptor — write plain text.
