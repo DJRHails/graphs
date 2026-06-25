@@ -909,7 +909,7 @@ def _superscript_axis_label(ax, axis: str) -> None:
     )
 
 
-def dark_zero_line(ax) -> None:
+def dark_zero_line(ax, *, skip_axhline: bool = False) -> None:
     """Draw a strong dark rule on the zero baseline a chart's data straddles.
 
     No-op unless the y-range strictly spans 0 *and* the axes has visible y
@@ -929,6 +929,11 @@ def dark_zero_line(ax) -> None:
 
     Args:
         ax: Axes whose zero baseline should carry the rule.
+        skip_axhline: When the caller already drew their own zero rule (a
+            manual ``axhline(0)``, e.g. one that sits *over* the data), pass
+            ``True``. The zero gridline is still recoloured — so its gutter
+            extension matches the manual rule rather than reading as a broken
+            grey stub — but no duplicate ``axhline`` is added.
     """
     y_lo, y_hi = sorted(ax.get_ylim())
     if not y_lo < 0.0 < y_hi:
@@ -949,7 +954,7 @@ def dark_zero_line(ax) -> None:
         # Keep the gridline's own (axisbelow) zorder so the rule stays under
         # every data line, exactly like the lighter gridlines.
         zero_grid.set(color=C_SPINE, linewidth=1.0)
-    else:
+    elif not skip_axhline:
         ax.axhline(0.0, color=C_SPINE, linewidth=1.0, zorder=0.5)
 
 
@@ -1423,8 +1428,10 @@ def finalize(
         len(ln.get_ydata()) and all(abs(v) < 1e-12 for v in ln.get_ydata())
         for ln in ax.lines
     )
-    if zero_rule and not has_zero_rule:
-        dark_zero_line(ax)
+    if zero_rule:
+        # Still recolour the zero gridline when a manual rule exists, so its
+        # on-grid gutter extension matches; only skip adding a duplicate line.
+        dark_zero_line(ax, skip_axhline=has_zero_rule)
 
     # House default: numeric y labels sit on gridlines that extend under
     # them. Gated on visible y gridlines so categorical axes (bar_h rows,

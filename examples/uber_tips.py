@@ -85,8 +85,16 @@ finalize(
     autoscale_y=False,
     footnote_lines=1,  # the source wraps to a second line
 )
-# finalize's bottom-spine recolour assumes the house dark spine; restore the
-# reference's lighter axis line after the title stack is laid out.
-ax.spines["bottom"].set_color("#b3b3b3")
+# finalize recolours the bottom spine — and the floor's on-grid gutter
+# extension — to the house dark. Restore the reference's lighter axis line:
+# the spine plus that floor extension (else the gutter reads as a dark stub
+# while the in-plot baseline stays light).
+_LIGHT_AXIS = "#b3b3b3"
+ax.spines["bottom"].set_color(_LIGHT_AXIS)
+_floor = ax.get_ylim()[0]
+for _line in ax.lines:
+    ydata = _line.get_ydata()
+    if _line.get_gid() == "y-labels-on-grid" and len(ydata) and abs(ydata[0] - _floor) < 1e-9:
+        _line.set_color(_LIGHT_AXIS)
 
 save_chart(__file__)
