@@ -12,7 +12,7 @@ accent red so the eye reads "today" first — this is the reusable
 ``graphs.snapshot_palette``.
 
 Y-axis truncates at 1.5 (no zero baseline); the ``broken_axis`` helper
-draws the squiggle on the right-hand y-tick column to flag this.
+draws the heartbeat mark on the right-hand y-tick column to flag this.
 """
 
 import sys
@@ -174,8 +174,8 @@ for (label, ys), color in zip(series, colors):
         zorder=4 if label == "2024" else 3,
     )
 
-# Axis cosmetics. Y-axis is truncated (1.5 → 4.0); broken_axis squiggle
-# flags the non-zero baseline.
+# Axis cosmetics. Y-axis is truncated (1.5 → 4.0); broken_axis heartbeat
+# mark flags the non-zero baseline.
 ax.set_xlim(-1.5, 100.5)
 ax.set_ylim(1.5, 4.0)
 ax.set_xticks(list(x))
@@ -235,8 +235,8 @@ finalize(
     footnote_lines=2,  # right-anchored footnote sits below source + xlabel
 )
 
-# Broken-axis squiggle on the right (matches the y-tick column).
-broken_axis(ax, side="right")
+# Broken-axis heartbeat mark, auto-aligned to the y-tick-label column.
+broken_axis(ax)
 
 # Footnotes sit on the same baseline as the source line, anchored on the
 # right (matches the Economist reference layout for this chart).

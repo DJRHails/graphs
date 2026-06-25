@@ -9,8 +9,8 @@ Two lines of global consumption spending share, 2000-2025: the richest
 1% (grey) drifts down from ~13.4% while the poorest 50% (red) climbs
 from ~7%, the two crossing around 2018-19. Values are approximated by
 pixel-sampling the reference image. Y-axis is truncated (5.5 -> 14), so
-``broken_axis`` flags the non-zero baseline with the squiggle next to
-the right-hand tick column.
+``broken_axis`` flags the non-zero baseline with the heartbeat mark next
+to the right-hand tick column.
 """
 
 import sys
@@ -168,8 +168,8 @@ finalize(
     autoscale_y=False,
 )
 
-# Squiggle in the right-hand tick column (just past the axis end, under
-# the "6" label) flags the truncated baseline, as in the reference.
-broken_axis(ax, x=2026.3)
+# Heartbeat mark auto-aligned to the y-tick-label column flags the truncated
+# baseline, as in the reference.
+broken_axis(ax)
 
 save_chart(__file__)

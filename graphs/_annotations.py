@@ -15,6 +15,7 @@ from graphs._fonts import _get_font_condensed
 from graphs._palette import (
     C_BOX_FILL,
     C_HIGHLIGHT_PANEL,
+    C_LABEL,
     C_LABEL_MUTED,
     C_RED,
     C_SPINE,
@@ -207,35 +208,88 @@ def _detect_y_label_side(ax) -> str:
     return "right" if right_has else "left"
 
 
+def _y_label_anchor(ax) -> tuple[str, float, float] | None:
+    """Locate the y-label column from ``y_labels_on_grid`` text artists.
+
+    ``finalize`` replaces the native y-tick labels with figure-stable text
+    artists (tagged ``"y-labels-on-grid"``) and hides the originals, which
+    defeats :func:`_detect_y_label_side`. When those artists are present this
+    reads the column straight off them.
+
+    Returns ``(side, x_fig, floor_fig)`` — the side the labels sit on, the
+    column's horizontal centre, and the bottom edge of the lowest label, all
+    in figure-fraction coords — or ``None`` when the chart keeps its native
+    tick labels.
+    """
+    fig = ax.get_figure()
+    renderer = fig.canvas.get_renderer()
+    labels = [
+        t for t in ax.texts if t.get_gid() == "y-labels-on-grid" and t.get_text()
+    ]
+    if not labels:
+        return None
+    boxes = [t.get_window_extent(renderer=renderer) for t in labels]
+    x_px = sum((b.x0 + b.x1) / 2 for b in boxes) / len(boxes)
+    floor_px = min(b.y0 for b in boxes)  # bottom edge of the lowest label
+    ax_bbox = ax.get_window_extent(renderer=renderer)
+    side = "right" if x_px > (ax_bbox.x0 + ax_bbox.x1) / 2 else "left"
+    fig_w_px = fig.get_figwidth() * fig.dpi
+    fig_h_px = fig.get_figheight() * fig.dpi
+    return side, x_px / fig_w_px, floor_px / fig_h_px
+
+
+def _heartbeat_points(
+    cx: float, base: float, half_w: float, amp: float
+) -> tuple[list[float], list[float]]:
+    """Return ``(xs, ys)`` for a symmetric heartbeat glyph in figure coords.
+
+    Flat lead-in, spike up to the peak, spike down past the baseline to the
+    trough, then a matched flat lead-out — centred on ``cx`` with its flat
+    baseline at ``base``. ``half_w`` is the half-width and ``amp`` the peak
+    height (= trough depth), both already in figure-fraction units.
+    """
+    xs = [
+        cx - half_w,
+        cx - 0.50 * half_w,
+        cx - 0.25 * half_w,
+        cx + 0.25 * half_w,
+        cx + 0.50 * half_w,
+        cx + half_w,
+    ]
+    ys = [base, base, base + amp, base - amp, base, base]
+    return xs, ys
+
+
 def broken_axis(
     ax,
     *,
     side: str = "auto",
     x: float | None = None,
-    size: float = 10.0,
+    size: float = 16.0,
     axis: str = "y",
 ):
-    """Draw the small squiggle(s) marking a broken/non-zero baseline.
+    """Draw the small heartbeat glyph marking a broken/non-zero baseline.
 
-    Styleguide: small zig-zag stroke placed just outside the plotting area on
-    the relevant axis, indicating that the scale doesn't start at zero. Valid
-    on line, thermometer, and scatter charts. **Never** use on bar/column
-    charts — switch to a thermometer instead.
+    Styleguide: a flat → spike-up → spike-down → flat mark placed in the
+    y-tick-label column, indicating that the scale doesn't start at zero.
+    Valid on line, thermometer, and scatter charts. **Never** use on
+    bar/column charts — switch to a thermometer instead.
 
-    By default the y-axis squiggle is placed next to the y-tick-labels column.
-    With ``y_axis_right=True`` (our default) that's the right edge; otherwise
-    the left. Pass ``side="left"``/``"right"`` to force, or ``x=`` to anchor
-    at a specific data x-coordinate (overrides ``side``) — applies to the
-    y-axis squiggle only.
+    By default the mark auto-aligns under the y-tick-label column (detected
+    from the on-grid labels ``finalize`` lays down) and sits just above the
+    bottom spine — or just below it when the lowest label rests on the
+    baseline. Pass ``side="left"``/``"right"`` to force the column, or ``x=``
+    to anchor at a specific data x-coordinate (overrides ``side``).
 
     Args:
         side: ``"auto"`` (default), ``"left"``, or ``"right"``. Y-axis only.
-        x: Explicit x-axis position (data coords) for the y-axis squiggle.
+        x: Explicit x-axis position (data coords) for the mark.
             Overrides ``side`` when set.
-        size: Width in points.
+        size: Width of the heartbeat glyph in points.
         axis: ``"y"`` (default), ``"x"``, or ``"both"``. Selects which axes
-            get a squiggle. Use ``"both"`` when both axes have a truncated
-            origin (e.g. brexit: years start mid-2016 and y starts ~36%).
+            get the heartbeat mark — the y-axis mark sits in the tick-label
+            column, the x-axis mark on the bottom spine near the origin. Use
+            ``"both"`` when both axes have a truncated origin.
     """
     if axis not in ("x", "y", "both"):
         raise ValueError(f"axis must be 'x', 'y', or 'both'; got {axis!r}")
@@ -254,59 +308,43 @@ def broken_axis(
         fig_h_px = fig.get_figheight() * fig.dpi
         bbox = ax.get_position()
         y_lo = bbox.y0
+        # Match the mark stroke to the spine it interrupts.
+        spine_lw = ax.spines["bottom"].get_linewidth()
+        pt = fig.dpi / 72.0
+        half_w = (size / 4) * pt / fig_w_px  # narrow: total width ≈ size/2
+        amp = (size * 0.16) * pt / fig_h_px  # peak height (= trough depth)
+        gap = 2.0 * pt / fig_h_px
 
-        # ---- y-axis squiggle ----
-        # When ``axis="y"`` alone (legacy default for index charts) keep the
-        # historical horizontal zig-zag sitting on the bottom spine. When
-        # ``axis="both"`` the y-axis squiggle becomes a vertical zig-zag
-        # running up the y-axis, so it visually pairs with a perpendicular
-        # x-axis squiggle on the bottom spine.
+        # ---- y-axis break mark ----
+        # A heartbeat glyph — flat, spike up, spike down, flat — drawn across
+        # the (implied) y-axis in the tick-label column. It marks the broken
+        # vertical scale beside the numbers it qualifies, in the label colour,
+        # and stays clear of the bottom spine so the x-axis never looks like
+        # the broken one. An explicit ``x=`` or ``side=`` overrides the
+        # auto-detected column.
         if axis in ("y", "both"):
-            if x is None:
-                # Place the y-squiggle on whichever side carries the y-tick
-                # labels — the squiggle visually annotates the broken scale
-                # next to the numbers it's qualifying. Caller can override
-                # with ``side="left"``/``"right"``.
+            anchor = _y_label_anchor(ax) if (x is None and side == "auto") else None
+            label_floor = None
+            if x is not None:
+                resolved = "left"  # explicit x: left-anchored unless caller picks right
+                x_fig = ax.transData.transform((x, ax.get_ylim()[0]))[0] / fig_w_px
+            elif anchor is not None:
+                resolved, x_fig, label_floor = anchor  # centre on the on-grid column
+            else:
                 resolved = _detect_y_label_side(ax) if side == "auto" else side
-                x_lim = ax.get_xlim()
-                x_data = x_lim[1] if resolved == "right" else x_lim[0]
-            else:
-                resolved = (
-                    "left"  # explicit x: assume left-anchored unless caller picks right
-                )
-                x_data = x
-            x_disp = ax.transData.transform((x_data, ax.get_ylim()[0]))[0]
-            x_fig = x_disp / fig_w_px
-            # When both squiggles are drawn, push the y-axis one further out
-            # so it clears the corner tick mark (the x-axis squiggle takes
-            # the spot immediately above the data origin).
-            if axis == "both":
-                shift = (_CORNER_CLEAR_PT / 72.0) * fig.dpi / fig_w_px
-                if resolved == "right":
-                    x_fig += shift
-                else:
-                    x_fig -= shift
+                x_data = ax.get_xlim()[1] if resolved == "right" else ax.get_xlim()[0]
+                x_fig = ax.transData.transform((x_data, ax.get_ylim()[0]))[0] / fig_w_px
+            if axis == "both":  # push clear of the corner the x-mark occupies
+                shift = (_CORNER_CLEAR_PT * pt) / fig_w_px
+                x_fig += shift if resolved == "right" else -shift
 
-            if axis == "both":
-                # Vertical zig-zag: oscillate x, ascend y. Sits above the
-                # bottom-left corner running up along the y-axis line.
-                amp_x = (3.0 / 72.0) * fig.dpi / fig_w_px
-                half_y = (size / 2) / fig_h_px
-                y_mid = y_lo + half_y + (2.0 / 72.0) * fig.dpi / fig_h_px
-                ys = [
-                    y_mid - half_y,
-                    y_mid - half_y / 3,
-                    y_mid + half_y / 3,
-                    y_mid + half_y,
-                ]
-                xs = [x_fig - amp_x, x_fig + amp_x, x_fig - amp_x, x_fig + amp_x]
-            else:
-                # Legacy horizontal zig-zag on the bottom spine.
-                half = (size / 2) / fig_w_px
-                amp = 0.006  # vertical half-amplitude in figure coords
-                y_mid = y_lo + 0.002
-                xs = [x_fig - half, x_fig - half / 3, x_fig + half / 3, x_fig + half]
-                ys = [y_mid - amp, y_mid + amp, y_mid - amp, y_mid + amp]
+            # Rest just above the spine; but if the lowest label sits on the
+            # baseline (no room above), hang it just below the spine instead.
+            base = y_lo + gap + 0.7 * amp  # trough clears the spine by ``gap``
+            margin = 1.5 * pt / fig_h_px
+            if label_floor is not None and base + amp > label_floor - margin:
+                base = y_lo - gap - amp
+            xs, ys = _heartbeat_points(x_fig, base, half_w, amp)
 
             line = state["y_line"]
             if line is None:
@@ -314,8 +352,8 @@ def broken_axis(
                     xs,
                     ys,
                     transform=fig.transFigure,
-                    color=C_SPINE,
-                    linewidth=1.0,
+                    color=C_LABEL,
+                    linewidth=spine_lw,
                     solid_capstyle="round",
                     solid_joinstyle="round",
                     clip_on=False,
@@ -325,29 +363,14 @@ def broken_axis(
             else:
                 line.set_data(xs, ys)
 
-        # ---- x-axis squiggle (horizontal zig-zag sitting on the bottom spine) ----
+        # ---- x-axis break mark ----
+        # The same heartbeat, sitting on the bottom spine just right of the
+        # bottom-left corner, marking a truncated x-origin.
         if axis in ("x", "both"):
-            # Anchor on the data x-axis (left edge), then nudge right so it sits
-            # between the y-axis line and the leftmost data point.
-            x_lim = ax.get_xlim()
-            x_data_x = x_lim[0]
-            x_disp_x = ax.transData.transform((x_data_x, ax.get_ylim()[0]))[0]
-            x_fig_x = x_disp_x / fig_w_px
-            # Nudge right of the corner so it doesn't collide with the y-axis squiggle.
-            x_shift = (_CORNER_CLEAR_PT / 72.0) * fig.dpi / fig_w_px
-            x_fig_x += x_shift
-            # Horizontal zig-zag: vary x along the spine, oscillate y vertically.
-            half_x = (size / 2) / fig_w_px
-            # amp in y direction; convert points to figure-y fraction
-            amp_y = (3.0 / 72.0) * fig.dpi / fig_h_px
-            y_mid_x = y_lo
-            xs2 = [
-                x_fig_x - half_x,
-                x_fig_x - half_x / 3,
-                x_fig_x + half_x / 3,
-                x_fig_x + half_x,
-            ]
-            ys2 = [y_mid_x - amp_y, y_mid_x + amp_y, y_mid_x - amp_y, y_mid_x + amp_y]
+            x_data_x = ax.get_xlim()[0]
+            x_fig_x = ax.transData.transform((x_data_x, ax.get_ylim()[0]))[0] / fig_w_px
+            x_fig_x += (_CORNER_CLEAR_PT * pt) / fig_w_px  # clear the corner
+            xs2, ys2 = _heartbeat_points(x_fig_x, y_lo, half_w, amp)
             line2 = state["x_line"]
             if line2 is None:
                 line2 = plt.Line2D(
@@ -355,7 +378,7 @@ def broken_axis(
                     ys2,
                     transform=fig.transFigure,
                     color=C_SPINE,
-                    linewidth=1.0,
+                    linewidth=spine_lw,
                     solid_capstyle="round",
                     solid_joinstyle="round",
                     clip_on=False,

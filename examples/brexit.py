@@ -13,7 +13,7 @@ made opinion look erratic. The redesign:
   fitted by linear interpolation across time)
 * leaves at least 33% of the plot area free below the lowest data point
   (Francis Gagnon's rule for broken y-axes)
-* marks the broken baseline with the squiggle helper
+* marks the broken baseline with the heartbeat helper
 """
 
 import csv
@@ -81,7 +81,7 @@ ax.plot(xs_wrong, ys_wrong, color=PALETTE["red"], linewidth=2.0)
 # ≥33% headroom below the lowest data point.
 low = min(min(right), min(wrong))
 high = max(max(right), max(wrong))
-span = (high - low) / 0.62  # leave ~38% empty below the lowest dot
+span = (high - low) / (1 - 0.33)  # leave ~33% empty below the lowest dot
 ax.set_ylim(low - (span - (high - low)), high + 1)
 
 # Economist convention: full year for the leftmost tick, two-digit '%y for the rest.
@@ -100,7 +100,7 @@ ax.text(xs_right[-1] + 8, ys_right[-1], "Right", color=PALETTE["blue"],
 ax.text(xs_wrong[-1] + 8, ys_wrong[-1], "Wrong", color=PALETTE["red"],
         va="center", ha="left", fontsize=9, fontweight="medium")
 
-broken_axis(ax, axis="both")
+broken_axis(ax)
 
 finalize(
     ax,
