@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from graphs import (
     C_RED,
+    PALETTE,
     finalize,
     footnotes,
     save_chart,
@@ -43,7 +44,7 @@ SHARES = {
     2016: (13.2, 6.3), 2017: (13.6, 6.4), 2018: (15.0, 6.5), 2019: (15.8, 6.8),
 }
 
-C_LEFT = "#B2D0DC"  # pale blue sampled from the original
+C_LEFT = PALETTE["blue"]  # graph-design blue, paired with C_RED right wing
 
 years = list(SHARES)
 right = [SHARES[y][0] for y in years]

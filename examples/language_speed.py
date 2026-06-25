@@ -26,7 +26,9 @@ import numpy as np
 
 from graphs import (
     C_LABEL,
+    C_RED,
     C_SPINE,
+    PALETTE,
     direction_label,
     finalize,
     footnotes,
@@ -38,8 +40,8 @@ from graphs import (
 
 set_theme()
 
-RED_FILL = "#E92A36"   # vivid red sampled from the original
-BLUE_FILL = "#80AEC5"  # muted steel blue sampled from the original
+RED_FILL = C_RED  # graph-design accent red
+BLUE_FILL = PALETTE["blue"]  # graph-design blue
 
 # Real per-language means and standard deviations from Coupé et al.
 # (2019), computed from the authors' supplementary data (InfoRateData.csv):
