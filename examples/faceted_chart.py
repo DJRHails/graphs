@@ -17,12 +17,14 @@ from graphs import (
     C_RED,
     C_SPINE,
     ci_fill,
+    dark_zero_line,
     finalize,
     panel_label,
     right_axis,
     save_chart,
     set_theme,
     subplots,
+    y_labels_on_grid,
 )
 
 set_theme()
@@ -43,12 +45,14 @@ for ax, (panel_name, y) in zip(axes, panels.items()):
     ci = np.abs(np.random.randn(len(x))) * 0.025 + 0.01
     ci_fill(ax, x, y - ci, y + ci)
     ax.plot(x, y, color=C_RED, linewidth=2)
-    ax.axhline(0, color=C_SPINE, linewidth=0.8, zorder=3)
     ax.scatter([0], [0], color=C_SPINE, s=40, zorder=5)
 
     right_axis(ax)
     ax.yaxis.set_tick_params(pad=-2, labelsize=8.5)
     ax.set_ylim(-0.22, 0.22)
+    # Explicit ticks at 0.1 so "%.1f" doesn't collapse 0.05-spaced labels into
+    # duplicate strings (-0.2, -0.2, -0.1, -0.1, …).
+    ax.set_yticks([-0.2, -0.1, 0.0, 0.1, 0.2])
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
     ax.set_xlabel(
         "Years since cancer diagnosis (1980-2018)",
@@ -75,7 +79,12 @@ finalize(
     y_start=0.075,
 )
 
+# finalize only finishes the primary axes, so apply the per-panel conventions
+# (dark zero centreline under the data, on-grid y-labels with a baseline that
+# meets the gridlines) to every facet.
 for ax, panel_name in zip(axes, panels.keys()):
+    dark_zero_line(ax)
+    y_labels_on_grid(ax)
     panel_label(ax, panel_name)
 
 save_chart(__file__)
