@@ -134,6 +134,7 @@ finalize(
     title_x=0.02,
     y_start=0.17,
     autoscale_y=False,
+    zero_rule=False,  # y is latitude; the value baseline is the x=0 vertical
 )
 
 # finalize auto-layouts the left margin from the measured latitude labels

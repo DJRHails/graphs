@@ -51,6 +51,7 @@ from graphs._charts import (
     trend_line,
 )
 from graphs._finalize import (
+    dark_zero_line,
     finalize,
     footnotes,
     panel_label,
@@ -106,6 +107,7 @@ __all__ = [
     "subplots",
     "FORMATS",
     "finalize",
+    "dark_zero_line",
     "footnotes",
     "panel_label",
     "save_chart",

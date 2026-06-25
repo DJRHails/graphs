@@ -9,6 +9,7 @@ from typing import Iterable
 import matplotlib.font_manager as fm
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
+from matplotlib.transforms import offset_copy
 
 from graphs._fonts import _get_font
 
@@ -229,17 +230,18 @@ def inset_tick_labels(ax, *, axis: str = "x") -> None:
     labels[-1].set_ha("right")
 
 
-def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
+def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> None:
     """Sit y tick labels on top of gridlines that extend under them.
 
     Standard Economist daily-chart convention: each gridline continues past
     the axes edge into the label gutter, ending flush with the labels'
-    common outer edge; the label rests on its line (bottom-aligned, flush
-    with the line's outer end). Works on whichever side the labels sit —
-    right-side labels get rightward extensions, left-side labels leftward
-    (e.g. a latitude axis). The bottom tick's extension inherits the dark
-    spine / zero-rule stroke when it coincides with one, so "0" sits on
-    the rule.
+    common outer edge; the label rests just above its line. Works on
+    whichever side the labels sit — right-side labels get rightward
+    extensions, left-side labels leftward (e.g. a latitude axis). The bottom
+    tick's extension inherits the dark spine / zero-rule stroke when it
+    coincides with one, so "0" sits on the rule. When the floor is *not* a
+    gridded tick, the bottom baseline is itself extended into the gutter so
+    it ends flush with the gridlines rather than at the data edge.
 
     Call AFTER ``finalize()`` (labels and limits must be final). Native
     tick labels are replaced by figure-stable text artists; the series
@@ -250,6 +252,9 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
         ax: Axes styled with the theme's y labels (either side).
         pad_pt: Gap between the axes edge and the labels' near extent,
             in points.
+        label_lift_pt: Gap between a label's baseline and the gridline it
+            rests on, in points — a little breathing room so glyphs don't
+            touch the rule.
     """
     fig = ax.get_figure()
     fig.canvas.draw()
@@ -299,6 +304,8 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
     grid_by_loc = dict(zip(ax.get_yticks(), gridlines))
     bottom_spine = ax.spines["bottom"]
     trans = ax.get_yaxis_transform(which="grid")
+    # Lift labels a hair off their gridline so glyphs don't touch the rule.
+    label_trans = offset_copy(trans, fig=fig, y=label_lift_pt, units="points")
 
     for loc, label in ticks:
         # Stroke style: continue the gridline; at the axes floor, continue
@@ -333,7 +340,7 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
             edge_frac,
             loc,
             label.get_text(),
-            transform=trans,
+            transform=label_trans,
             ha=text_ha,
             va="bottom",
             fontsize=label.get_fontsize(),
@@ -342,6 +349,27 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0) -> None:
             gid="y-labels-on-grid",
         )
         text.set_clip_on(False)
+
+    # Extend the bottom baseline into the label gutter so it ends flush with
+    # the gridlines. When a tick sits on the floor its extension above already
+    # carries the dark baseline stroke, so only extend when the floor is bare.
+    floor_has_tick = any(
+        abs(loc - y_lo) <= 1e-9 * max(1.0, abs(y_hi - y_lo)) for loc, _ in ticks
+    )
+    if bottom_spine.get_visible() and not floor_has_tick:
+        ax.add_line(
+            plt.Line2D(
+                [near_frac, edge_frac],
+                [y_lo, y_lo],
+                transform=trans,
+                color=bottom_spine.get_edgecolor(),
+                linewidth=bottom_spine.get_linewidth(),
+                solid_capstyle="butt",
+                clip_on=False,
+                zorder=bottom_spine.get_zorder(),
+                gid="y-labels-on-grid",
+            )
+        )
 
     ax.tick_params(axis="y", labelright=False, labelleft=False)
 

@@ -95,12 +95,23 @@ Behaviour that's automatic unless you override it:
   added by the auto-wrap alone never trigger the styling.
 - **Numeric y labels sit on their gridlines** (`y_labels="on_grid"`,
   the `finalize()` default): each gridline extends into the label gutter
-  and ends flush with the labels' outer edge; the label rests on its
-  line, and the bottom tick inherits the dark baseline stroke. Applied
-  only when the axes has visible y gridlines, so categorical axes are
-  untouched; works on either side (e.g. a left latitude axis). Opt out
-  with `y_labels="ticks"`, or call `y_labels_on_grid(ax)` manually on
-  extra facet panels.
+  and ends flush with the labels' outer edge; the label rests just above
+  its line (a little breathing room so glyphs don't touch the rule), and
+  the bottom baseline extends into the gutter too — meeting the gridlines
+  rather than stopping at the data edge — whether or not the floor is a
+  tick. Applied only when the axes has visible y gridlines, so categorical
+  axes are untouched; works on either side (e.g. a left latitude axis).
+  Opt out with `y_labels="ticks"`, or call `y_labels_on_grid(ax)` manually
+  on extra facet panels.
+- **A dark zero centreline is automatic when the y-range straddles 0**
+  (`finalize` default; `zero_rule=True`): a strong `C_SPINE` rule on the
+  zero baseline the data crosses, kept *under* every data line (so lines
+  cross over it) and running the full gutter width so "0" sits on it.
+  Skipped when the caller already drew their own zero rule (e.g. a bar
+  chart's on-top `axhline(0)`). Set `zero_rule=False` for horizontal-value
+  charts whose y-axis is merely a coordinate spanning 0 (a latitude axis
+  through the equator). On a faceted figure call `dark_zero_line(ax)` per
+  panel — `finalize` only finishes the primary axes.
 - **Annotations default to 9pt** — `callout`, `highlight_label`,
   `direction_label`, `threshold_arrows` match direct-label size (the
   print spec's 7.5pt reads too small at daily-chart scale).
@@ -201,8 +212,12 @@ as a draft. The essentials:
 
 - **Title states the finding, not the topic** — "Eastern promise", not
   "GDP growth, 2010-2024". ≤50 characters, no units/dates/geography.
-- **Descriptor carries the meat in one breath**: subject, geography/scope,
-  period, units — `"United States, CPI, % year on year"`.
+- **Descriptor labels the y-axis in one breath**: name the measured
+  quantity and its units first, then geography/scope and period —
+  `"United States, CPI, % year on year"`. The title is usually a wink, so
+  the descriptor is where the metric gets named; a scope-only descriptor
+  (`"Selected European cities, 2025, log scale"`) only works when the title
+  is itself descriptive of the metric.
 - **Footnotes clarify specific words**, anchored by `*`/`†` markers placed
   in the title or descriptor (auto-superscripted).
 - **Source names the entity** (`Source:` / `Sources:`); synthetic or
@@ -243,7 +258,8 @@ Style overrides to apply on top:
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
 | `subplots(format="daily", *, height=None, **kwargs)`                | `plt.subplots` at a standard chart width — `"daily"` 4.6in / `"wide"` 7.0in; height is the per-chart choice. |
-| `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels. Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
+| `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, zero_rule=True, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels, and a dark zero centreline when the y-range straddles 0 (`zero_rule`). Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
+| `dark_zero_line(ax)`                                                | Dark `C_SPINE` rule on the zero baseline the data straddles, under the data lines. Auto-applied by `finalize`; call per panel on facets. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
@@ -435,3 +451,4 @@ data and story shapes the core helpers don't cover directly.
 - [`spending_convergence.py`](./examples/spending_convergence.py) — **Load when:** two lines converging or crossing, where the meaningful window forces a truncated y-axis that must be signalled, not hidden. Crossing line pair with the `broken_axis` squiggle beside the right tick column.
 - [`gold_rally.py`](./examples/gold_rally.py) — **Load when:** comparing returns over a sub-year window — rebased to 100 (as `index_chart.py`) but with dense daily data and month-resolution ticks. `index_marker` + month-letter ticks, direct line labels.
 - [`nuclear_warheads.py`](./examples/nuclear_warheads.py) — **Load when:** ranked totals per entity with an internal status breakdown, plus a forecast for one entity that must read as projection. Stacked `barh` inventories, top axis + `top_legend`, dashed forecast box.
+- [`european_warming.py`](./examples/european_warming.py) — **Load when:** many same-unit time series where one entity is the story and the rest are context — highlight two lines against a faded backdrop of the others, no legend. A wink title carried by a y-axis-labelling descriptor; direct labels on the two highlighted lines; real Berkeley Earth decadal anomalies.

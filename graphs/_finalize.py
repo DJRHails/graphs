@@ -909,6 +909,50 @@ def _superscript_axis_label(ax, axis: str) -> None:
     )
 
 
+def dark_zero_line(ax) -> None:
+    """Draw a strong dark rule on the zero baseline a chart's data straddles.
+
+    No-op unless the y-range strictly spans 0 *and* the axes has visible y
+    gridlines — a numeric value axis. Categorical axes (``bar_h`` rows,
+    thermometer categories) have their y grid off, so they never pick up a
+    spurious centreline even though their tick positions span 0.
+
+    Recolours the zero gridline (so its ``y_labels_on_grid`` gutter extension
+    inherits the dark stroke and "0" sits on a full-width rule) and keeps the
+    gridline's own ``axisbelow`` zorder, so the rule stays *under* every data
+    line. Falls back to an ``axhline`` when there are gridlines but none lands
+    on zero.
+
+    ``finalize`` calls this automatically (see its ``zero_rule`` argument).
+    Call it directly per panel on a faceted figure, where ``finalize`` only
+    finishes the primary axes.
+
+    Args:
+        ax: Axes whose zero baseline should carry the rule.
+    """
+    y_lo, y_hi = sorted(ax.get_ylim())
+    if not y_lo < 0.0 < y_hi:
+        return
+    gridlines = ax.get_ygridlines()
+    if not any(g.get_visible() for g in gridlines):
+        return  # categorical / grid-off y-axis: no zero centreline
+    span = max(1.0, y_hi - y_lo)
+    zero_grid = next(
+        (
+            g
+            for loc, g in zip(ax.get_yticks(), gridlines)
+            if abs(loc) <= 1e-9 * span and g.get_visible()
+        ),
+        None,
+    )
+    if zero_grid is not None:
+        # Keep the gridline's own (axisbelow) zorder so the rule stays under
+        # every data line, exactly like the lighter gridlines.
+        zero_grid.set(color=C_SPINE, linewidth=1.0)
+    else:
+        ax.axhline(0.0, color=C_SPINE, linewidth=1.0, zorder=0.5)
+
+
 def finalize(
     ax,
     title: str = "",
@@ -924,6 +968,7 @@ def finalize(
     y_labels: str = "on_grid",
     panel_labels: bool = False,
     auto_layout: bool = True,
+    zero_rule: bool = True,
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -993,6 +1038,12 @@ def finalize(
             auto ``hspace`` then reserves the rule-and-label height between
             rows so a heading can't collide with the row above it. Single-row
             grids ignore this (panel labels there sit in the top margin).
+        zero_rule: When the y-range straddles 0, draw a strong dark rule on
+            the zero baseline (a centreline the data crosses) unless the
+            caller already drew their own. Default ``True``. Set ``False`` for
+            horizontal-value charts whose y-axis is a coordinate that merely
+            spans 0 (e.g. a latitude axis through the equator), where the
+            value baseline is the vertical x=0 line instead.
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
@@ -1364,6 +1415,16 @@ def finalize(
     # the clearance calculation above.
     _superscript_axis_label(ax, "x")
     _superscript_axis_label(ax, "y")
+
+    # House default: a strong dark rule on a zero baseline the data straddles
+    # (a centreline). Skipped when the caller already drew their own zero rule,
+    # so manual ``axhline(0)`` charts don't double up.
+    has_zero_rule = any(
+        len(ln.get_ydata()) and all(abs(v) < 1e-12 for v in ln.get_ydata())
+        for ln in ax.lines
+    )
+    if zero_rule and not has_zero_rule:
+        dark_zero_line(ax)
 
     # House default: numeric y labels sit on gridlines that extend under
     # them. Gated on visible y gridlines so categorical axes (bar_h rows,
