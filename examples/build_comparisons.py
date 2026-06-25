@@ -86,6 +86,12 @@ CHARTS: dict[str, dict] = {
         "ref_caption": "Economist reference (chronological snapshot lines)",
         "replica_caption": "Our replica using the graphs skill",
     },
+    "european_warming": {
+        "local_ref": "_originals/european_warming.png",
+        "replica": "european_warming.png",
+        "ref_caption": "The Economist — original daily chart (Copernicus ERA5, to 2025)",
+        "replica_caption": "Our replica using the graphs skill (Berkeley Earth, to 2020)",
+    },
 }
 
 # Daily-chart replicas: references are per-chart cells cut from two grid
