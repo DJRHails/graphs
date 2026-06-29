@@ -71,11 +71,37 @@ row when they fit, wrapping when they don't — leave `source=` off
 so auto-layout reserves the bottom band for them. `save_chart` is the
 standard epilogue: tight bbox, 150 dpi, close, one-line confirmation.
 
+## Rules at a glance
+
+A 30-second pre-flight before you ship a chart. Each line links to its full
+treatment below; the ✗ is the mistake the rule prevents.
+
+- **The title/descriptor IS the y-axis label — leave `ax.set_ylabel("")`.**
+  Put the measured quantity + units in `finalize(descriptor=...)`, never in an
+  axis label. ✗ `ax.set_ylabel("share of attempts")`. (For a horizontal
+  Economist-style title above the axis use `y_axis_label(ax, ...)`, not
+  `set_ylabel`.) Exceptions: a `twinx()` secondary axis, or a coordinate plot
+  (ROC, scatter) where *both* axes are dimensions — there, label the axes.
+  → [Headline conventions](#headline-conventions)
+- **Title states the finding, ≤50 chars, no units/dates/geography.**
+  ✗ "GDP growth, 2010–2024" → ✓ "Eastern promise". → [Headline conventions](#headline-conventions)
+- **Descriptor names the quantity + units first**, then scope, then period:
+  `"United States, CPI, % year on year"`. ✗ scope-only ("Selected cities, 2025").
+- **Size with `subplots("daily"|"wide")`, never `figsize=`.** Fixed widths keep
+  a set consistent; ad-hoc widths make a gallery ragged.
+  → [Default conventions](#default-visual-conventions)
+- **Call `finalize(ax, title, descriptor, source)` last** — it auto-sizes every
+  margin, seats numeric y-labels on the grid, and draws the delta marker. Don't
+  hand-set `subplots_adjust` before it.
+- **Read the rendered PNG back** and check it tells its story at a glance, every
+  element earns its place, and it's the right chart type. → [Review](#review)
+
 ### Default visual conventions
 
 Behaviour that's automatic unless you override it:
 
-- **Charts come in two widths.** Create figures with
+- **Charts come in two widths — size with `subplots()`, never a raw
+  `figsize=`.** Create figures with
   `subplots("daily")` (4.6in column, portrait-leaning) or
   `subplots("wide")` (7.0in article format) — like a newspaper's column
   formats, the width is fixed by the medium and only the height is the
@@ -220,7 +246,12 @@ as a draft. The essentials:
   `"United States, CPI, % year on year"`. The title is usually a wink, so
   the descriptor is where the metric gets named; a scope-only descriptor
   (`"Selected European cities, 2025, log scale"`) only works when the title
-  is itself descriptive of the metric.
+  is itself descriptive of the metric. **Because the descriptor carries the
+  quantity, leave the matplotlib axis label empty (`ax.set_ylabel("")`); for a
+  horizontal Economist-style title above the axis use `y_axis_label(ax, ...)`,
+  never a hardcoded `ax.set_ylabel("text")`. The exception is a coordinate plot
+  (ROC, scatter) or a `twinx()` secondary axis, where an axis genuinely needs
+  its own label.** (Enforced by `enforcement/rules/no-hardcoded-ylabel.yml`.)
 - **Footnotes clarify specific words**, anchored by `*`/`†` markers placed
   in the title or descriptor (auto-superscripted).
 - **Source names the entity** (`Source:` / `Sources:`); synthetic or
@@ -341,6 +372,7 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `verify_layout(fig, *, tolerance=0.005)`                            | Warn when any text artist (tick labels, titles, legends, footnotes) extends past the figure bounds. Catches the class of bug where `savefig(bbox_inches="tight")` silently expands the saved canvas to fit overflow. Auto-called by `footnotes()`. |
+| `enforcement/rules/no-hardcoded-ylabel.yml`                               | ast-grep rule: flags a hardcoded non-empty `ax.set_ylabel(...)` (the descriptor should carry the quantity). Warning + a `# ast-grep-ignore: no-hardcoded-ylabel` escape for twin/coordinate axes. See [`enforcement/README.md`](./enforcement/README.md). |
 
 ## Workflow
 

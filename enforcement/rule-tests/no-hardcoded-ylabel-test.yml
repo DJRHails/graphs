@@ -1,0 +1,12 @@
+id: no-hardcoded-ylabel
+valid:
+  - ax.set_ylabel("")
+  - ax.set_ylabel('   ')
+  - ax.set_ylabel(label_var)
+  - axes[0].set_ylabel("")
+  - ax.set_ylabel("", fontsize=8)
+invalid:
+  - ax.set_ylabel("share of authoring attempts")
+  - ax.set_ylabel('monitor score (0-100)')
+  - ax.set_ylabel(f"score {model}")
+  - ax.set_ylabel("rate", labelpad=8)
