@@ -30,6 +30,18 @@ gets named. A descriptor that gives only scope and period — leaving the
 quantity itself unnamed — sends the reader hunting. This is the single
 most common descriptor failure.
 
+**In code, this means the matplotlib y-axis label stays empty.** The descriptor
+*is* the y-axis label, so do **not** call `ax.set_ylabel("the quantity")` —
+leave it `ax.set_ylabel("")` (or never set it) and name the quantity in
+`finalize(descriptor=...)`. The one sanctioned non-empty path is
+`graphs.y_axis_label(ax, text, unit=...)`, which renders a horizontal title
+*above* the axis in the house style. A hardcoded `set_ylabel("text")` either
+duplicates the descriptor or silently contradicts it, and rotates vertically
+against the Economist convention. The genuine exceptions — where an axis names a
+*coordinate*, not the single measured quantity — are a `twinx()` secondary axis
+and a coordinate plot (ROC: y = TPR, x = FPR; scatter): there, label both axes.
+*(Enforced by `enforcement/rules/no-hardcoded-ylabel.yml`.)*
+
 State, in order:
 
 - **Subject — the measured quantity** (what the y-axis *is*). The part a

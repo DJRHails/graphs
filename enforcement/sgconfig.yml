@@ -1,0 +1,12 @@
+# ast-grep config for the graph-design convention rules
+# (https://ast-grep.github.io/reference/sgconfig.html).
+#
+# The convention is the skill's, so its enforcement ships with the skill. A
+# consuming repo opts in by either (a) adding `enforcement/rules` to its own
+# sgconfig `ruleDirs:` when the skill is vendored/submoduled at a known path,
+# or (b) copying the single rule into its `.ast-grep/rules/`. This config exists
+# so `ast-grep test` runs against the rule-tests in the skill's own CI.
+ruleDirs:
+  - rules
+testConfigs:
+  - testDir: rule-tests

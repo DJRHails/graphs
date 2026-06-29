@@ -1,0 +1,58 @@
+id: no-hardcoded-ylabel
+snapshots:
+  ax.set_ylabel("rate", labelpad=8):
+    labels:
+    - source: ax.set_ylabel("rate", labelpad=8)
+      style: primary
+      start: 0
+      end: 33
+    - source: rate
+      style: secondary
+      start: 15
+      end: 19
+    - source: '"rate"'
+      style: secondary
+      start: 14
+      end: 20
+  ax.set_ylabel("share of authoring attempts"):
+    labels:
+    - source: ax.set_ylabel("share of authoring attempts")
+      style: primary
+      start: 0
+      end: 44
+    - source: share of authoring attempts
+      style: secondary
+      start: 15
+      end: 42
+    - source: '"share of authoring attempts"'
+      style: secondary
+      start: 14
+      end: 43
+  ax.set_ylabel('monitor score (0-100)'):
+    labels:
+    - source: ax.set_ylabel('monitor score (0-100)')
+      style: primary
+      start: 0
+      end: 38
+    - source: monitor score (0-100)
+      style: secondary
+      start: 15
+      end: 36
+    - source: '''monitor score (0-100)'''
+      style: secondary
+      start: 14
+      end: 37
+  ax.set_ylabel(f"score {model}"):
+    labels:
+    - source: ax.set_ylabel(f"score {model}")
+      style: primary
+      start: 0
+      end: 31
+    - source: 'score '
+      style: secondary
+      start: 16
+      end: 22
+    - source: f"score {model}"
+      style: secondary
+      start: 14
+      end: 30

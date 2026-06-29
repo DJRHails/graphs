@@ -1,0 +1,24 @@
+id: no-hardcoded-ylabel
+language: python
+severity: warning
+message: >-
+  The title/descriptor IS the y-axis label — leave ax.set_ylabel("") and name
+  the measured quantity + units in finalize(descriptor=...). For a horizontal
+  Economist-style axis title use graphs.y_axis_label(ax, ...) instead.
+note: >-
+  graph-design "Rules at a glance": the descriptor carries the y-axis quantity;
+  a hardcoded axis label duplicates (or contradicts) it and breaks the
+  title-stack convention. Legit exceptions the AST cannot see — a twinx()
+  secondary axis, a coordinate plot (ROC: y=TPR, x=FPR; scatter) whose axes are
+  dimensions, or a faceted panel whose label genuinely differs from the shared
+  descriptor — get a trailing `# ast-grep-ignore: no-hardcoded-ylabel`.
+url: https://github.com/DJRHails/graphs/blob/main/SKILL.md
+rule:
+  pattern: $AX.set_ylabel($$$ARGS)
+  has:
+    kind: string
+    stopBy: end
+    has:
+      kind: string_content
+      stopBy: end
+      regex: '\S'
