@@ -690,14 +690,43 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     return True
 
 
+def _estimate_note_rows(fig, notes: tuple[str, ...]) -> int:
+    """Worst-case wrapped row count for the note block (notes stacked above the source).
+
+    Mirrors ``footnotes()``'s own wrap: measure the single-line width, derive a per-character
+    pitch, and word-wrap to ~full figure width — the width notes get when they stack above the
+    source line. This lets the band reserve the *exact* depth a multi-line footnote needs, so the
+    caller never has to hand-pass ``footnote_lines``. Returns ``1`` if it cannot measure (no
+    renderer yet) — the historical single-row reservation.
+    """
+    notes_clean, _ = strip_links("  ".join(notes))
+    if not notes_clean:
+        return 1
+    try:
+        fp = fm.FontProperties(family=_get_font_condensed(), weight="light")
+        probe = fig.text(
+            0, 0, notes_clean, fontproperties=fp, fontsize=FOOTNOTE_SIZE_PT
+        )
+        bb = probe.get_window_extent(renderer=fig.canvas.get_renderer())
+        text_w = bb.width / (fig.get_figwidth() * fig.dpi)
+        probe.remove()
+    except Exception:
+        return 1
+    # max_width_frac (0.95) minus the x anchor (0.02): the width notes wrap to above the source.
+    avail_frac = 0.93
+    per_char = text_w / len(notes_clean) if notes_clean else 0.0
+    max_chars = int(avail_frac / per_char) if per_char > 0 else len(notes_clean)
+    return _wrap_preserve_offsets(notes_clean, max_chars).count("\n") + 1
+
+
 def _footnotes_band_depth(fig, notes: tuple[str, ...], source: str | None) -> float:
     """Reach below the lowest panel baseline of the source/notes band.
 
-    The band sits an x-tick band plus ``SOURCE_Y_OFFSET`` below the baseline,
-    then the source line itself, plus one extra line box per note row that has
-    to wrap above the source. A conservative single extra row covers the common
-    "notes stack above source" case (``footnotes`` re-measures the exact wrap
-    once the panels are high enough). Returns a figure-fraction depth.
+    The band sits an x-tick band plus ``SOURCE_Y_OFFSET`` below the baseline, then the source line
+    itself, plus one line box per note row that wraps above the source. The wrapped row count is
+    measured from the actual note text (:func:`_estimate_note_rows`), so a 2- or 3-line footnote
+    reserves its full depth automatically — callers do not pass ``footnote_lines``. Returns a
+    figure-fraction depth.
     """
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
@@ -712,9 +741,12 @@ def _footnotes_band_depth(fig, notes: tuple[str, ...], source: str | None) -> fl
 
     depth = band + SOURCE_Y_OFFSET + SOURCE_SIZE_PT * 1.2 * pt2fig
     if notes:
-        # Notes that can't pack on the source row wrap above it — reserve one
-        # line box plus the stack gap so the climbed-back block still clears.
-        depth += FOOTNOTES_STACK_GAP + FOOTNOTE_SIZE_PT * 1.2 * pt2fig
+        # Notes that can't pack on the source row wrap above it — reserve a line box per wrapped
+        # row (measured, not a conservative single row) plus the stack gap so the block clears.
+        depth += (
+            FOOTNOTES_STACK_GAP
+            + FOOTNOTE_SIZE_PT * 1.2 * pt2fig * _estimate_note_rows(fig, notes)
+        )
     return depth
 
 
@@ -778,10 +810,7 @@ def _compute_auto_pads(
 
     stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
     top_pad = (
-        y_start
-        + top_legend_band
-        + stack_pt * pt2fig
-        + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
+        y_start + top_legend_band + stack_pt * pt2fig + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
     )
 
     # Reserve the measured height of the bottom x-tick labels (category names
@@ -1254,9 +1283,7 @@ def finalize(
         legend_h = top_legend_band - legend_gap
         anchor_fig_y = y_cursor + legend_h
         anchor_axes_y = (anchor_fig_y - bbox.y0) / bbox.height
-        blended = mtransforms.blended_transform_factory(
-            fig.transFigure, ax.transAxes
-        )
+        blended = mtransforms.blended_transform_factory(fig.transFigure, ax.transAxes)
         top_legend.set_bbox_to_anchor((spec.x, anchor_axes_y), transform=blended)
         y_cursor += top_legend_band
 
