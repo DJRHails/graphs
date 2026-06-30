@@ -27,7 +27,13 @@ _CATEGORY_CEILING = 4
 
 
 def ci_fill(ax, x, y_lower, y_upper, *, color: str | None = None, alpha: float = 0.20):
-    """Fill a confidence-interval band.
+    """Fill a confidence-interval band — how a line plot shows uncertainty.
+
+    This is the convention for uncertainty on a connected series over a
+    continuous/ordinal x (a sweep, trend, or depth curve): a translucent band,
+    not per-point ``errorbar`` whiskers (which clutter a trend and fight the eye
+    once two lines overlap). Reserve whiskers for categorical estimates — bars
+    and dot plots, where there is no line to fill beneath.
 
     By default uses the Economist salmon (#f5c5b8) at full opacity — the
     legacy behaviour, fine for charts with a single series. When a colour is

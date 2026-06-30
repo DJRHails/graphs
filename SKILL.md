@@ -95,6 +95,13 @@ treatment below; the ✗ is the mistake the rule prevents.
   hand-set `subplots_adjust` before it.
 - **Read the rendered PNG back** and check it tells its story at a glance, every
   element earns its place, and it's the right chart type. → [Review](#review)
+- **Line plots show uncertainty as a `ci_fill` band, never error-bar whiskers.**
+  A connected series over a continuous/ordinal x (a sweep, a trend, a depth
+  curve) gets a translucent band via `ci_fill(ax, x, lo, hi, color=line_col)`,
+  not per-point `errorbar(yerr=…)` caps. ✗ `ax.errorbar(x, y, yerr=…)` for a
+  trend → ✓ `ax.plot(x, y, color=c); ci_fill(ax, x, lo, hi, color=c)`. Whiskers
+  belong on **categorical** comparisons (bars, dot plots) where there's no line
+  to fill under. → [Uncertainty bands](#default-visual-conventions)
 
 ### Default visual conventions
 
@@ -148,6 +155,18 @@ Behaviour that's automatic unless you override it:
   render as superscripts anywhere they appear in titles, descriptors,
   source lines, or footnote bodies — write plain text, the renderer
   handles the typography.
+- **Uncertainty on a line is a filled band, not whiskers.** For a connected
+  series over a continuous or ordinal x — a sweep, a trend, a depth/budget curve
+  — draw the confidence interval as a translucent `ci_fill(ax, x, lo, hi,
+  color=line_col)` band behind the line (step 3 of [Build](#build), so it sits
+  under the data), passing the line's own colour so the band reads as *its*
+  range. Per-point `errorbar(yerr=…)` caps clutter a trend, fight the eye across
+  the series, and break down once two lines overlap; a band shows trend and
+  range together. Reserve error-bar whiskers for **categorical** estimates —
+  bars and dot plots, where there is no line to fill beneath and each point is
+  an independent comparison (a binomial proportion's Wilson CI on a bar stays a
+  whisker). `ci_fill` defaults to the Economist salmon for a single series; pass
+  `color=` per line on a multi-series chart so each band matches its line.
 - **Frameless legends are default** for both `smart_legend()` and
   `top_legend()`. Boxed legends are opt-in.
 - **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
@@ -330,7 +349,7 @@ Style overrides to apply on top:
 | `scatter_category(ax, x, y)`                                        | Bubble dot, 50% fill + 0.3px stroke for overlap.       |
 | `trend_line(ax, x, y)`                                              | Dashed 1px trend line.                                 |
 | `smoothed_line(ax, x, y, *, color)`                                 | Three-layer scatter + CI band + smoothed line.         |
-| `ci_fill(ax, x, lo, hi, *, color=None)`                             | CI band. Salmon by default; pass colour to match line. |
+| `ci_fill(ax, x, lo, hi, *, color=None)`                             | CI band for a line — **the way to show uncertainty on a sweep/trend, not `errorbar` whiskers.** Salmon by default; pass the line colour to match. |
 
 ### Annotations
 
