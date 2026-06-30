@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -45,16 +44,26 @@ def smart_legend(
     ax,
     *,
     pad: float = 0.02,
-    prefer: tuple[str, ...] = ("upper right", "upper left", "lower right", "lower left"),
+    prefer: tuple[str, ...] = (
+        "upper right",
+        "upper left",
+        "lower right",
+        "lower left",
+    ),
     fontsize: int = 9,
     frame: bool = False,
     **legend_kwargs,
 ):
-    """Place a legend in the emptiest corner of the axes.
+    """Place a legend in the emptiest corner of the axes, or above it if none is clear.
 
-    Inspects every artist on `ax` (lines, bars, error-bars, scatter, fills),
-    samples their occupied pixel bboxes, and picks the corner of the axes that
-    has the most empty space for a legend roughly sized to fit the entries.
+    Rasterises the actual data "ink" (filled bars/areas mark every cell they cover; thin
+    lines / error-bar whiskers / scatter mark only the cells their geometry crosses) onto a coarse
+    occupancy grid, then picks the corner whose candidate legend box covers the fewest occupied
+    cells. This is faithful where a bounding-box-area score is not — a full-width whisker or a long
+    bar no longer ties every corner. When **no** corner is clear of the data, it falls back to a
+    frameless :func:`top_legend` above the axes (which reserves its own y-space via ``finalize``)
+    rather than dropping the legend on top of the data — so call ``smart_legend`` *before*
+    ``finalize`` for the fallback to claim its band.
 
     Args:
         pad: Fractional inset from the axes edge (data area).
@@ -62,10 +71,11 @@ def smart_legend(
         fontsize: Legend text size.
         frame: Opt-in boxed legend. Default False (frameless). Boxed legends
             are discouraged — prefer frameless or direct labels.
-        **legend_kwargs: Forwarded to ax.legend (e.g. title, ncol).
+        **legend_kwargs: Forwarded to ax.legend (e.g. title, ncol). Dropped on the
+            top-legend fallback, which takes none of the corner-specific options.
 
     Returns:
-        The matplotlib Legend object.
+        The matplotlib Legend object (a corner legend, or the top-legend fallback).
     """
     fig = ax.get_figure()
     try:
@@ -95,30 +105,82 @@ def smart_legend(
 
     ax_bbox = ax.get_window_extent(renderer=renderer)
 
-    # Gather artist bboxes that count as "data ink" we should avoid.
-    artist_bboxes = []
-    for art in (
-        list(ax.lines)
-        + list(ax.patches)
-        + list(ax.collections)
-        + list(ax.containers)
-    ):
-        # ErrorbarContainer / BarContainer aren't artists themselves but iterate.
-        if hasattr(art, "get_window_extent"):
-            try:
-                bb = art.get_window_extent(renderer=renderer)
-                if bb.width > 0 and bb.height > 0:
-                    artist_bboxes.append(bb)
-            except Exception:
-                pass
-        elif hasattr(art, "__iter__"):
-            for sub in art:
-                try:
-                    bb = sub.get_window_extent(renderer=renderer)
-                    if bb.width > 0 and bb.height > 0:
-                        artist_bboxes.append(bb)
-                except Exception:
-                    pass
+    # Build a coarse occupancy grid of the actual data "ink", then score each corner by how many
+    # occupied cells a candidate legend box would cover. This is faithful where summing artist
+    # bounding boxes is not: a sparse, wide artist — an errorbar-whisker LineCollection, a long bar
+    # series — has a bbox spanning most of the axes, so a bbox-area score ties every corner and
+    # collapses the choice to prefer[0] (landing the legend on top of a long bar). Filled patches
+    # mark every cell they cover; thin lines / collections mark only the cells their geometry
+    # actually crosses, so an empty corner reads as empty even next to a full-width whisker.
+    n_cells = 48
+    grid_x0, grid_y0 = ax_bbox.x0, ax_bbox.y0
+    grid_w = ax_bbox.width or 1.0
+    grid_h = ax_bbox.height or 1.0
+    occupied: set[tuple[int, int]] = set()
+
+    def _cell(px: float, py: float) -> tuple[int, int]:
+        cx = min(n_cells - 1, max(0, int((px - grid_x0) / grid_w * n_cells)))
+        cy = min(n_cells - 1, max(0, int((py - grid_y0) / grid_h * n_cells)))
+        return cx, cy
+
+    def _mark_filled(bb) -> None:
+        cx0, cy0 = _cell(bb.x0, bb.y0)
+        cx1, cy1 = _cell(bb.x1, bb.y1)
+        for cx in range(min(cx0, cx1), max(cx0, cx1) + 1):
+            for cy in range(min(cy0, cy1), max(cy0, cy1) + 1):
+                occupied.add((cx, cy))
+
+    def _mark_points(points) -> None:
+        for px, py in points:
+            occupied.add(_cell(px, py))
+
+    step_px = max(1.0, min(grid_w / n_cells, grid_h / n_cells))
+
+    def _mark_polyline(pixel_pts) -> None:
+        # Walk each segment at ~one-cell resolution so a long sparse line marks every cell it
+        # crosses, not just its vertices (a 2-point line would otherwise mark only its endpoints).
+        pts = [(float(px), float(py)) for px, py in pixel_pts]
+        if not pts:
+            return
+        if len(pts) == 1:
+            occupied.add(_cell(*pts[0]))
+            return
+        for (x0p, y0p), (x1p, y1p) in zip(pts, pts[1:]):
+            steps = min(256, max(1, int(max(abs(x1p - x0p), abs(y1p - y0p)) / step_px)))
+            for s in range(steps + 1):
+                t = s / steps
+                occupied.add(_cell(x0p + (x1p - x0p) * t, y0p + (y1p - y0p) * t))
+
+    # Bars / filled areas are solid: mark every cell they cover.
+    for patch in ax.patches:
+        try:
+            bb = patch.get_window_extent(renderer=renderer)
+            if bb.width > 0 and bb.height > 0:
+                _mark_filled(bb)
+        except Exception:
+            pass
+    # Thin lines: mark every cell the path crosses.
+    for line in ax.lines:
+        try:
+            xy = line.get_xydata()
+            if len(xy):
+                _mark_polyline(ax.transData.transform(xy))
+        except Exception:
+            pass
+    # Scatter offsets + LineCollection segments (whiskers): thin geometry, not their bbox.
+    for col in ax.collections:
+        try:
+            offsets = col.get_offsets()
+            if offsets is not None and len(offsets):
+                _mark_points(col.get_offset_transform().transform(offsets))
+        except Exception:
+            pass
+        try:
+            for segment in col.get_segments():
+                if len(segment):
+                    _mark_polyline(ax.transData.transform(segment))
+        except Exception:
+            pass
 
     def overlap_score(corner: str) -> float:
         ax_x, ax_y = _CORNERS[corner]
@@ -136,23 +198,26 @@ def smart_legend(
             y0 = ax_bbox.y0 + pad * ax_bbox.height
             y1 = y0 + leg_h_px
 
-        score = 0.0
-        for bb in artist_bboxes:
-            ox = max(0, min(x1, bb.x1) - max(x0, bb.x0))
-            oy = max(0, min(y1, bb.y1) - max(y0, bb.y0))
-            score += ox * oy
-        return score
+        c0x, c0y = _cell(x0, y0)
+        c1x, c1y = _cell(x1, y1)
+        return float(
+            sum(
+                (cx, cy) in occupied
+                for cx in range(min(c0x, c1x), max(c0x, c1x) + 1)
+                for cy in range(min(c0y, c1y), max(c0y, c1y) + 1)
+            )
+        )
 
     scored = [(overlap_score(c), prefer.index(c), c) for c in prefer]
     scored.sort()  # lowest overlap wins; tie-break by user preference order
     best = scored[0][2]
     if scored[0][0] > 0:
-        warnings.warn(
-            f"graphs.smart_legend: best corner {best!r} still overlaps "
-            "data. Consider tightening axes limits or moving the legend "
-            "outside the axes with bbox_to_anchor.",
-            stacklevel=2,
-        )
+        # No corner is clear of the data — rather than drop the legend on top of it, anchor a
+        # frameless legend above the axes. top_legend stashes a spec that finalize reads to reserve
+        # the band (the extra y-space), so this only gains its room when smart_legend is called
+        # before finalize (the documented order). Corner-specific legend_kwargs (e.g. a corner loc)
+        # don't apply to a top legend and are dropped.
+        return top_legend(fig, handles, labels, fontsize=fontsize)
 
     leg = ax.legend(
         handles,
@@ -229,7 +294,9 @@ def top_legend(
         raise ValueError(f"align must be 'left' or 'right', got {align!r}")
     auto_y = y is None
     if auto_y:
-        ref = anchor_to if anchor_to is not None else (fig.axes[0] if fig.axes else None)
+        ref = (
+            anchor_to if anchor_to is not None else (fig.axes[0] if fig.axes else None)
+        )
         if ref is None:
             y = 0.82
         else:
