@@ -967,6 +967,13 @@ def dark_zero_line(ax, *, skip_axhline: bool = False) -> None:
     y_lo, y_hi = sorted(ax.get_ylim())
     if not y_lo < 0.0 < y_hi:
         return
+    # A tiny dip below zero from cosmetic ylim padding (e.g. ``set_ylim(-0.01, ...)``
+    # on an all-non-negative chart, for breathing room under the baseline) is not a
+    # genuine straddle. Ruling zero there recolours the 0-gridline dark on top of the
+    # black bottom spine — a doubled baseline. Only rule zero when a real negative
+    # y-tick is present (genuine +/- data), not merely a padded y-limit.
+    if not any(loc < -1e-9 * (y_hi - y_lo) for loc in ax.get_yticks() if y_lo <= loc <= y_hi):
+        return
     gridlines = ax.get_ygridlines()
     if not any(g.get_visible() for g in gridlines):
         return  # categorical / grid-off y-axis: no zero centreline
