@@ -8,7 +8,7 @@ description: >
   typography, titles/descriptors/sources, annotation conventions and chart-type
   selection. Not for non-matplotlib charting (d3, plotly, spreadsheets).
 license: MIT
-version: 0.6.0
+version: 0.6.4
 author: Daniel Hails <graphs@hails.info>
 tags: [matplotlib, seaborn, data-visualisation, charts, economist]
 metadata:
