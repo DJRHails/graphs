@@ -761,6 +761,7 @@ def _compute_auto_pads(
     y_start: float,
     footnote_lines: int,
     top_legend_band: float = 0.0,
+    top_panel_label_band: float = 0.0,
 ) -> tuple[float, float]:
     """Compute (top_pad, bottom_pad) for ``fig.subplots_adjust``.
 
@@ -769,7 +770,11 @@ def _compute_auto_pads(
     overhang, ``y_start`` padding, plus a small breathing margin). When an
     auto-positioned ``top_legend`` is present, ``top_legend_band`` (its measured
     height plus a gap, in figure fraction) is added so the title-stack drops
-    enough to clear the legend row that sits between it and the axes.
+    enough to clear the legend row that sits between it and the axes. When the
+    top row carries ``panel_label`` headings (``top_panel_label_band`` > 0, set
+    by ``panel_labels=True``), that band is reserved too so the rule-and-label
+    heading — which ``panel_label`` draws *above* the axes top — sits in the top
+    margin rather than colliding with the axes or an overlying top legend.
 
     Bottom pad reserves room for the source line at its true depth below the
     axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
@@ -810,7 +815,11 @@ def _compute_auto_pads(
 
     stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
     top_pad = (
-        y_start + top_legend_band + stack_pt * pt2fig + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
+        y_start
+        + top_legend_band
+        + top_panel_label_band
+        + stack_pt * pt2fig
+        + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
     )
 
     # Reserve the measured height of the bottom x-tick labels (category names
@@ -1074,11 +1083,12 @@ def finalize(
             gridlines that extend under them (``y_labels_on_grid``); applied
             only when the axes has visible y gridlines, so categorical
             charts are unaffected. ``"ticks"`` keeps native tick labels.
-        panel_labels: Set ``True`` when a multi-row faceted layout adds a
-            ``panel_label`` heading to each panel *after* ``finalize`` — the
-            auto ``hspace`` then reserves the rule-and-label height between
-            rows so a heading can't collide with the row above it. Single-row
-            grids ignore this (panel labels there sit in the top margin).
+        panel_labels: Set ``True`` when a faceted layout adds a ``panel_label``
+            heading to each panel *after* ``finalize``. The top margin then
+            reserves the rule-and-label band above the top row (so the heading
+            can't collide with the axes below or an auto ``top_legend`` above —
+            the stack becomes legend → panel label → axes), and on a multi-row
+            grid the auto ``hspace`` reserves the same height between rows.
         zero_rule: When the y-range straddles 0, draw a strong dark rule on
             the zero baseline (a centreline the data crosses) unless the
             caller already drew their own. Default ``True``. Set ``False`` for
@@ -1190,6 +1200,17 @@ def finalize(
         if legend_h:
             top_legend_band = legend_h + legend_gap
 
+    # A top-row ``panel_label`` (rule + bold heading, drawn *above* the axes top
+    # after ``finalize``) needs its own band in the top margin, or it lands on
+    # the axes / an overlying top legend. ``panel_labels=True`` is the caller's
+    # signal that they'll add these headings; reserve the same rule-and-label
+    # height the inter-row ``hspace`` uses. Single-row and multi-row grids alike
+    # gain it — every row's panel label draws above its own axes top, and the
+    # top row's is the one that eats the top margin.
+    top_panel_label_band = (
+        AUTO_LAYOUT_PANEL_LABEL_PT / 72.0 / fig_h_in if panel_labels else 0.0
+    )
+
     # Auto-layout always runs — size every margin and the inter-panel spacing
     # from the renderer. Top/bottom fit the title-stack and source band;
     # left/right are measured from the actual y-axis text; wspace/hspace size a
@@ -1204,6 +1225,7 @@ def finalize(
         y_start=y_start,
         footnote_lines=footnote_lines,
         top_legend_band=top_legend_band,
+        top_panel_label_band=top_panel_label_band,
     )
     left, right = _compute_side_margins(fig)
     adjust_kwargs = {
@@ -1270,6 +1292,13 @@ def finalize(
             y_cursor = highest_fig_y + TOP_TICK_CLEARANCE_PT * pt2fig
     except Exception:
         pass
+
+    # A top-row ``panel_label`` occupies the band immediately above the axes top
+    # (rule + bold heading, drawn after ``finalize``). Advance the title-stack
+    # cursor past its reserved band so everything above — an auto top legend, the
+    # descriptor, the title — seats above the heading instead of on top of it.
+    if top_panel_label_band > 0.0:
+        y_cursor = max(y_cursor, bbox.y1 + top_panel_label_band)
 
     # Place an auto top_legend in the reserved band: its bottom sits at the
     # current title-stack base (just above the axes / top-mounted ticks), so it

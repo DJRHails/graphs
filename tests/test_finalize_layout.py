@@ -545,3 +545,92 @@ def test_no_top_legend_leaves_top_margin_unchanged():
     plt.close(fig_b)
 
     assert top_a == pytest.approx(top_b, abs=1e-9)
+
+
+def test_panel_labels_reserve_top_band():
+    """``panel_labels=True`` drops the top row's axes to make room for the heading.
+
+    The top-row ``panel_label`` (rule + bold heading) draws *above* the axes
+    top; without a reserved band it lands in the top margin, on the axes or an
+    overlying legend. The band drops the top-row axes vs. the same chart with
+    ``panel_labels=False``.
+    """
+    fig_off, axes_off = plt.subplots(1, 2, figsize=(7.0, 3.9))
+    for ax in axes_off:
+        ax.plot([0, 1, 2], [0, 1, 0])
+    finalize(axes_off[0], title="T", descriptor="D", source="S", title_x=0.04)
+    top_off = axes_off[0].get_position().y1
+    plt.close(fig_off)
+
+    fig_on, axes_on = plt.subplots(1, 2, figsize=(7.0, 3.9))
+    for ax in axes_on:
+        ax.plot([0, 1, 2], [0, 1, 0])
+    finalize(
+        axes_on[0], title="T", descriptor="D", source="S", title_x=0.04, panel_labels=True
+    )
+    top_on = axes_on[0].get_position().y1
+    plt.close(fig_on)
+
+    assert top_on < top_off, (
+        f"panel_labels=True should drop the top-row axes ({top_on:.4f}) "
+        f"below the plain layout ({top_off:.4f})"
+    )
+
+
+def test_top_legend_clears_top_row_panel_labels():
+    """Auto top_legend + top-row panel_labels stack cleanly: legend → label → axes.
+
+    The reference case for the merged faceted FP figure. With both an auto
+    ``top_legend`` (shared colour key) and per-panel ``panel_label`` headings,
+    the legend must sit above every heading and each heading above its axes —
+    no artist lands on the data or on a neighbour.
+    """
+    import numpy as np
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.9), sharey=True)
+    xs = np.array([1, 2, 4, 8])
+    for ax in axes:
+        (a,) = ax.plot(xs, [0.1, 0.2, 0.3, 0.4], label="on")
+        (b,) = ax.plot(xs, [0.1, 0.1, 0.2, 0.3], label="off")
+        ax.set_ylim(0, 0.6)
+        ax.set_ylabel("")
+    top_legend(fig, [a, b], ["on", "off"], x=0.07, ncol=2)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        finalize(
+            axes[0],
+            title="A faceted chart with a shared key and panel headings",
+            descriptor="A descriptor\n% of traffic",
+            source="Source: test",
+            title_x=0.07,
+            y_axis_right=False,
+            panel_labels=True,
+        )
+        for ax, name in zip(axes, ["Panel A", "Panel B"]):
+            panel_label(ax, name)
+        verify_layout_mod = __import__(
+            "graphs._finalize", fromlist=["verify_layout"]
+        ).verify_layout
+        verify_layout_mod(fig)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    leg = fig.legends[0].get_window_extent(renderer=renderer).transformed(inv)
+    label_texts = [t for t in fig.texts if t.get_text() in ("Panel A", "Panel B")]
+    label_bbs = [
+        t.get_window_extent(renderer=renderer).transformed(inv) for t in label_texts
+    ]
+    axes_top = max(ax.get_position().y1 for ax in axes)
+
+    # Legend above every panel-label heading.
+    assert leg.y0 > max(bb.y1 for bb in label_bbs), (
+        f"legend bottom {leg.y0:.4f} dips into the panel-label band"
+    )
+    # Each heading above the axes it belongs to.
+    assert min(bb.y0 for bb in label_bbs) >= axes_top - 0.01, (
+        f"panel label bottom {min(bb.y0 for bb in label_bbs):.4f} sits on the axes"
+    )
+    overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
+    assert not overflow, f"verify_layout flagged an overflow: {overflow}"
+    plt.close(fig)
