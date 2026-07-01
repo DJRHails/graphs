@@ -634,3 +634,83 @@ def test_top_legend_clears_top_row_panel_labels():
     overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
     assert not overflow, f"verify_layout flagged an overflow: {overflow}"
     plt.close(fig)
+
+
+def _stacked_rows(fig, *, below: float = 0.30):
+    """Bottom-band text rows as ``(y0, y1, text)``, ordered bottom-to-top."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    rows = []
+    for t in fig.texts:
+        if not t.get_text().strip():
+            continue
+        bb = t.get_window_extent(renderer=renderer).transformed(inv)
+        if bb.y1 < below:
+            rows.append((bb.y0, bb.y1, t.get_text()))
+    return sorted(rows)
+
+
+def test_stacked_footnotes_one_row_per_note():
+    """``footnotes(stack=True)`` renders each note on its own line plus a source row.
+
+    Three short definitions plus a source line must land as four distinct,
+    non-overlapping rows in the bottom band — the case the touchstone
+    ``_stacked_mode_footnote`` workaround hand-rolled. Bottom-to-top the source
+    is lowest and each note sits one line box above the previous, so no two
+    rows share a baseline.
+    """
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xlim(0.5, 3.5)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xlabel("an x-axis label the footnote stack must clear")
+    notes = ("alpha: first definition", "beta: second definition", "gamma: third definition")
+    finalize(ax, title="T", descriptor="D", source="", footnote_lines=len(notes) + 1)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        footnotes(fig, *notes, source="Source: test", stack=True, check_anchors=False)
+
+    rows = _stacked_rows(fig)
+    assert len(rows) == len(notes) + 1, (
+        f"expected {len(notes) + 1} stacked rows, got {len(rows)}: {[r[2] for r in rows]}"
+    )
+    # The lowest row is the source; every other row is a distinct note.
+    assert rows[0][2].startswith("Source"), f"bottom row should be the source, got {rows[0][2]!r}"
+    # Each row sits strictly above the one below it (no shared baseline / overlap).
+    for lower, upper in zip(rows, rows[1:]):
+        assert upper[0] >= lower[1] - 1e-3, (
+            f"row {upper[2]!r} (y0={upper[0]:.4f}) overlaps row {lower[2]!r} (y1={lower[1]:.4f})"
+        )
+    overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
+    assert not overflow, f"verify_layout flagged an overflow: {overflow}"
+    plt.close(fig)
+
+
+def test_stacked_footnotes_clear_the_xlabel():
+    """The stacked block sits entirely below the x-axis label — no collision.
+
+    ``footnotes(stack=True)`` anchors its bottom-most row below the lowest
+    x-tick label / xlabel; every stacked row (including the top-most note) must
+    stay under the xlabel's bottom edge so the definitions never overwrite it.
+    """
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xlim(0.5, 3.5)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xlabel("an x-axis label the footnote stack must clear")
+    notes = ("alpha: first", "beta: second", "gamma: third")
+    finalize(ax, title="T", descriptor="D", source="", footnote_lines=len(notes) + 1)
+    footnotes(fig, *notes, source="Source: test", stack=True, check_anchors=False)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    xlabel_y0 = ax.xaxis.label.get_window_extent(renderer=renderer).transformed(inv).y0
+    rows = _stacked_rows(fig)
+    highest_row_top = max(r[1] for r in rows)
+    assert highest_row_top <= xlabel_y0 + 1e-3, (
+        f"top stacked row (y1={highest_row_top:.4f}) collides with the xlabel "
+        f"(y0={xlabel_y0:.4f})"
+    )
+    plt.close(fig)

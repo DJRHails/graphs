@@ -2002,6 +2002,104 @@ def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
                 break
 
 
+def _bottom_band_top(fig) -> float:
+    """Top of the bottom band — just under the lowest x-tick label / xlabel.
+
+    Mirrors the ``base_y0`` computation the packed/legacy ``footnotes`` paths
+    use: start at the lowest panel baseline, then drop below any x-tick labels
+    and the xlabel so a footnote row can't overlap them. Returns a figure-y
+    fraction; the stacked layout anchors its bottom-most row a
+    ``SOURCE_Y_OFFSET`` below this.
+    """
+    axes_y0 = [a.get_position().y0 for a in fig.axes]
+    base_y0 = min(axes_y0) if axes_y0 else 0.10
+    try:
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        return base_y0
+    inv = fig.transFigure.inverted()
+    lowest = base_y0
+    for a in fig.axes:
+        xlabel = a.xaxis.label
+        if xlabel.get_text():
+            lowest = min(lowest, xlabel.get_window_extent(renderer=renderer).transformed(inv).y0)
+        for tl in a.get_xticklabels():
+            if not tl.get_text() or not tl.get_visible():
+                continue
+            lowest = min(lowest, tl.get_window_extent(renderer=renderer).transformed(inv).y0)
+    return lowest
+
+
+def _stack_footnotes(
+    fig,
+    notes: tuple[str, ...],
+    source: str | None,
+    *,
+    x: float,
+    y: float | None,
+    max_width_frac: float,
+    wrap: bool,
+    verify: bool,
+) -> None:
+    """Render each note on its own line, source on the bottom row, stacked downward.
+
+    ``footnotes(..., stack=True)`` path: a multi-line footnote where each
+    ``note`` is a distinct entry (a definition line, a caveat) that must read
+    as its own row rather than a dense inline run — plus the ``source`` line on
+    the bottom-most row. The block anchors its *top* row a ``FOOTNOTES_STACK_GAP``
+    below the x-tick / xlabel band and descends one line box per row, so the
+    whole stack sits clear of the axis label and each row clear of the next.
+    Each row still word-wraps to the chart width (``wrap``), so a long
+    definition that overflows one line adds its own continuation rows (and
+    pushes the rows below it further down within the reserved band).
+
+    Reserve the band up front with ``finalize(footnote_lines=len(notes) + 1)``
+    (one row per note plus the source line) so the auto-layout drops the axes
+    baseline enough to hold the whole stack.
+    """
+    fig.canvas.draw()
+    rows = [strip_links(n) for n in notes]
+    if source is not None:
+        rows.append(strip_links(source))
+
+    fp = fm.FontProperties(family=_get_font_condensed(), weight="light")
+    line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
+    avail_frac = max(0.0, min(max_width_frac, 1.0) - x)
+
+    band_top = _bottom_band_top(fig)
+    # Anchor the TOP row just below the x-tick/xlabel band, then descend — the
+    # whole stack stays under the axis label. An explicit ``y`` is honoured as
+    # the top row's top.
+    top_row_y = y if y is not None else band_top - FOOTNOTES_STACK_GAP
+
+    # Top-to-bottom: the first row (a note) sits highest; the source (last row)
+    # is lowest. Wrap each row first so a row that wraps to k lines advances the
+    # cursor by k line boxes, keeping the row below it clear.
+    row_top = top_row_y
+    for text, urls in rows:
+        text_w = _text_width_fig(fig, text, fp) if text else 0.0
+        per_char = text_w / len(text) if text else 0.0
+        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
+        wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
+        n_lines = wrapped.count("\n") + 1
+        render_text_with_superscripts(
+            fig,
+            x,
+            row_top,
+            wrapped,
+            fontsize=FOOTNOTE_SIZE_PT,
+            fontproperties=fp,
+            color=C_SOURCE,
+            va="top",
+            ha="left",
+            url_spans=urls,
+        )
+        row_top -= n_lines * line_h
+
+    if verify:
+        verify_layout(fig)
+
+
 def footnotes(
     fig,
     *notes: str,
@@ -2010,6 +2108,7 @@ def footnotes(
     x: float = 0.02,
     max_width_frac: float = 0.95,
     wrap: bool = True,
+    stack: bool = False,
     check_anchors: bool = True,
     verify: bool = True,
 ) -> None:
@@ -2018,8 +2117,15 @@ def footnotes(
     Joins ``notes`` with two spaces and renders them in IBM Plex Sans
     Condensed at the source line's size (9pt, ``C_SOURCE``).
 
-    Behaviour depends on whether ``source`` is provided:
+    Behaviour depends on ``stack`` and whether ``source`` is provided:
 
+    * **``stack=True``**: each ``note`` renders on its OWN line, stacked
+      upward, with the ``source`` line on the bottom-most row — the whole
+      block sits below the x-tick labels / xlabel, every row clear of the axis
+      label and of each other. Use for a multi-line footnote whose entries are
+      distinct (a set of term definitions, a list of caveats) rather than one
+      flowing run. Reserve the band with ``finalize(footnote_lines=len(notes)
+      + 1)`` and pass ``source=""`` to ``finalize`` so it draws no source line.
     * **No ``source``** (legacy mode): notes render at ``y`` (defaulting to
       ``min(axes.y0) - 0.045`` — just above the source line drawn by
       ``finalize``). Caller must still pass ``source=...`` to ``finalize``
@@ -2045,6 +2151,9 @@ def footnotes(
         wrap: When True (default), word-wrap notes that overflow one row
             (offset-preserving, so URL spans and superscript markers stay
             valid). Disable for fixed-width legacy layouts.
+        stack: When True, render each ``note`` on its own line (plus the
+            ``source`` line on the bottom row) instead of joining them into
+            one flowing block. See the ``stack=True`` bullet above.
         check_anchors: When True (default), warn if any footnote's leading
             marker (``*``, ``†``, ``‡``, ``§``) isn't found in the title,
             descriptor, axis labels, or any in-chart text.
@@ -2056,6 +2165,19 @@ def footnotes(
         return
     if check_anchors:
         _check_footnote_anchors(fig, notes)
+
+    if stack:
+        _stack_footnotes(
+            fig,
+            notes,
+            source,
+            x=x,
+            y=y,
+            max_width_frac=max_width_frac,
+            wrap=wrap,
+            verify=verify,
+        )
+        return
 
     fig.canvas.draw()
 
