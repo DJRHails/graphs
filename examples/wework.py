@@ -53,7 +53,7 @@ fig, axes = subplots("daily", height=4.7, nrows=4)
 # Pre-size the panel band (wide left margin) so value_label's data-unit pad is
 # computed against roughly the final axes width; finalize re-applies the auto
 # outer margins, and the bespoke margins are restored after it (below).
-fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
+fig.subplots_adjust(top=0.76, bottom=0.165, left=0.245, right=0.945, hspace=0.38)
 
 
 def value_label(ax, value: float, text: str, y: float, span: float) -> None:
@@ -117,7 +117,7 @@ finalize(
 # finalize can't measure them: there are no y-tick labels to widen the left
 # from, and the value labels don't exist yet when the right is measured. Pin
 # the bespoke wide-left band + hspace so those post-finalize artists land right.
-fig.subplots_adjust(top=0.76, bottom=0.12, left=0.245, right=0.945, hspace=0.38)
+fig.subplots_adjust(top=0.76, bottom=0.165, left=0.245, right=0.945, hspace=0.38)
 
 # Category labels sit on the pale band, which extends left of each bar pair.
 BAND_X0 = 0.02  # flush with the title's left edge
@@ -158,7 +158,6 @@ footnotes(
     "†Latest",
     "‡Estimate",
     source="Sources: Bloomberg; company reports",
-    max_width_frac=0.6,  # force the notes onto their own row above the source
 )
 
 save_chart(__file__)

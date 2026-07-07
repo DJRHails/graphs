@@ -117,3 +117,20 @@ def test_orphan_warning_still_fires_without_any_anchor():
         footnotes(fig, "*A note with no referent on the chart.")
     orphan = [w for w in caught if "no matching anchor" in str(w.message)]
     assert orphan
+
+
+def test_figure_legend_anchor_silences_orphan_warning():
+    """A marker anchored only by a figure-level ``fig.legend`` entry is no orphan.
+
+    ``check_anchors`` scans ``fig.legends`` as well as each axes' own legend —
+    a bare ``fig.legend(...)`` label like ``"decline†"`` anchors ``†`` notes.
+    """
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    (line,) = ax.plot([1, 2], [0.6, 0.4], label="decline†")
+    fig.legend(handles=[line], loc="upper right")
+    finalize(ax, title="T", descriptor="D")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        footnotes(fig, "†Definition of the starred decline.")
+    orphan = [w for w in caught if "no matching anchor" in str(w.message)]
+    assert not orphan, [str(w.message) for w in orphan]

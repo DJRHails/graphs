@@ -714,3 +714,121 @@ def test_stacked_footnotes_clear_the_xlabel():
         f"(y0={xlabel_y0:.4f})"
     )
     plt.close(fig)
+
+
+def _bottom_row_geometry(fig):
+    """Bottom-band rows as ``(y0, x0, text)`` rounded for cross-figure comparison."""
+    return [(round(y0, 4), round(x0, 4), text) for y0, _, text, x0 in _stacked_rows_x(fig)]
+
+
+def _stacked_rows_x(fig, *, below: float = 0.30):
+    """Like :func:`_stacked_rows` but carrying each row's left edge too."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    rows = []
+    for t in fig.texts:
+        if not t.get_text().strip():
+            continue
+        bb = t.get_window_extent(renderer=renderer).transformed(inv)
+        if bb.y1 < below:
+            rows.append((bb.y0, bb.y1, t.get_text(), bb.x0))
+    return sorted(rows)
+
+
+def _footnoted_fig(*notes, source="Source: test", **footnote_kwargs):
+    """A single-panel chart with ``footnotes(*notes, source=...)`` applied."""
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xticks([1, 2, 3])
+    finalize(ax, title="T", descriptor="D", source="")
+    footnotes(fig, *notes, source=source, check_anchors=False, **footnote_kwargs)
+    return fig
+
+
+def test_auto_stack_multi_note_matches_explicit_stack():
+    """``stack`` unset with two notes renders the stacked layout, not the packed row.
+
+    The auto default must be indistinguishable from ``stack=True`` — same rows
+    at the same positions — and must NOT reproduce the packed layout.
+    """
+    notes = ("*first definition", "†second definition")
+    auto = _bottom_row_geometry(_footnoted_fig(*notes))
+    forced = _bottom_row_geometry(_footnoted_fig(*notes, stack=True))
+    packed = _bottom_row_geometry(_footnoted_fig(*notes, stack=False))
+    assert auto == forced, f"auto != stack=True:\n{auto}\nvs\n{forced}"
+    assert auto != packed, "auto default reproduced the packed layout for two notes"
+    plt.close("all")
+
+
+def test_auto_stack_single_short_note_stays_packed():
+    """A single note that fits on the source row keeps the packed one-row layout.
+
+    The Economist age-gap pattern — note right-aligned on the source row — is
+    the one case pack mode earns; the auto default must leave it byte-similar
+    to ``stack=False``.
+    """
+    note = "*short note"
+    auto = _bottom_row_geometry(_footnoted_fig(note))
+    packed = _bottom_row_geometry(_footnoted_fig(note, stack=False))
+    forced = _bottom_row_geometry(_footnoted_fig(note, stack=True))
+    assert auto == packed, f"auto != stack=False:\n{auto}\nvs\n{packed}"
+    assert auto != forced, "a single short note should not auto-stack"
+    # Packed means one shared row: note and source at the same baseline band.
+    (src_y0, _, _), (note_y0, _, _) = sorted(auto)[:2]
+    assert abs(src_y0 - note_y0) < 5e-3, f"note not packed on the source row: {auto}"
+    plt.close("all")
+
+
+def test_auto_stack_single_wrapping_note_stacks():
+    """A single note too long for one row auto-picks the stacked layout."""
+    note = (
+        "*a very long definition that cannot possibly fit on a single footnote row "
+        "because it keeps going and going, spelling out the whole condition with an "
+        "example where one helps, e.g. 0-10 means eleven levels and 1-5 means five"
+    )
+    auto = _bottom_row_geometry(_footnoted_fig(note))
+    forced = _bottom_row_geometry(_footnoted_fig(note, stack=True))
+    assert auto == forced, f"auto != stack=True:\n{auto}\nvs\n{forced}"
+    plt.close("all")
+
+
+def test_stacked_wrapped_notes_grow_bottom_band():
+    """Long stacked notes never overflow — no ``footnote_lines``, no ``stack`` needed.
+
+    The regression: three ~180-char notes wrap to ~2 rows each, but the band
+    reservation counted one row per note, pushing the source line off the
+    bottom edge. ``footnotes()`` must measure the wrapped rows itself and grow
+    the bottom margin, with the caller passing nothing.
+    """
+    from graphs import subplots
+
+    long_notes = tuple(
+        f"{marker}{body}"
+        for marker, body in [
+            ("*", "first regime: the monitor answers the harm question on every "
+                  "transcript with no abstain option, so borderline benign "
+                  "transcripts get pushed over the flagging threshold anyway"),
+            ("†", "second regime: the monitor emits a calibrated probability and "
+                  "a deployment-tuned threshold converts it into a flag, which "
+                  "absorbs most of the borderline mass before human review"),
+            ("‡", "third category: transcripts whose surface features match a "
+                  "harm taxonomy entry but whose full context shows no policy "
+                  "violation on a careful reading of the whole exchange"),
+        ]
+    )
+    fig, axes = subplots("wide", height=4.0, ncols=2, sharey=True)
+    for ax in axes:
+        ax.bar([0, 1], [3, 5], 0.6)
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels(["Forced", "Calibrated"])
+    finalize(axes[0], title="T", descriptor="D", source="")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        footnotes(fig, *long_notes, source="Source: test", check_anchors=False)
+    overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
+    assert not overflow, f"stacked notes overflowed the bottom band: {overflow}"
+    # The block really is stacked: three notes + source, one text block per row.
+    rows = _stacked_rows(fig)
+    assert rows[0][2].startswith("Source"), f"bottom row should be the source: {rows}"
+    plt.close(fig)

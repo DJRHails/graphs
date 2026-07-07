@@ -123,12 +123,11 @@ finalize(
     ax_left,
     title="Fit as a butcher's dog",
     descriptor=_descriptor,
-    source="",  # owned by footnotes() below so notes can pack alongside it
+    source="",  # owned by footnotes() below, which stacks the notes above it
     y_axis_right=False,
     title_x=0.02,
     y_start=0.035,
     autoscale_y=False,
-    footnote_lines=1,  # notes pack alongside source line
 )
 
 _draw_axis_titles(fig, ax_left)
