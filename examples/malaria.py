@@ -134,10 +134,9 @@ finalize(
     source="",
     y_axis_right=True,
     autoscale_y=False,
-    footnote_lines=2,
 )
 # At the 4.6in daily width, source + notes can never share a row, so the
-# stacked footer (notes above the source line) happens naturally.
+# stacked footer (one note per row above the source line) happens naturally.
 footnotes(
     fig,
     "*Global Technical Strategy for Malaria 2016-30",

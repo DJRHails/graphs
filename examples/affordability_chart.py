@@ -86,7 +86,6 @@ finalize(
     title_x=0.02,
     autoscale_y=False,
     y_start=0.050,  # clear the top-mounted x-tick labels at the 4.6in width
-    footnote_lines=2,
 )
 
 threshold_arrows(

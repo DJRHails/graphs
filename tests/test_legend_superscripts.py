@@ -124,11 +124,12 @@ def test_figure_legend_anchor_silences_orphan_warning():
 
     ``check_anchors`` scans ``fig.legends`` as well as each axes' own legend —
     a bare ``fig.legend(...)`` label like ``"decline†"`` anchors ``†`` notes.
+    No ``finalize`` here on purpose: its superscript pass copies legend marker
+    chunks into ``fig.texts``, which would mask a regressed legend scan.
     """
     fig, ax = plt.subplots(figsize=(5.0, 3.4))
     (line,) = ax.plot([1, 2], [0.6, 0.4], label="decline†")
     fig.legend(handles=[line], loc="upper right")
-    finalize(ax, title="T", descriptor="D")
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         footnotes(fig, "†Definition of the starred decline.")

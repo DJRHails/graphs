@@ -100,7 +100,6 @@ finalize(
     y_axis_right=True,
     y_start=0.085,  # leave room for the "Mothers" panel heading
     autoscale_y=False,
-    footnote_lines=3,
 )
 # finalize auto-layouts the right margin from the measured right-hand y-tick
 # labels, so they fit on this narrow figure — no manual subplots_adjust needed.
