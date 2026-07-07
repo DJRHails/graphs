@@ -85,10 +85,21 @@ treatment below; the ✗ is the mistake the rule prevents.
   pass `finalize(..., allow_ylabel=True)`. `finalize()` **raises** on a
   non-empty y-label (the ast-grep rule catches it too), so this isn't a style
   nicety you can skip. → [Headline conventions](#headline-conventions)
-- **Title states the finding, ≤50 chars, no units/dates/geography.**
-  ✗ "GDP growth, 2010–2024" → ✓ "Eastern promise". → [Headline conventions](#headline-conventions)
-- **Descriptor names the quantity + units first**, then scope, then period:
-  `"United States, CPI, % year on year"`. ✗ scope-only ("Selected cities, 2025").
+- **Title states one plain claim, quantified, no wink.** ✗ "Outclassing the
+  guardians" → ✓ "Claude Opus 4.8 outscores the specialised guard models";
+  ✗ "a few categories" → ✓ "9 categories". If the intervals can't back a
+  claim, title the question instead. → [Headline conventions](#headline-conventions)
+- **Descriptor names the quantity + axis mapping, one sentence — nothing else.**
+  ✗ "…F1, n=543; official protocol, CoT mode, temperature 0.6" →
+  ✓ "DynaBench policy-violation F1 (FAIL = violation)". Model, conditions →
+  footnotes; N → source; empty is correct when an on-chart label carries the
+  metric (name it exactly once).
+- **Never caption statistics machinery.** Draw whiskers and `ci_fill` bands;
+  "95% Wilson CI" / "bootstrap CI band" never appears in figure text.
+  ✗ footnote "Whiskers: 95% Wilson CI on the total rate".
+- **Source = `Source: <dataset> (N=…); <script>`** — dataset named by entity,
+  its computed N attached, generating script last. ✗ a bare
+  `crossfire_correlates.py`. → [Headline conventions](#headline-conventions)
 - **Size with `subplots("daily"|"wide")`, never `figsize=`.** Fixed widths keep
   a set consistent; ad-hoc widths make a gallery ragged.
   → [Default conventions](#default-visual-conventions)
@@ -256,31 +267,44 @@ Rules the helpers were built to enforce. When in doubt, satisfy the most.
 
 ## Headline conventions
 
-The three strings passed to `finalize(title=, descriptor=, source=)` carry
-distinct jobs — get them wrong and a technically correct chart still reads
-as a draft. The essentials:
+The strings passed to `finalize(title=, descriptor=, source=)` and
+`footnotes(...)` form an inverted pyramid — each row answers the reader's
+next question, and every fact sits on the lowest row that still serves it.
+Get them wrong and a technically correct chart still reads as a draft.
+The essentials:
 
-- **Title states the finding, not the topic** — "Eastern promise", not
-  "GDP growth, 2010-2024". ≤50 characters, no units/dates/geography.
-- **Descriptor labels the y-axis in one breath**: name the measured
-  quantity and its units first, then geography/scope and period —
-  `"United States, CPI, % year on year"`. The title is usually a wink, so
-  the descriptor is where the metric gets named; a scope-only descriptor
-  (`"Selected European cities, 2025, log scale"`) only works when the title
-  is itself descriptive of the metric. **Because the descriptor carries the
-  quantity, leave the matplotlib axis label empty (`ax.set_ylabel("")`); for a
-  horizontal Economist-style title above the axis use `y_axis_label(ax, ...)`,
-  never a hardcoded `ax.set_ylabel("text")`. The exception is a coordinate plot
-  (ROC, scatter) or a `twinx()` secondary axis, where an axis genuinely needs
-  its own label — there, pass `finalize(..., allow_ylabel=True)` to opt out.**
+- **Title: one plain claim the chart can defend** — "Claude Opus 4.8
+  outscores the specialised guard models", not "Outclassing the guardians".
+  Quantify what the chart quantifies ("9 categories", "96% of
+  cross-fires*"); star coined terms and define them in a footnote, or
+  rewrite them away; match claim strength to the drawn evidence (weak
+  intervals → title the *question*). Don't write winks — an existing wink
+  survives only if it decodes on sight into the exact mechanism ("Marking
+  your own homework" for self-review); the replica gallery keeps its
+  Economist winks, research figures don't get new ones.
+- **Descriptor: the measured quantity + axis mapping, one sentence — or
+  empty when an on-chart label already names the metric** (name it exactly
+  once). Model ids, protocol knobs and condition tags go to footnotes;
+  sample sizes go to the source line; anything the legend already says is
+  cut. **Because the descriptor carries the quantity, leave the matplotlib
+  axis label empty (`ax.set_ylabel("")`); for a horizontal Economist-style
+  title above the axis use `y_axis_label(ax, ...)`, never a hardcoded
+  `ax.set_ylabel("text")`. The exception is a coordinate plot (ROC,
+  scatter) or a `twinx()` secondary axis, where an axis genuinely needs its
+  own label — there, pass `finalize(..., allow_ylabel=True)` to opt out.**
   (Enforced two ways: `finalize()` **raises `ValueError`** on a non-empty
-  y-label at runtime, and `enforcement/rules/no-hardcoded-ylabel.yml` flags it
-  at lint time.)
-- **Footnotes clarify specific words**, anchored by `*`/`†` markers placed
-  in the title or descriptor (auto-superscripted).
-- **Source names the entity** (`Source:` / `Sources:`); synthetic or
-  experimental data cites the generating file. Markdown links survive into
-  SVG/PDF output.
+  y-label at runtime, and `enforcement/rules/no-hardcoded-ylabel.yml` flags
+  it at lint time.)
+- **Footnotes: starred definitions first, then conditions.** Each coined
+  term gets `*term: plain-words definition` with a concrete example; anchor
+  the star wherever the reader meets the term (title, descriptor, legend
+  entry, panel label). Conditions + model follow, blank-line separated,
+  with every count computed ("unparseable outputs (N=0) scored wrong").
+  Never: CI/whisker mechanics, epistemic status tags, project-internal
+  commentary.
+- **Source: `Source: <dataset> (N=…); <script>`** — dataset named by
+  entity with its computed N attached, generating script last, `Sources:`
+  for several. Markdown links survive into SVG/PDF output.
 
 Read [references/headline-conventions.md](./references/headline-conventions.md)
 before writing the strings for a publishable chart — it carries the worked
@@ -428,8 +452,9 @@ For each rendered figure, answer three questions before moving on:
 1. **Does the chart tell its intended story at a glance?**
    If the reader needs body text to know what to look at, the title is
    doing too little. Re-read the title — does it state the *finding*, or
-   only the topic? "Eastern promise" tells you what to see; "GDP growth,
-   2010–2024" doesn't. Iterate until the title carries the story alone.
+   only the topic? "Claude Opus 4.8 outscores the specialised guard
+   models" tells you what to see; "GDP growth, 2010–2024" doesn't.
+   Iterate until the title carries the story alone.
 
 2. **Is every element earning its place?**
    Bars at the rounding-noise threshold, legends that duplicate direct

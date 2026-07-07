@@ -1,0 +1,92 @@
+id: no-ci-machinery-in-text
+snapshots:
+  ? |
+    finalize(ax, descriptor="shaded: 90% confidence interval band")
+  : labels:
+    - source: 'shaded: 90% confidence interval band'
+      style: primary
+      start: 25
+      end: 61
+    - source: finalize
+      style: secondary
+      start: 0
+      end: 8
+    - source: 'finalize(ax, descriptor="shaded: 90% confidence interval band")'
+      style: secondary
+      start: 0
+      end: 63
+  ? |
+    finalize(ax, title="t", descriptor="AUROC re-binned to k levels (95% bootstrap CI band)")
+  : labels:
+    - source: AUROC re-binned to k levels (95% bootstrap CI band)
+      style: primary
+      start: 36
+      end: 87
+    - source: finalize
+      style: secondary
+      start: 0
+      end: 8
+    - source: finalize(ax, title="t", descriptor="AUROC re-binned to k levels (95% bootstrap CI band)")
+      style: secondary
+      start: 0
+      end: 89
+  ? |
+    footnotes(fig, "Error bars: 99% CIs per category", source="s.py")
+  : labels:
+    - source: 'Error bars: 99% CIs per category'
+      style: primary
+      start: 16
+      end: 48
+    - source: footnotes
+      style: secondary
+      start: 0
+      end: 9
+    - source: 'footnotes(fig, "Error bars: 99% CIs per category", source="s.py")'
+      style: secondary
+      start: 0
+      end: 65
+  ? |
+    footnotes(fig, "Whiskers: 95% Wilson CI on the total over-fire rate", source="s.py")
+  : labels:
+    - source: 'Whiskers: 95% Wilson CI on the total over-fire rate'
+      style: primary
+      start: 16
+      end: 67
+    - source: footnotes
+      style: secondary
+      start: 0
+      end: 9
+    - source: 'footnotes(fig, "Whiskers: 95% Wilson CI on the total over-fire rate", source="s.py")'
+      style: secondary
+      start: 0
+      end: 84
+  ? |
+    graphs.finalize(ax, descriptor="Opus-4.8 forced probes; fire >= 50; N=240 smushes; 95% Wilson")
+  : labels:
+    - source: Opus-4.8 forced probes; fire >= 50; N=240 smushes; 95% Wilson
+      style: primary
+      start: 32
+      end: 93
+    - source: graphs.finalize
+      style: secondary
+      start: 0
+      end: 15
+    - source: graphs.finalize(ax, descriptor="Opus-4.8 forced probes; fire >= 50; N=240 smushes; 95% Wilson")
+      style: secondary
+      start: 0
+      end: 95
+  ? |
+    graphs.footnotes(fig, source="Source: patches, n=24/class, 95% bootstrap CI. After Khullar et al. (2026)")
+  : labels:
+    - source: 'Source: patches, n=24/class, 95% bootstrap CI. After Khullar et al. (2026)'
+      style: primary
+      start: 30
+      end: 104
+    - source: graphs.footnotes
+      style: secondary
+      start: 0
+      end: 16
+    - source: 'graphs.footnotes(fig, source="Source: patches, n=24/class, 95% bootstrap CI. After Khullar et al. (2026)")'
+      style: secondary
+      start: 0
+      end: 106

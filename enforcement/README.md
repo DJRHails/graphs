@@ -22,10 +22,19 @@ they cover what a regex can't.
   `# ast-grep-ignore: no-hardcoded-ylabel` with the reason (the runtime twin
   opts out with `finalize(..., allow_ylabel=True)`).
 
+- **`rules/no-ci-machinery-in-text.yml`** — flags "Wilson" / "bootstrap" /
+  "NN% CI(s)" / "confidence interval" / "whisker" inside any string passed to
+  `finalize()` or `footnotes()`. Statistics machinery appears in ink only
+  ([Headline conventions](../references/headline-conventions.md)): draw the
+  whiskers and `ci_fill` bands, never caption them. Scoped to those two calls,
+  so computing helpers (`wilson_ci(...)`, bootstrap functions) are untouched.
+  `severity: warning` while existing charts are swept; escalate to `error`
+  once a consuming repo is clean.
+
 ## Using it in a consuming repo
 
 Either (a) add this dir to your `sgconfig.yml` `ruleDirs:` when the skill is
-vendored/submoduled at a known path, or (b) copy the single rule file into your
+vendored/submoduled at a known path, or (b) copy the rule files into your
 own `.ast-grep/rules/`. Run via `ast-grep scan` under pre-commit / CI. Keep one
 canonical source — don't re-derive the rule (the `string_content` match is
 non-obvious, and the naive `regex: '\S'` on the whole `string` node over-fires
