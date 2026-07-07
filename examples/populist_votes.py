@@ -64,8 +64,7 @@ finalize(
     ax,
     title="How Europe’s populists are changing",
     descriptor="Europe, aggregated populist votes*, %",
-    source="",  # owned by footnotes() below so the note packs alongside it
-    footnote_lines=3,  # note row + blank spacer row above the source
+    source="",  # owned by footnotes() below, which stacks the note above it
 )
 top_legend(fig, [bars_left, bars_right], ["Left wing", "Right wing"], fontsize=9)
 footnotes(

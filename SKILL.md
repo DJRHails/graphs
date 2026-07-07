@@ -8,7 +8,7 @@ description: >
   typography, titles/descriptors/sources, annotation conventions and chart-type
   selection. Not for non-matplotlib charting (d3, plotly, spreadsheets).
 license: MIT
-version: 0.7.0
+version: 0.9.0
 author: Daniel Hails <graphs@hails.info>
 tags: [matplotlib, seaborn, data-visualisation, charts, economist]
 metadata:
@@ -52,7 +52,6 @@ finalize(
     ax,
     title="Cooling off",
     descriptor="Headline CPI*, % change on a year earlier, monthly",
-    footnote_lines=1,  # reserve room for the footnote row drawn below
 )
 footnotes(
     fig,
@@ -65,11 +64,12 @@ save_chart(__file__)  # writes quick.png beside the script
 ```
 
 Save to `quick.py` and run; the output sits next to it. `finalize()`
-auto-sizes margins, and `footnotes()` packs the note and source onto one
-row when they fit, wrapping when they don't — leave `source=` off
-`finalize()` so they belong to the same line, and pass `footnote_lines=`
-so auto-layout reserves the bottom band for them. `save_chart` is the
-standard epilogue: tight bbox, 150 dpi, close, one-line confirmation.
+auto-sizes margins, and `footnotes()` sizes its own bottom band: a single
+short note packs on the source row, while several notes (or a note that
+would word-wrap) stack as one definition per row above the source — leave
+`source=` off `finalize()` so `footnotes()` owns the whole block.
+`save_chart` is the standard epilogue: tight bbox, 150 dpi, close,
+one-line confirmation.
 
 ## Rules at a glance
 
@@ -202,10 +202,17 @@ Behaviour that's automatic unless you override it:
   charts no longer need to. Don't restore `top=` after finalize — it anchors
   the title to its own auto top, so overriding `top` detaches the title; raise
   `y_start` instead to reserve more headroom.
+- **Multi-note footnotes stack by default.** `footnotes(stack=None)` (the
+  default) renders more than one note — or a single note that would
+  word-wrap — as a term-definition stack: one row per note, source on the
+  bottom row, and the bottom band grows to fit the measured rows, wrapped
+  continuation lines included (no `finalize(footnote_lines=)` needed on
+  single-row figures; a multi-row grid still reserves up front with it). A
+  single short note keeps the packed note-beside-source row (the Economist
+  age-gap pattern). Force either layout with `stack=True` / `stack=False`.
 - **Long footnotes word-wrap automatically.** `footnotes(wrap=True)` is the
-  default — overflowing notes break to multiple lines that stack above the
-  source line, and the chart shifts up to reserve room. No need to hand-
-  break with `\n`.
+  default — an overflowing row breaks to continuation lines, and the chart
+  shifts up to reserve room. No need to hand-break with `\n`.
 - **Orphan footnote markers warn.** `footnotes(check_anchors=True)` (default)
   raises a `UserWarning` when a note starts with `*` / `†` / `‡` / `§`
   that isn't found in the title, descriptor, axis labels, legend entries,
@@ -351,7 +358,7 @@ Style overrides to apply on top:
 | `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, zero_rule=True, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels, and a dark zero centreline when the y-range straddles 0 (`zero_rule`). Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
 | `dark_zero_line(ax)`                                                | Dark `C_SPINE` rule on the zero baseline the data straddles, under the data lines. Auto-applied by `finalize`; call per panel on facets. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
-| `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor/legend (`check_anchors=True`). |
+| `footnotes(fig, *notes, source=None, wrap=True, stack=None, check_anchors=True)` | Footnote strip + optional source line. `stack=None` (default) auto-picks the layout: several notes — or one that would word-wrap — stack one row per note with the source on the bottom row, and the bottom band self-sizes to the measured rows; a single short note packs beside the source. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long rows word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor/axis labels/legend entries (axes or figure-level)/in-chart text (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. Call BEFORE `finalize` — it reserves a band under the descriptor and re-anchors the label to the final axes top, so a tall title stack never overlaps it. |
 | `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
@@ -506,7 +513,7 @@ pattern.
 - [`line_chart.py`](./examples/line_chart.py) — **Load when:** noisy point estimates over time with uncertainty — the reader should see trend and range, not individual points. `smoothed_line` (scatter + CI band + trend), custom `_LineBandHandler` legend, `year_axis(set_locator=False)`.
 - [`bump_chart.py`](./examples/bump_chart.py) — **Load when:** the story is rank changes over time in a large field, with only a few entities highlighted against a faded backdrop. `bump_chart` with `highlight=`, `colors=`, `right_labels=True`, `x_labels_top=True`, `max_rank` cropping; real data via `_data.py`.
 - [`corbyn.py`](./examples/corbyn.py) — **Load when:** ranked bars where one dominant value tempts you to truncate the scale (don't — show it whole), or specific row labels need bold/italic emphasis. `bar_h` + `style_labels(italic=, bold=)`.
-- [`dogs.py`](./examples/dogs.py) — **Load when:** two different units genuinely must share one panel and the twin axes have to be honest — both ranges sized so 1% of the midpoint spans equal distance. `color_axis(spine=False, ticks=False)`, manual series titles via `render_text_with_superscripts`, `footnotes(source=)` packing two notes.
+- [`dogs.py`](./examples/dogs.py) — **Load when:** two different units genuinely must share one panel and the twin axes have to be honest — both ranges sized so 1% of the midpoint spans equal distance. `color_axis(spine=False, ticks=False)`, manual series titles via `render_text_with_superscripts`, a two-note `footnotes(source=)` definition stack.
 - [`brexit.py`](./examples/brexit.py) — **Load when:** irregular poll/survey readings over time — connecting the dots would look erratic, so show points plus a smoothed trend on a truncated axis. `scatter_standard` + Savitzky-Golay smoothing, manual year ticks + `year_axis(set_locator=False)`, `inset_tick_labels`, `broken_axis(side="right")`.
 - [`us_trade.py`](./examples/us_trade.py) — **Load when:** two related time series with incompatible units or baselines tempt you toward a double axis — split into stacked `sharex` panels instead. `panel_label`, `right_axis`, `inset_tick_labels`, source via `footnotes(source=)`.
 - [`pensions.py`](./examples/pensions.py) — **Load when:** a scatter where labelled points need emphasis but a second colour would falsely read as a category — use opacity within one hue. Same-hue dots with opacity-for-emphasis, italic average label via `FontProperties`, `y_axis_label(unit=)`.

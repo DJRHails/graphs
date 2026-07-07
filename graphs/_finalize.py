@@ -1289,8 +1289,10 @@ def finalize(
             ``"none"`` skips the marker entirely.
         footnote_lines: Extra lines of ``footnotes()`` text below the chart.
             Auto-layout reserves an additional ~7pt-line per footnote row so
-            wrapped notes don't clip. Pass the count when calling
-            ``footnotes(fig, ...)`` after ``finalize`` with multi-line notes.
+            wrapped notes don't clip. Only needed on multi-row grids (whose
+            bottom margin can't grow after ``panel_label``) — on single-row
+            figures ``footnotes()`` measures its own wrapped rows and grows
+            the bottom margin itself.
         y_labels: ``"on_grid"`` (default) sits numeric y tick labels on
             gridlines that extend under them (``y_labels_on_grid``); applied
             only when the axes has visible y gridlines, so categorical
@@ -2058,9 +2060,21 @@ def year_axis(ax, *, abbreviate: bool = True, set_locator: bool = True) -> None:
     ax.xaxis.set_major_formatter(plt.FuncFormatter(_fmt))
 
 
-def _text_width_fig(fig, text: str, fontproperties: fm.FontProperties) -> float:
-    """Measure rendered width of ``text`` in figure-x fraction (Agg renderer)."""
+def _text_width_fig(
+    fig,
+    text: str,
+    fontproperties: fm.FontProperties,
+    *,
+    fontsize: float | None = None,
+) -> float:
+    """Measure rendered width of ``text`` in figure-x fraction (Agg renderer).
+
+    ``fontsize`` overrides the size carried by ``fontproperties`` (or the
+    rcParams default) so callers can measure at the exact size they render at.
+    """
     artist = fig.text(0, 0, text, fontproperties=fontproperties)
+    if fontsize is not None:
+        artist.set_fontsize(fontsize)
     try:
         renderer = fig.canvas.get_renderer()
         width_px = artist.get_window_extent(renderer=renderer).width
@@ -2335,19 +2349,24 @@ def _stack_footnotes(
 ) -> None:
     """Render each note on its own line, source on the bottom row, stacked downward.
 
-    ``footnotes(..., stack=True)`` path: a multi-line footnote where each
-    ``note`` is a distinct entry (a definition line, a caveat) that must read
-    as its own row rather than a dense inline run — plus the ``source`` line on
-    the bottom-most row. The block anchors its *top* row a ``FOOTNOTES_STACK_GAP``
-    below the x-tick / xlabel band and descends one line box per row, so the
-    whole stack sits clear of the axis label and each row clear of the next.
-    Each row still word-wraps to the chart width (``wrap``), so a long
-    definition that overflows one line adds its own continuation rows (and
-    pushes the rows below it further down within the reserved band).
+    The stacked layout — ``footnotes(..., stack=True)``, or the ``stack=None``
+    auto default when there is more than one note or a single note that would
+    word-wrap: each ``note`` is a distinct entry (a definition line, a caveat)
+    that must read as its own row rather than a dense inline run — plus the
+    ``source`` line on the bottom-most row. The block anchors its *top* row a
+    ``FOOTNOTES_STACK_GAP`` below the x-tick / xlabel band and descends one
+    line box per row, so the whole stack sits clear of the axis label and each
+    row clear of the next. Each row still word-wraps to the chart width
+    (``wrap``), so a long definition that overflows one line adds its own
+    continuation rows (and pushes the rows below it further down).
 
-    Reserve the band up front with ``finalize(footnote_lines=len(notes) + 1)``
-    (one row per note plus the source line) so the auto-layout drops the axes
-    baseline enough to hold the whole stack.
+    The band is reserved automatically: every row is wrapped up front and the
+    bottom margin grows (:func:`_ensure_bottom_clearance`) until the measured
+    stack — wrapped continuation rows included — fits on-figure, so callers do
+    not pass ``finalize(footnote_lines=...)``. The exception is a multi-row
+    grid (growing its bottom margin post hoc would move the lower row's top
+    and detach ``panel_label`` headings): reserve those up front with
+    ``finalize(footnote_lines=<total wrapped rows>)``.
     """
     fig.canvas.draw()
     rows = [strip_links(n) for n in notes]
@@ -2358,6 +2377,35 @@ def _stack_footnotes(
     line_h = FOOTNOTE_SIZE_PT * 1.2 / (fig.get_figheight() * 72.0)
     avail_frac = max(0.0, min(max_width_frac, 1.0) - x)
 
+    # Wrap every row up front so the band reservation below sees the true
+    # depth — a ~180-char note contributes its wrapped row count, not 1.
+    wrapped_rows: list[tuple[str, list, int]] = []
+    for text, urls in rows:
+        text_w = _text_width_fig(fig, text, fp) if text else 0.0
+        per_char = text_w / len(text) if text else 0.0
+        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
+        wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
+        wrapped_rows.append((wrapped, urls, wrapped.count("\n") + 1))
+    total_lines = sum(n_lines for _, _, n_lines in wrapped_rows)
+
+    # Grow the bottom margin until the whole measured stack lands on-figure.
+    # ``finalize`` cannot know the wrapped row count (``footnotes`` runs after
+    # it), so the reservation happens here — the reason ``footnote_lines`` is
+    # no longer needed for single-row figures. Skip when the caller pinned an
+    # explicit ``y`` (they own placement then).
+    if y is None:
+        stack_panel_y0s = [
+            a.get_position().y0 for a in fig.axes if a.get_subplotspec() is not None
+        ]
+        if stack_panel_y0s:
+            tick_band = max(0.0, min(stack_panel_y0s) - _bottom_band_top(fig))
+            _ensure_bottom_clearance(
+                fig,
+                depth_below_panels=tick_band
+                + FOOTNOTES_STACK_GAP
+                + total_lines * line_h,
+            )
+
     band_top = _bottom_band_top(fig)
     # Anchor the TOP row just below the x-tick/xlabel band, then descend — the
     # whole stack stays under the axis label. An explicit ``y`` is honoured as
@@ -2365,15 +2413,10 @@ def _stack_footnotes(
     top_row_y = y if y is not None else band_top - FOOTNOTES_STACK_GAP
 
     # Top-to-bottom: the first row (a note) sits highest; the source (last row)
-    # is lowest. Wrap each row first so a row that wraps to k lines advances the
-    # cursor by k line boxes, keeping the row below it clear.
+    # is lowest. A row that wrapped to k lines advances the cursor by k line
+    # boxes, keeping the row below it clear.
     row_top = top_row_y
-    for text, urls in rows:
-        text_w = _text_width_fig(fig, text, fp) if text else 0.0
-        per_char = text_w / len(text) if text else 0.0
-        max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
-        wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
-        n_lines = wrapped.count("\n") + 1
+    for wrapped, urls, n_lines in wrapped_rows:
         render_text_with_superscripts(
             fig,
             x,
@@ -2392,6 +2435,63 @@ def _stack_footnotes(
         verify_layout(fig)
 
 
+def _auto_stack(
+    fig,
+    notes: tuple[str, ...],
+    source: str | None,
+    *,
+    x: float,
+    max_width_frac: float,
+    wrap: bool,
+) -> bool:
+    """Resolve ``footnotes(stack=None)``: stacked unless a single short note packs.
+
+    The stacked term-definition layout is the default — more than one note
+    always stacks, each definition on its own row. A single note keeps the
+    one-row layout only when it genuinely fits on one line: packed on the
+    source row (the Economist age-gap pattern) when ``source`` is given, or
+    unwrapped at the legacy anchor when it isn't. Both fit tests mirror the
+    packed path's own measurements, so ``stack=None`` never resolves to packed
+    and then wraps anyway. Falls back to packed when the backend can't measure
+    text (non-Agg) — the historical default.
+    """
+    if len(notes) != 1:
+        return len(notes) > 1
+    note_clean, _ = strip_links(notes[0])
+    if not note_clean:
+        return False
+    try:
+        fig.canvas.draw()
+        fp = fm.FontProperties(family=_get_font_condensed(), weight="light")
+        note_w = _text_width_fig(fig, note_clean, fp, fontsize=FOOTNOTE_SIZE_PT)
+        if source is None:
+            # Legacy anchor — stack iff the packed path would word-wrap the
+            # note. Mirror its wrap parameters exactly (per-char pitch,
+            # symmetric ``x`` margins, ``wrap`` honoured).
+            if not wrap:
+                return False
+            avail = max(0.0, min(max_width_frac, 1.0) - 2 * x)
+            per_char = note_w / len(note_clean)
+            max_chars = int(avail / per_char) if per_char > 0 else len(note_clean)
+            return "\n" in _wrap_preserve_offsets(note_clean, max_chars)
+        # Source-aware — stack iff the note can't pack on the source row.
+        # Mirrors the packed path's ``notes_fits`` test.
+        source_clean, _ = strip_links(source) if source else ("", [])
+        src_w = (
+            _text_width_fig(fig, source_clean, fp, fontsize=SOURCE_MEASURE_SIZE_PT)
+            if source_clean
+            else 0.0
+        )
+        axes_x1 = [a.get_position().x1 for a in fig.axes]
+        right_x = max(axes_x1) if axes_x1 else 1.0 - x
+        limit = min(right_x, max_width_frac)
+        source_wraps = bool(source) and src_w > max(0.0, limit - x)
+        fits = not source_wraps and (x + src_w + FOOTNOTES_PACK_GAP + note_w) <= limit
+        return not fits
+    except Exception:
+        return False
+
+
 def footnotes(
     fig,
     *notes: str,
@@ -2400,7 +2500,7 @@ def footnotes(
     x: float = 0.02,
     max_width_frac: float = 0.95,
     wrap: bool = True,
-    stack: bool = False,
+    stack: bool | None = None,
     check_anchors: bool = True,
     verify: bool = True,
 ) -> None:
@@ -2411,19 +2511,25 @@ def footnotes(
 
     Behaviour depends on ``stack`` and whether ``source`` is provided:
 
-    * **``stack=True``**: each ``note`` renders on its OWN line, stacked
-      upward, with the ``source`` line on the bottom-most row — the whole
-      block sits below the x-tick labels / xlabel, every row clear of the axis
-      label and of each other. Use for a multi-line footnote whose entries are
-      distinct (a set of term definitions, a list of caveats) rather than one
-      flowing run. Reserve the band with ``finalize(footnote_lines=len(notes)
-      + 1)`` and pass ``source=""`` to ``finalize`` so it draws no source line.
-    * **No ``source``** (legacy mode): notes render at ``y`` (defaulting to
+    * **Stacked layout** — ``stack=True``, or the ``stack=None`` default when
+      there is more than one note or a single note that would word-wrap: each
+      ``note`` renders on its OWN line with the ``source`` line on the
+      bottom-most row — the whole block sits below the x-tick labels /
+      xlabel, every row clear of the axis label and of each other. This is
+      the term-definition layout (a set of starred definitions, a list of
+      caveats). The bottom band grows to fit the measured stack — wrapped
+      continuation rows included — so single-row figures need no
+      ``finalize(footnote_lines=...)``; pass ``source=""`` to ``finalize`` so
+      it draws no source line. Multi-row grids still reserve up front with
+      ``footnote_lines``.
+    * **No ``source``** (legacy mode — ``stack=False``, or an auto-packed
+      single short note): notes render at ``y`` (defaulting to
       ``min(axes.y0) - 0.045`` — just above the source line drawn by
       ``finalize``). Caller must still pass ``source=...`` to ``finalize``
       to get an attribution line.
-    * **With ``source``**: notes try to pack on the SAME ROW as the source
-      line, right-aligned to ``bbox.x1`` of the widest axes (matches the
+    * **With ``source``** (``stack=False``, or an auto-packed single short
+      note): notes try to pack on the SAME ROW as the source line,
+      right-aligned to ``bbox.x1`` of the widest axes (matches the
       Economist age-gap layout). If the combined source + notes would
       exceed ``max_width_frac`` of the figure width, notes wrap to a row
       ABOVE the source instead. Caller should pass ``source=""`` to
@@ -2443,12 +2549,15 @@ def footnotes(
         wrap: When True (default), word-wrap notes that overflow one row
             (offset-preserving, so URL spans and superscript markers stay
             valid). Disable for fixed-width legacy layouts.
-        stack: When True, render each ``note`` on its own line (plus the
-            ``source`` line on the bottom row) instead of joining them into
-            one flowing block. See the ``stack=True`` bullet above.
+        stack: ``None`` (default) picks the layout: more than one note, or a
+            single note that would word-wrap, renders stacked (one row per
+            note, source on the bottom row); a single note that fits packed
+            keeps the one-row layout. ``True`` forces the stacked layout;
+            ``False`` forces the packed/legacy layout.
         check_anchors: When True (default), warn if any footnote's leading
             marker (``*``, ``†``, ``‡``, ``§``) isn't found in the title,
-            descriptor, axis labels, legend entries, or any in-chart text.
+            descriptor, axis labels, legend entries (axes and figure-level),
+            or any in-chart text.
         verify: When True (default), run :func:`verify_layout` after
             rendering to warn if any text artist has overflowed the figure
             bbox (a silent ``bbox_inches="tight"`` expansion).
@@ -2458,6 +2567,10 @@ def footnotes(
     if check_anchors:
         _check_footnote_anchors(fig, notes)
 
+    if stack is None:
+        stack = _auto_stack(
+            fig, notes, source, x=x, max_width_frac=max_width_frac, wrap=wrap
+        )
     if stack:
         _stack_footnotes(
             fig,
