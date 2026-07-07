@@ -1,6 +1,6 @@
 id: no-hardcoded-ylabel
 language: python
-severity: warning
+severity: error
 message: >-
   The title/descriptor IS the y-axis label — leave ax.set_ylabel("") and name
   the measured quantity + units in finalize(descriptor=...). For a horizontal
@@ -12,6 +12,9 @@ note: >-
   secondary axis, a coordinate plot (ROC: y=TPR, x=FPR; scatter) whose axes are
   dimensions, or a faceted panel whose label genuinely differs from the shared
   descriptor — get a trailing `# ast-grep-ignore: no-hardcoded-ylabel`.
+  graphs.finalize() enforces the same rule at runtime (it raises on a non-empty
+  y-label; opt out with finalize(..., allow_ylabel=True)), so a chart is held to
+  it whether it is linted or merely run.
 url: https://github.com/DJRHails/graphs/blob/main/SKILL.md
 rule:
   pattern: $AX.set_ylabel($$$ARGS)

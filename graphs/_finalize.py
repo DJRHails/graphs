@@ -1003,6 +1003,40 @@ def dark_zero_line(ax, *, skip_axhline: bool = False) -> None:
         ax.axhline(0.0, color=C_SPINE, linewidth=1.0, zorder=0.5)
 
 
+def _check_ylabel(ax, *, allow_ylabel: bool) -> None:
+    """Raise when the axes carries a hardcoded y-axis label.
+
+    The title/descriptor *is* the y-axis label (graph-design "Headline
+    conventions"): name the measured quantity and its units in
+    ``finalize(descriptor=...)`` and leave ``ax.set_ylabel("")``. A hardcoded
+    axis label duplicates — or silently contradicts — the descriptor and breaks
+    the title-stack convention. For a horizontal Economist-style axis title use
+    :func:`y_axis_label`, which renders through ``fig.text`` rather than
+    ``set_ylabel`` and so never trips this check.
+
+    The genuine exceptions the runtime can't tell apart from a mistake — a
+    ``twinx()`` secondary axis, or a coordinate plot (ROC with y=TPR / x=FPR, a
+    scatter whose two axes are both dimensions) where an axis legitimately needs
+    its own label — pass ``allow_ylabel=True``. This mirrors the static
+    ``enforcement/rules/no-hardcoded-ylabel.yml`` ast-grep rule (whose escape
+    hatch is a trailing ``# ast-grep-ignore: no-hardcoded-ylabel``), so a chart
+    is held to the same rule whether it is linted or merely run.
+    """
+    if allow_ylabel:
+        return
+    label = ax.get_ylabel().strip()
+    if not label:
+        return
+    raise ValueError(
+        f"graphs.finalize: the axes has a hardcoded y-axis label {label!r}. The "
+        "title/descriptor IS the y-axis label — name the measured quantity + "
+        'units in finalize(descriptor=...) and leave ax.set_ylabel(""). For a '
+        "horizontal Economist-style axis title use graphs.y_axis_label(ax, ...). "
+        "For a genuine coordinate plot (ROC / scatter, both axes dimensions) or "
+        "a twinx() secondary axis, pass finalize(..., allow_ylabel=True)."
+    )
+
+
 def finalize(
     ax,
     title: str = "",
@@ -1019,6 +1053,7 @@ def finalize(
     panel_labels: bool = False,
     auto_layout: bool = True,
     zero_rule: bool = True,
+    allow_ylabel: bool = False,
 ):
     """Add Economist finishing touches to an axes object.
 
@@ -1095,11 +1130,25 @@ def finalize(
             horizontal-value charts whose y-axis is a coordinate that merely
             spans 0 (e.g. a latitude axis through the equator), where the
             value baseline is the vertical x=0 line instead.
+        allow_ylabel: Opt out of the hardcoded-y-label guard. ``finalize``
+            raises when the axes carries a non-empty ``ax.set_ylabel(...)`` —
+            the descriptor is meant to carry the y-axis quantity (see the class
+            docstring and ``y_axis_label``). Pass ``True`` for the genuine
+            exceptions the runtime can't tell from a mistake: a coordinate plot
+            (ROC / scatter, both axes dimensions) or a ``twinx()`` secondary
+            axis.
+
+    Raises:
+        ValueError: If the axes has a hardcoded non-empty y-axis label and
+            ``allow_ylabel`` is not set — the descriptor should name the
+            measured quantity, or use :func:`y_axis_label` for a horizontal
+            axis title.
     """
     if marker not in ("delta", "rule", "none"):
         raise ValueError(f"marker must be 'delta', 'rule', or 'none', got {marker!r}")
     if y_labels not in ("on_grid", "ticks"):
         raise ValueError(f"y_labels must be 'on_grid' or 'ticks', got {y_labels!r}")
+    _check_ylabel(ax, allow_ylabel=allow_ylabel)
     fig = ax.get_figure()
 
     # Wrap the title stack to the figure's own width BEFORE pad computation

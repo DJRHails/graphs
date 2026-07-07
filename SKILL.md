@@ -8,7 +8,7 @@ description: >
   typography, titles/descriptors/sources, annotation conventions and chart-type
   selection. Not for non-matplotlib charting (d3, plotly, spreadsheets).
 license: MIT
-version: 0.6.5
+version: 0.7.0
 author: Daniel Hails <graphs@hails.info>
 tags: [matplotlib, seaborn, data-visualisation, charts, economist]
 metadata:
@@ -81,8 +81,10 @@ treatment below; the ✗ is the mistake the rule prevents.
   axis label. ✗ `ax.set_ylabel("share of attempts")`. (For a horizontal
   Economist-style title above the axis use `y_axis_label(ax, ...)`, not
   `set_ylabel`.) Exceptions: a `twinx()` secondary axis, or a coordinate plot
-  (ROC, scatter) where *both* axes are dimensions — there, label the axes.
-  → [Headline conventions](#headline-conventions)
+  (ROC, scatter) where *both* axes are dimensions — there, label the axes and
+  pass `finalize(..., allow_ylabel=True)`. `finalize()` **raises** on a
+  non-empty y-label (the ast-grep rule catches it too), so this isn't a style
+  nicety you can skip. → [Headline conventions](#headline-conventions)
 - **Title states the finding, ≤50 chars, no units/dates/geography.**
   ✗ "GDP growth, 2010–2024" → ✓ "Eastern promise". → [Headline conventions](#headline-conventions)
 - **Descriptor names the quantity + units first**, then scope, then period:
@@ -270,7 +272,10 @@ as a draft. The essentials:
   horizontal Economist-style title above the axis use `y_axis_label(ax, ...)`,
   never a hardcoded `ax.set_ylabel("text")`. The exception is a coordinate plot
   (ROC, scatter) or a `twinx()` secondary axis, where an axis genuinely needs
-  its own label.** (Enforced by `enforcement/rules/no-hardcoded-ylabel.yml`.)
+  its own label — there, pass `finalize(..., allow_ylabel=True)` to opt out.**
+  (Enforced two ways: `finalize()` **raises `ValueError`** on a non-empty
+  y-label at runtime, and `enforcement/rules/no-hardcoded-ylabel.yml` flags it
+  at lint time.)
 - **Footnotes clarify specific words**, anchored by `*`/`†` markers placed
   in the title or descriptor (auto-superscripted).
 - **Source names the entity** (`Source:` / `Sources:`); synthetic or
@@ -391,7 +396,8 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `verify_layout(fig, *, tolerance=0.005)`                            | Warn when any text artist (tick labels, titles, legends, footnotes) extends past the figure bounds. Catches the class of bug where `savefig(bbox_inches="tight")` silently expands the saved canvas to fit overflow. Auto-called by `footnotes()`. |
-| `enforcement/rules/no-hardcoded-ylabel.yml`                               | ast-grep rule: flags a hardcoded non-empty `ax.set_ylabel(...)` (the descriptor should carry the quantity). Warning + a `# ast-grep-ignore: no-hardcoded-ylabel` escape for twin/coordinate axes. See [`enforcement/README.md`](./enforcement/README.md). |
+| `finalize(..., allow_ylabel=False)`                                 | Runtime guard: `finalize()` **raises `ValueError`** when the axes carries a hardcoded non-empty `ax.set_ylabel(...)` (the descriptor should carry the quantity). Pass `allow_ylabel=True` for a coordinate plot (ROC/scatter) or a `twinx()` secondary axis. |
+| `enforcement/rules/no-hardcoded-ylabel.yml`                               | Lint-time twin of the above: ast-grep rule (`severity: error`) that flags a hardcoded non-empty `ax.set_ylabel(...)`, with a `# ast-grep-ignore: no-hardcoded-ylabel` escape for twin/coordinate axes. See [`enforcement/README.md`](./enforcement/README.md). |
 
 ## Workflow
 

@@ -13,10 +13,14 @@ they cover what a regex can't.
   in `finalize(descriptor=...)` and leave `ax.set_ylabel("")`. It matches the
   `string_content` node (the text *between* the quotes), so it flags `"text"`,
   `'text'`, and f-strings while skipping `""` and whitespace-only labels.
-  `severity: warning`, not error, because the AST can't see the genuine
+  `severity: error` — a hardcoded label is a convention violation the author
+  should fix, not merely note. `graphs.finalize()` enforces the identical rule
+  at runtime (it raises `ValueError` on a non-empty y-label), so a chart is
+  caught whether it is linted or just run. The AST can't see the genuine
   exceptions — a `twinx()` secondary axis, a coordinate plot (ROC/scatter), or a
   faceted panel with a per-panel quantity. At such a site, add a trailing
-  `# ast-grep-ignore: no-hardcoded-ylabel` with the reason.
+  `# ast-grep-ignore: no-hardcoded-ylabel` with the reason (the runtime twin
+  opts out with `finalize(..., allow_ylabel=True)`).
 
 ## Using it in a consuming repo
 
