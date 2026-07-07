@@ -452,8 +452,9 @@ For each rendered figure, answer three questions before moving on:
 1. **Does the chart tell its intended story at a glance?**
    If the reader needs body text to know what to look at, the title is
    doing too little. Re-read the title — does it state the *finding*, or
-   only the topic? "Eastern promise" tells you what to see; "GDP growth,
-   2010–2024" doesn't. Iterate until the title carries the story alone.
+   only the topic? "Claude Opus 4.8 outscores the specialised guard
+   models" tells you what to see; "GDP growth, 2010–2024" doesn't.
+   Iterate until the title carries the story alone.
 
 2. **Is every element earning its place?**
    Bars at the rounding-noise threshold, legends that duplicate direct

@@ -10,6 +10,8 @@ valid:
     res = paired_bootstrap_auroc_diff(labels, scores)
   - |
     ax.set_title("recall by depth")
+  - |
+    graphs.finalize(ax, title="96% of cross-fires* cite a harm that is really present")
 invalid:
   - |
     graphs.finalize(ax, descriptor="Opus-4.8 forced probes; fire >= 50; N=240 smushes; 95% Wilson")
@@ -19,3 +21,7 @@ invalid:
     finalize(ax, title="t", descriptor="AUROC re-binned to k levels (95% bootstrap CI band)")
   - |
     graphs.footnotes(fig, source="Source: patches, n=24/class, 95% bootstrap CI. After Khullar et al. (2026)")
+  - |
+    finalize(ax, descriptor="shaded: 90% confidence interval band")
+  - |
+    footnotes(fig, "Error bars: 99% CIs per category", source="s.py")

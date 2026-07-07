@@ -1,6 +1,21 @@
 id: no-ci-machinery-in-text
 snapshots:
   ? |
+    finalize(ax, descriptor="shaded: 90% confidence interval band")
+  : labels:
+    - source: 'shaded: 90% confidence interval band'
+      style: primary
+      start: 25
+      end: 61
+    - source: finalize
+      style: secondary
+      start: 0
+      end: 8
+    - source: 'finalize(ax, descriptor="shaded: 90% confidence interval band")'
+      style: secondary
+      start: 0
+      end: 63
+  ? |
     finalize(ax, title="t", descriptor="AUROC re-binned to k levels (95% bootstrap CI band)")
   : labels:
     - source: AUROC re-binned to k levels (95% bootstrap CI band)
@@ -15,6 +30,21 @@ snapshots:
       style: secondary
       start: 0
       end: 89
+  ? |
+    footnotes(fig, "Error bars: 99% CIs per category", source="s.py")
+  : labels:
+    - source: 'Error bars: 99% CIs per category'
+      style: primary
+      start: 16
+      end: 48
+    - source: footnotes
+      style: secondary
+      start: 0
+      end: 9
+    - source: 'footnotes(fig, "Error bars: 99% CIs per category", source="s.py")'
+      style: secondary
+      start: 0
+      end: 65
   ? |
     footnotes(fig, "Whiskers: 95% Wilson CI on the total over-fire rate", source="s.py")
   : labels:

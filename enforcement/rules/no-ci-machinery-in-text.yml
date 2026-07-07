@@ -16,7 +16,7 @@ note: >-
 url: https://github.com/DJRHails/graphs/blob/main/references/headline-conventions.md
 rule:
   kind: string_content
-  regex: (?i)\b(wilson|bootstrap)\b|\b95%\s*CI\b|whisker
+  regex: (?i)\b(wilson|bootstrap)\b|\b\d{1,2}(\.\d+)?%\s*CIs?\b|\bconfidence\s+intervals?\b|whisker
   inside:
     stopBy: end
     kind: call

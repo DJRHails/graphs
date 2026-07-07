@@ -23,8 +23,8 @@ they cover what a regex can't.
   opts out with `finalize(..., allow_ylabel=True)`).
 
 - **`rules/no-ci-machinery-in-text.yml`** — flags "Wilson" / "bootstrap" /
-  "95% CI" / "whisker" inside any string passed to `finalize()` or
-  `footnotes()`. Statistics machinery appears in ink only
+  "NN% CI(s)" / "confidence interval" / "whisker" inside any string passed to
+  `finalize()` or `footnotes()`. Statistics machinery appears in ink only
   ([Headline conventions](../references/headline-conventions.md)): draw the
   whiskers and `ci_fill` bands, never caption them. Scoped to those two calls,
   so computing helpers (`wilson_ci(...)`, bootstrap functions) are untouched.
