@@ -166,8 +166,9 @@ Behaviour that's automatic unless you override it:
   print spec's 7.5pt reads too small at daily-chart scale).
 - **Footnote markers auto-superscript.** `*, †, ‡, §, **, ††, ‡‡, §§`
   render as superscripts anywhere they appear in titles, descriptors,
-  source lines, or footnote bodies — write plain text, the renderer
-  handles the typography.
+  source lines, footnote bodies, or legend entry texts (`finalize()`
+  post-processes every legend on the figure) — write plain text, the
+  renderer handles the typography.
 - **Uncertainty on a line is a filled band, not whiskers.** For a connected
   series over a continuous or ordinal x — a sweep, a trend, a depth/budget curve
   — draw the confidence interval as a translucent `ci_fill(ax, x, lo, hi,
@@ -207,9 +208,10 @@ Behaviour that's automatic unless you override it:
   break with `\n`.
 - **Orphan footnote markers warn.** `footnotes(check_anchors=True)` (default)
   raises a `UserWarning` when a note starts with `*` / `†` / `‡` / `§`
-  that isn't found in the title, descriptor, axis labels, or any in-chart
-  text. Anchor the marker by adding it after a word in the descriptor
-  (e.g. `descriptor="Verified contracts* per TVL bucket"`).
+  that isn't found in the title, descriptor, axis labels, legend entries,
+  or any in-chart text. Anchor the marker by adding it after a word in the
+  descriptor (e.g. `descriptor="Verified contracts* per TVL bucket"`) or a
+  legend label (`label="Self-attributed*"`).
 
 ### Vertical bar charts (plug-and-play)
 
@@ -349,8 +351,8 @@ Style overrides to apply on top:
 | `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, zero_rule=True, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels, and a dark zero centreline when the y-range straddles 0 (`zero_rule`). Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
 | `dark_zero_line(ax)`                                                | Dark `C_SPINE` rule on the zero baseline the data straddles, under the data lines. Auto-applied by `finalize`; call per panel on facets. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
-| `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor (`check_anchors=True`). |
-| `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. |
+| `footnotes(fig, *notes, source=None, wrap=True, check_anchors=True)` | Smart-packing footnote strip + optional source line. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long notes word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor/legend (`check_anchors=True`). |
+| `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. Call BEFORE `finalize` — it reserves a band under the descriptor and re-anchors the label to the final axes top, so a tall title stack never overlaps it. |
 | `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
