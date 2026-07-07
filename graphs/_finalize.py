@@ -2,6 +2,7 @@
 
 import textwrap
 import warnings
+from dataclasses import dataclass, field
 
 import matplotlib.dates as mdates
 import matplotlib.font_manager as fm
@@ -152,6 +153,7 @@ AUTO_LAYOUT_WSPACE_GUTTER_PT = 10.0  # gutter added to inter-column label width
 AUTO_LAYOUT_PANEL_LABEL_PT = 22.0  # rule + bold panel_label height between rows
 AUTO_LAYOUT_HSPACE_GUTTER_PT = 6.0  # breathing room between stacked-row bands
 AUTO_LAYOUT_TOP_LEGEND_GAP_PT = 5.0  # gap above an auto top_legend (legend↔descriptor)
+AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT = 4.0  # gap above a y_axis_label (label↔descriptor)
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -351,6 +353,103 @@ def _top_legend_height_fig(fig, legend) -> float | None:
     if bb.height <= 0:
         return 0.0
     return bb.transformed(fig.transFigure.inverted()).height
+
+
+@dataclass(kw_only=True)
+class _YAxisLabelSpec:
+    """Placement record of one :func:`y_axis_label` block, tagged on the figure.
+
+    ``y_axis_label`` renders against the axes position at call time; when
+    ``finalize`` then auto-lays-out the margins the axes moves and the label is
+    left stranded — colliding with the title stack when the stack is tall (the
+    touchstone ``length_control_guilt_vs_n`` failure). Each call appends a spec
+    to ``fig._graphs_y_axis_labels`` so ``finalize`` can (a) reserve a band for
+    the label between the descriptor and the axes top and (b) re-anchor the
+    rendered artists to the final axes position. Labels rendered *after*
+    ``finalize`` keep their spec too, but nothing reads it — they stay where
+    they were drawn (the manual-placement path).
+
+    Attributes:
+        ax: The axes the label titles (its top edge is the anchor).
+        artists: Every ``Text`` artist the label rendered (the wrapped text
+            block plus the optional unit line — and each superscript chunk when
+            markers split the render).
+        axes_top: ``ax.get_position().y1`` when the label was rendered.
+        anchor_x: The x edge the label is flush against at render time
+            (``bbox.x1`` for ``side="right"``, ``bbox.x0`` for ``"left"``).
+        side: ``"right"`` or ``"left"`` — which axes edge ``anchor_x`` tracks.
+    """
+
+    ax: object
+    artists: list = field(default_factory=list)
+    axes_top: float = 0.0
+    anchor_x: float = 0.0
+    side: str = "right"
+
+
+def _y_axis_label_specs(fig) -> list[_YAxisLabelSpec]:
+    """Live :class:`_YAxisLabelSpec` records tagged on ``fig``.
+
+    Filters out stale specs whose artists have since been removed from the
+    figure, so a caller that cleared its texts doesn't get phantom bands.
+    """
+    specs = getattr(fig, "_graphs_y_axis_labels", [])
+    fig_texts = set(fig.texts)
+    return [s for s in specs if any(a in fig_texts for a in s.artists)]
+
+
+def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
+    """Height of the tallest ``y_axis_label`` block, in figure fraction.
+
+    Measures the union of each spec's rendered artists with the renderer
+    (mirroring the title-stack / top-legend measurements) and returns the
+    tallest block plus its ``Y_AXIS_LABEL_MARGIN`` seat above the axes top.
+    Returns ``0.0`` when nothing measures (no specs, or a non-Agg backend) —
+    the caller then reserves nothing, today's behaviour.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return 0.0
+    inv = fig.transFigure.inverted()
+    band = 0.0
+    for spec in specs:
+        top: float | None = None
+        bottom: float | None = None
+        for artist in spec.artists:
+            try:
+                bb = artist.get_window_extent(renderer=renderer).transformed(inv)
+            except Exception:
+                continue
+            top = bb.y1 if top is None else max(top, bb.y1)
+            bottom = bb.y0 if bottom is None else min(bottom, bb.y0)
+        if top is None or bottom is None:
+            continue
+        band = max(band, (top - bottom) + Y_AXIS_LABEL_MARGIN)
+    return band
+
+
+def _reanchor_y_axis_labels(fig) -> None:
+    """Shift each ``y_axis_label`` block to its axes' final position.
+
+    The label artists were rendered flush against the axes edge *before*
+    ``finalize`` moved it; shift every artist by the axes-edge delta so the
+    block seats just above the final axes top again (the reserved band above it
+    keeps the title stack clear). Pure translation in figure coords — the
+    per-chunk superscript layout inside the block is preserved. Updates each
+    spec's stored anchors so a repeated ``finalize`` is a no-op shift.
+    """
+    for spec in _y_axis_label_specs(fig):
+        pos = spec.ax.get_position()
+        new_anchor_x = pos.x1 if spec.side == "right" else pos.x0
+        dx = new_anchor_x - spec.anchor_x
+        dy = pos.y1 - spec.axes_top
+        if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+            continue
+        for artist in spec.artists:
+            x_old, y_old = artist.get_position()
+            artist.set_position((x_old + dx, y_old + dy))
+        spec.anchor_x = new_anchor_x
+        spec.axes_top = pos.y1
 
 
 def _side_protrusions_fig(fig, ax) -> tuple[float, float] | None:
@@ -762,6 +861,7 @@ def _compute_auto_pads(
     footnote_lines: int,
     top_legend_band: float = 0.0,
     top_panel_label_band: float = 0.0,
+    y_axis_label_band: float = 0.0,
 ) -> tuple[float, float]:
     """Compute (top_pad, bottom_pad) for ``fig.subplots_adjust``.
 
@@ -775,6 +875,9 @@ def _compute_auto_pads(
     by ``panel_labels=True``), that band is reserved too so the rule-and-label
     heading — which ``panel_label`` draws *above* the axes top — sits in the top
     margin rather than colliding with the axes or an overlying top legend.
+    ``y_axis_label_band`` (measured block height plus a gap) reserves the strip
+    a pre-``finalize`` :func:`y_axis_label` occupies just above the axes top, so
+    the descriptor seats above the label instead of on it.
 
     Bottom pad reserves room for the source line at its true depth below the
     axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
@@ -818,6 +921,7 @@ def _compute_auto_pads(
         y_start
         + top_legend_band
         + top_panel_label_band
+        + y_axis_label_band
         + stack_pt * pt2fig
         + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
     )
@@ -1333,6 +1437,20 @@ def finalize(
         AUTO_LAYOUT_PANEL_LABEL_PT / 72.0 / fig_h_in if panel_labels else 0.0
     )
 
+    # A pre-``finalize`` ``y_axis_label`` (tagged on the figure at render time)
+    # occupies a strip just above the axes top. Measure the tallest block and
+    # reserve a band for it so the descriptor — and the whole title stack —
+    # seats above the label instead of overlapping it; the label artists are
+    # re-anchored to the final axes top after auto-layout below.
+    y_label_specs = _y_axis_label_specs(fig)
+    y_axis_label_band = 0.0
+    if y_label_specs:
+        label_block = _y_axis_label_band_fig(fig, y_label_specs)
+        if label_block:
+            y_axis_label_band = (
+                label_block + AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT / 72.0 / fig_h_in
+            )
+
     # Auto-layout always runs — size every margin and the inter-panel spacing
     # from the renderer. Top/bottom fit the title-stack and source band;
     # left/right are measured from the actual y-axis text; wspace/hspace size a
@@ -1348,6 +1466,7 @@ def finalize(
         footnote_lines=footnote_lines,
         top_legend_band=top_legend_band,
         top_panel_label_band=top_panel_label_band,
+        y_axis_label_band=y_axis_label_band,
     )
     left, right = _compute_side_margins(fig)
     adjust_kwargs = {
@@ -1375,6 +1494,12 @@ def finalize(
         if new_left < new_right:  # never invert the axes
             fig.subplots_adjust(left=new_left, right=new_right)
             fig.canvas.draw()
+
+    # Auto-layout moved the axes; shift every pre-``finalize`` ``y_axis_label``
+    # block back onto its axes' final top edge (the reserved band above it
+    # keeps the title stack clear).
+    if y_label_specs:
+        _reanchor_y_axis_labels(fig)
 
     bbox = ax.get_position()
     tx = title_x if title_x is not None else bbox.x0
@@ -1414,6 +1539,12 @@ def finalize(
             y_cursor = highest_fig_y + TOP_TICK_CLEARANCE_PT * pt2fig
     except Exception:
         pass
+
+    # A re-anchored ``y_axis_label`` block sits immediately above the axes top.
+    # Advance the title-stack cursor past its reserved band so the descriptor —
+    # and an auto top legend — seat above the label instead of on top of it.
+    if y_axis_label_band > 0.0:
+        y_cursor = max(y_cursor, bbox.y1 + y_axis_label_band)
 
     # A top-row ``panel_label`` occupies the band immediately above the axes top
     # (rule + bold heading, drawn after ``finalize``). Advance the title-stack
@@ -1715,6 +1846,14 @@ def y_axis_label(
     in a lighter colour (``C_LABEL_MUTED`` by default) — the Economist
     convention for "metric / unit" stacked labels.
 
+    **Call it before ``finalize``** (like ``top_legend``): the rendered block
+    is tagged on the figure, and ``finalize`` reserves a band for it between
+    the descriptor and the axes top, then re-anchors it to the final axes
+    position — so a tall title stack can never overlap the label. Calling it
+    *after* ``finalize`` is manual placement: the label lands just above the
+    final axes top with no reserved room, which collides with the descriptor
+    whenever the stack reaches the label's side of the chart.
+
     Args:
         text: Label text (will be word-wrapped).
         unit: Optional unit string rendered on a second line in ``unit_color``.
@@ -1743,6 +1882,7 @@ def y_axis_label(
     x = bbox.x1 if side == "right" else bbox.x0
     ha = "right" if side == "right" else "left"
     fp = fm.FontProperties(family=_get_font_condensed(), weight="medium")
+    n_texts_before = len(fig.texts)
 
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
@@ -1782,6 +1922,24 @@ def y_axis_label(
             ha=ha,
             linespacing=Y_AXIS_LABEL_LINESPACING,
         )
+
+    # Tag the rendered block on the figure so a later ``finalize`` can reserve
+    # a band for it in the top margin and re-anchor it to the final axes top
+    # (see ``_YAxisLabelSpec``). The artist list is the delta of ``fig.texts``
+    # across the render, so superscript chunk splits are captured too.
+    specs = getattr(fig, "_graphs_y_axis_labels", None)
+    if specs is None:
+        specs = []
+        fig._graphs_y_axis_labels = specs
+    specs.append(
+        _YAxisLabelSpec(
+            ax=ax,
+            artists=list(fig.texts[n_texts_before:]),
+            axes_top=bbox.y1,
+            anchor_x=x,
+            side=side,
+        )
+    )
 
 
 def save_chart(
@@ -2090,8 +2248,8 @@ def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
 
     Walks every existing :class:`~matplotlib.text.Text` artist on ``fig``
     and treats their concatenated text as the universe of possible anchors
-    (title, descriptor, axis labels, in-chart annotations). Notes whose
-    leading marker doesn't appear in that universe trigger a
+    (title, descriptor, axis labels, legend entries, in-chart annotations).
+    Notes whose leading marker doesn't appear in that universe trigger a
     ``UserWarning`` so the reader can trace each footnote back to its
     referent.
 
