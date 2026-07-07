@@ -1,0 +1,25 @@
+id: no-ci-machinery-in-text
+language: python
+severity: warning
+message: >-
+  Statistics machinery appears in ink only — draw the whiskers / ci_fill band,
+  never caption them. Drop "95% Wilson CI" / "bootstrap CI" / "Whiskers: ..."
+  from titles, descriptors, footnotes and source lines.
+note: >-
+  graph-design headline conventions: two hand-review rounds deleted every
+  CI-machinery mention from figure text, in every row including the source
+  line. The interval is visible on the chart; naming the method adds nothing a
+  reader acts on. Computing functions (wilson_ci(...), bootstrap helpers) are
+  unaffected — this rule only inspects strings passed to finalize()/footnotes().
+  If a string legitimately needs the word (rare), add a trailing
+  `# ast-grep-ignore: no-ci-machinery-in-text`.
+url: https://github.com/DJRHails/graphs/blob/main/references/headline-conventions.md
+rule:
+  kind: string_content
+  regex: (?i)\b(wilson|bootstrap)\b|\b95%\s*CI\b|whisker
+  inside:
+    stopBy: end
+    kind: call
+    has:
+      field: function
+      regex: (^|\.)(finalize|footnotes)$
