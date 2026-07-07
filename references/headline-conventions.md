@@ -177,7 +177,8 @@ URL is dropped with a `UserWarning` because the marker splits the rendered
 text into chunks the URL can't span.
 
 Footnote markers (`*`, `†`, `‡`, `§`) auto-superscript anywhere in the
-title, descriptor, source or footnote bodies — write plain text.
+title, descriptor, source, footnote bodies or legend entry texts — write
+plain text.
 
 ## Before / after
 

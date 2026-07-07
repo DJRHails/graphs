@@ -947,6 +947,79 @@ def _superscript_axis_label(ax, axis: str) -> None:
     )
 
 
+def _figure_legends(fig) -> list:
+    """Every legend on ``fig`` — figure legends plus each axes' own legend.
+
+    Covers the library's own :func:`~graphs.top_legend` (a figure legend) and
+    :func:`~graphs.smart_legend` (a corner axes legend or its top-legend
+    fallback) as well as plain ``ax.legend()`` / ``fig.legend()`` calls.
+    """
+    legends = list(fig.legends)
+    for axes in fig.axes:
+        legend = axes.get_legend()
+        if legend is not None:
+            legends.append(legend)
+    return legends
+
+
+def _superscript_legend_texts(fig) -> None:
+    """Re-render legend entry texts so footnote markers become superscripts.
+
+    A legend label like ``"Self-attributed*"`` renders its marker inline at
+    full size — matplotlib legend entries are single ``Text`` artists. For each
+    entry containing a marker, this captures the artist's anchor in figure
+    coordinates, makes the original invisible (``alpha=0`` — the text is kept
+    so the legend's own layout, the footnote anchor scan and ``verify_layout``
+    still see it and the legend box doesn't reflow), and re-renders the string
+    at the same anchor through :func:`render_text_with_superscripts`. The
+    overlay artists take a zorder above the legend's so a framed legend can't
+    paint over them. Runs at the end of ``finalize`` (after any ``top_legend``
+    re-anchor, so the measured positions are final); processed entries are
+    tagged and skipped on a repeated ``finalize``.
+
+    Limitations:
+      * The overlay is anchored in figure coordinates. Legends the library
+        manages (``smart_legend`` corner legends, an auto ``top_legend``
+        re-anchored by ``finalize``) track those coordinates exactly through
+        ``savefig(bbox_inches="tight")``; a raw ``fig.legend()`` or an
+        explicit-``y`` ``top_legend`` is re-anchored against the cropped
+        figure box at save time and can shift a few pixels relative to the
+        overlay.
+    """
+    entries = [t for leg in _figure_legends(fig) for t in leg.get_texts()]
+    if not any(_has_marker(t.get_text()) for t in entries):
+        return
+
+    fig.canvas.draw()
+    inv = fig.transFigure.inverted()
+    for entry in entries:
+        text = entry.get_text()
+        if not text or not _has_marker(text):
+            continue
+        if getattr(entry, "_graphs_superscripted", False):
+            continue
+        x_disp, y_disp = entry.get_transform().transform(entry.get_position())
+        x_fig, y_fig = inv.transform((x_disp, y_disp))
+        n_texts_before = len(fig.texts)
+        render_text_with_superscripts(
+            fig,
+            x_fig,
+            y_fig,
+            text,
+            fontsize=entry.get_fontsize(),
+            fontproperties=entry.get_fontproperties(),
+            color=entry.get_color(),
+            va=entry.get_va(),
+            ha=entry.get_ha(),
+        )
+        # Framed figure legends draw at zorder 5 — above default fig.text
+        # (zorder 3) — so lift the overlay chunks clear of the frame.
+        for chunk in fig.texts[n_texts_before:]:
+            chunk.set_zorder(entry.get_zorder() + 3)
+        entry.set_alpha(0.0)
+        entry._graphs_superscripted = True
+
+
 def dark_zero_line(ax, *, skip_axhline: bool = False) -> None:
     """Draw a strong dark rule on the zero baseline a chart's data straddles.
 
@@ -1553,6 +1626,12 @@ def finalize(
 
         y_labels_on_grid(ax)
 
+    # Post-process legend entry texts so footnote markers ("Self-attributed*")
+    # render as superscripts, exactly as they do in the title, descriptor,
+    # source and axis labels. Runs last: the top_legend re-anchor above must
+    # settle before the entries' positions are measured.
+    _superscript_legend_texts(fig)
+
     return fig, ax
 
 
@@ -2031,6 +2110,12 @@ def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
             existing.append(tl.get_text() or "")
     for t in fig.texts:
         existing.append(t.get_text() or "")
+    # Legend entry texts anchor markers too ("Self-attributed*"). The
+    # superscript pass keeps the entry's text (it only zeroes alpha), so the
+    # scan sees the marker whether or not finalize has already processed it.
+    for legend in _figure_legends(fig):
+        for t in legend.get_texts():
+            existing.append(t.get_text() or "")
     universe = " ".join(existing)
 
     for note in notes:
@@ -2043,9 +2128,9 @@ def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
                     warnings.warn(
                         f"graphs.footnotes: footnote starts with {marker!r} but "
                         f"no matching anchor was found in the title, descriptor, "
-                        f"axis labels, or in-chart text. Add {marker!r} after a "
-                        f"word in the title or descriptor so the reader can "
-                        f"trace the note back to its referent.",
+                        f"axis labels, legend entries, or in-chart text. Add "
+                        f"{marker!r} after a word in the title or descriptor so "
+                        f"the reader can trace the note back to its referent.",
                         stacklevel=3,
                     )
                 break
@@ -2205,7 +2290,7 @@ def footnotes(
             one flowing block. See the ``stack=True`` bullet above.
         check_anchors: When True (default), warn if any footnote's leading
             marker (``*``, ``†``, ``‡``, ``§``) isn't found in the title,
-            descriptor, axis labels, or any in-chart text.
+            descriptor, axis labels, legend entries, or any in-chart text.
         verify: When True (default), run :func:`verify_layout` after
             rendering to warn if any text artist has overflowed the figure
             bbox (a silent ``bbox_inches="tight"`` expansion).

@@ -166,8 +166,9 @@ Behaviour that's automatic unless you override it:
   print spec's 7.5pt reads too small at daily-chart scale).
 - **Footnote markers auto-superscript.** `*, †, ‡, §, **, ††, ‡‡, §§`
   render as superscripts anywhere they appear in titles, descriptors,
-  source lines, or footnote bodies — write plain text, the renderer
-  handles the typography.
+  source lines, footnote bodies, or legend entry texts (`finalize()`
+  post-processes every legend on the figure) — write plain text, the
+  renderer handles the typography.
 - **Uncertainty on a line is a filled band, not whiskers.** For a connected
   series over a continuous or ordinal x — a sweep, a trend, a depth/budget curve
   — draw the confidence interval as a translucent `ci_fill(ax, x, lo, hi,
@@ -207,9 +208,10 @@ Behaviour that's automatic unless you override it:
   break with `\n`.
 - **Orphan footnote markers warn.** `footnotes(check_anchors=True)` (default)
   raises a `UserWarning` when a note starts with `*` / `†` / `‡` / `§`
-  that isn't found in the title, descriptor, axis labels, or any in-chart
-  text. Anchor the marker by adding it after a word in the descriptor
-  (e.g. `descriptor="Verified contracts* per TVL bucket"`).
+  that isn't found in the title, descriptor, axis labels, legend entries,
+  or any in-chart text. Anchor the marker by adding it after a word in the
+  descriptor (e.g. `descriptor="Verified contracts* per TVL bucket"`) or a
+  legend label (`label="Self-attributed*"`).
 
 ### Vertical bar charts (plug-and-play)
 
