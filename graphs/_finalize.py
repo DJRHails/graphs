@@ -994,12 +994,19 @@ def _superscript_axis_label(ax, axis: str) -> None:
     Standard ``ax.set_xlabel`` / ``ax.set_ylabel`` calls produce a single
     matplotlib ``Text`` artist that renders footnote markers (``*``, ``†``,
     ``‡``, ``§``) inline at full size. This helper detects markers, hides
-    the original artist, and re-renders the same string at the same anchor
-    in figure coordinates so the markers come out as proper superscripts.
+    the original artist (``alpha=0`` — the text is kept so the footnote
+    anchor scan and the bottom-band measurements still see it), and
+    re-renders the same string at the same anchor so the markers come out
+    as proper superscripts. The overlay is anchored to the AXES (fraction
+    along the axis, a fixed point offset across it), so a later
+    ``footnotes()`` call that grows the bottom margin carries the label
+    with the panel instead of orphaning it at stale figure coordinates
+    (issue #14).
 
     Only labels containing a marker are touched; plain labels keep their
     original matplotlib artist (and any styling matplotlib applies via
     rcParams or the user's ``set_xlabel(..., rotation=...)`` call).
+    Processed labels are tagged and skipped on a repeated ``finalize``.
 
     Limitations:
       * Rotation other than 0 is not preserved — the re-rendered text uses
@@ -1015,6 +1022,8 @@ def _superscript_axis_label(ax, axis: str) -> None:
     text = label_artist.get_text()
     if not text or not _has_marker(text):
         return
+    if getattr(label_artist, "_graphs_superscripted", False):
+        return
 
     fig = ax.get_figure()
     fig.canvas.draw()
@@ -1025,30 +1034,47 @@ def _superscript_axis_label(ax, axis: str) -> None:
     ha = label_artist.get_ha()
     va = label_artist.get_va()
 
-    # Capture the artist's anchor in figure coordinates before we wipe it.
-    # The label uses its own transform (typically blended axes/figure
-    # coords); converting through display space gives us a stable point we
-    # can re-render at via ``fig.transFigure``.
+    # Anchor the overlay to the axes: fraction along the labelled axis (the
+    # label stays centred on the panel), a fixed point offset across it (the
+    # tick band the label clears doesn't change when the axes move). A
+    # figure-anchored overlay goes stale the moment ``footnotes()`` grows the
+    # bottom margin and lifts the axes.
     transform = label_artist.get_transform()
     x_disp, y_disp = transform.transform(label_artist.get_position())
-    x_fig, y_fig = fig.transFigure.inverted().transform((x_disp, y_disp))
-
-    # Hide the original — leave the artist in place so matplotlib's layout
-    # bookkeeping (label padding, ``get_window_extent`` for the source-line
-    # placement code) doesn't get confused by a missing label.
-    label_artist.set_text("")
+    ax_bbox_disp = ax.get_window_extent(renderer=fig.canvas.get_renderer())
+    if axis == "x":
+        anchor_x = (x_disp - ax_bbox_disp.x0) / ax_bbox_disp.width
+        anchor_y = 0.0
+        offset_x_pt = 0.0
+        offset_y_pt = (y_disp - ax_bbox_disp.y0) * 72.0 / fig.dpi
+    else:
+        anchor_x = 0.0
+        anchor_y = (y_disp - ax_bbox_disp.y0) / ax_bbox_disp.height
+        offset_x_pt = (x_disp - ax_bbox_disp.x0) * 72.0 / fig.dpi
+        offset_y_pt = 0.0
+    overlay_transform = mtransforms.offset_copy(
+        ax.transAxes, fig=fig, x=offset_x_pt, y=offset_y_pt, units="points"
+    )
 
     render_text_with_superscripts(
         fig,
-        x_fig,
-        y_fig,
+        anchor_x,
+        anchor_y,
         text,
         fontsize=fontsize,
         fontproperties=fp,
         color=color,
         va=va,
         ha=ha,
+        transform=overlay_transform,
     )
+
+    # Hide the original but KEEP its text (``alpha=0``, matching the legend
+    # superscript pass): ``footnotes``'s bottom-band measurement and its
+    # anchor scan both read the native artist, so wiping the text would let
+    # footnote rows land on the overlay and orphan the ``*`` anchor.
+    label_artist.set_alpha(0.0)
+    label_artist._graphs_superscripted = True
 
 
 def _figure_legends(fig) -> list:
@@ -1158,7 +1184,9 @@ def dark_zero_line(ax, *, skip_axhline: bool = False) -> None:
     # genuine straddle. Ruling zero there recolours the 0-gridline dark on top of the
     # black bottom spine — a doubled baseline. Only rule zero when a real negative
     # y-tick is present (genuine +/- data), not merely a padded y-limit.
-    if not any(loc < -1e-9 * (y_hi - y_lo) for loc in ax.get_yticks() if y_lo <= loc <= y_hi):
+    if not any(
+        loc < -1e-9 * (y_hi - y_lo) for loc in ax.get_yticks() if y_lo <= loc <= y_hi
+    ):
         return
     gridlines = ax.get_ygridlines()
     if not any(g.get_visible() for g in gridlines):
@@ -2328,11 +2356,15 @@ def _bottom_band_top(fig) -> float:
     for a in fig.axes:
         xlabel = a.xaxis.label
         if xlabel.get_text():
-            lowest = min(lowest, xlabel.get_window_extent(renderer=renderer).transformed(inv).y0)
+            lowest = min(
+                lowest, xlabel.get_window_extent(renderer=renderer).transformed(inv).y0
+            )
         for tl in a.get_xticklabels():
             if not tl.get_text() or not tl.get_visible():
                 continue
-            lowest = min(lowest, tl.get_window_extent(renderer=renderer).transformed(inv).y0)
+            lowest = min(
+                lowest, tl.get_window_extent(renderer=renderer).transformed(inv).y0
+            )
     return lowest
 
 
