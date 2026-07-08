@@ -77,6 +77,30 @@ def _autoscale_y(ax, *, headroom: float = 0.10, floor_frac: float = 0.40) -> Non
     ax.set_ylim(new_lo, new_hi)
 
 
+def _deck_strip_ids(fig) -> set[int]:
+    """Identity snapshot of the figure-level artists that exist right now.
+
+    Taken before ``finalize``/``footnotes`` draw their headline furniture;
+    ``_mark_deck_strip`` diffs against it to tag exactly the artists those
+    calls created (title stack, marker, source, footnote rows — including
+    superscript chunk artists), leaving pre-existing figure text such as
+    ``y_axis_label`` blocks and ``panel_label`` headings untouched.
+    """
+    return {id(artist) for artist in (*fig.texts, *fig.artists)}
+
+
+def _mark_deck_strip(fig, before_ids: set[int]) -> None:
+    """Tag every figure-level artist created since ``before_ids`` was taken.
+
+    Tagged artists (``_graphs_deck_strip = True``) are headline furniture
+    that :func:`graphs.save_deck_variant` removes when saving the deck
+    variant of a chart.
+    """
+    for artist in (*fig.texts, *fig.artists):
+        if id(artist) not in before_ids:
+            artist._graphs_deck_strip = True
+
+
 def _draw_rule(fig, tx: float, y_cursor: float) -> None:
     """Draw the short red rule above the title (legacy marker)."""
     rule_w = RULE_WIDTH_PX / (fig.get_figwidth() * fig.dpi)
@@ -1506,6 +1530,11 @@ def finalize(
     bbox = ax.get_position()
     tx = title_x if title_x is not None else bbox.x0
 
+    # Everything drawn between here and the end of the source block is
+    # headline furniture (marker, title, descriptor, source) — tag it so
+    # ``save_deck_variant`` can strip it from a deck variant of the chart.
+    deck_strip_before = _deck_strip_ids(fig)
+
     # Build title stack upward from just above the axes.
     # Gaps tuned against The Economist's web-styleguide reference: rule sits
     # ~6pt above the title cap-height, title sits ~3pt above the descriptor's
@@ -1731,6 +1760,8 @@ def finalize(
             ha="left",
             url_spans=source_urls,
         )
+
+    _mark_deck_strip(fig, deck_strip_before)
 
     # Post-process axis labels so footnote markers in ``set_xlabel`` /
     # ``set_ylabel`` strings render as superscripts. Runs after the source
@@ -2567,6 +2598,11 @@ def footnotes(
     if check_anchors:
         _check_footnote_anchors(fig, notes)
 
+    # Every artist footnotes() draws (note rows, the source row, wrapped
+    # continuations, superscript chunks) is headline furniture a deck
+    # variant drops — tag it for ``save_deck_variant``.
+    deck_strip_before = _deck_strip_ids(fig)
+
     if stack is None:
         stack = _auto_stack(
             fig, notes, source, x=x, max_width_frac=max_width_frac, wrap=wrap
@@ -2582,6 +2618,7 @@ def footnotes(
             wrap=wrap,
             verify=verify,
         )
+        _mark_deck_strip(fig, deck_strip_before)
         return
 
     fig.canvas.draw()
@@ -2811,6 +2848,8 @@ def footnotes(
             max(0.0, min(right_x, max_width_frac) - x),
             text_w=notes_w,
         )
+
+    _mark_deck_strip(fig, deck_strip_before)
 
     if verify:
         verify_layout(fig)
