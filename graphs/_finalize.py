@@ -509,9 +509,12 @@ def _reanchor_y_axis_labels(fig) -> None:
         pos = spec.ax.get_position()
         new_anchor_x = pos.x1 if spec.side == "right" else pos.x0
         # Seat the block above any in-axes text that pokes past the axes top
-        # (fanned annotations, direct labels) — the lifted anchor is stored so
-        # a repeated finalize stays a no-op shift.
+        # (fanned annotations, direct labels) and, for LEFT-side blocks, above
+        # the panel_label band (the heading shares the left anchor) — the
+        # lifted anchor is stored so a repeated finalize stays a no-op shift.
         lifted_top = pos.y1 + _axes_top_protrusion_fig(fig, spec)
+        if spec.side == "left":
+            lifted_top += getattr(fig, "_graphs_panel_label_band", 0.0)
         dx = new_anchor_x - spec.anchor_x
         dy = lifted_top - spec.axes_top
         if abs(dx) < 1e-12 and abs(dy) < 1e-12:
@@ -1510,6 +1513,11 @@ def finalize(
         AUTO_LAYOUT_PANEL_LABEL_PT / 72.0 / fig_h_in if panel_labels else 0.0
     )
 
+    # Stash the panel band so ``_reanchor_y_axis_labels`` can lift left-side
+    # marker blocks clear of the panel_label heading drawn post-finalize (the
+    # two bands used to share the strip and collide).
+    fig._graphs_panel_label_band = top_panel_label_band
+
     # A pre-``finalize`` ``y_axis_label`` (tagged on the figure at render time)
     # occupies a strip just above the axes top. Measure the tallest block and
     # reserve a band for it so the descriptor — and the whole title stack —
@@ -1621,8 +1629,15 @@ def finalize(
     # A re-anchored ``y_axis_label`` block sits immediately above the axes top.
     # Advance the title-stack cursor past its reserved band so the descriptor —
     # and an auto top legend — seat above the label instead of on top of it.
+    # A LEFT-side label block additionally sits above the panel_label band
+    # (the heading shares its left anchor), so the two bands stack, not share.
     if y_axis_label_band > 0.0:
-        y_cursor = max(y_cursor, bbox.y1 + y_axis_label_band)
+        label_base = bbox.y1
+        if top_panel_label_band > 0.0 and any(
+            spec.side == "left" for spec in y_label_specs
+        ):
+            label_base += top_panel_label_band
+        y_cursor = max(y_cursor, label_base + y_axis_label_band)
 
     # A top-row ``panel_label`` occupies the band immediately above the axes top
     # (rule + bold heading, drawn after ``finalize``). Advance the title-stack
@@ -2023,7 +2038,7 @@ def y_axis_label(
 
 
 def save_chart(
-    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True
+    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True, deck: bool = False
 ):
     """Save the current figure next to ``script_file`` as ``<stem>.png``.
 
@@ -2046,6 +2061,10 @@ def save_chart(
 
     out = Path(script_file).resolve().with_suffix(".png")
     plt.savefig(out, bbox_inches="tight", dpi=dpi)
+    if deck:
+        from graphs._deck import save_deck_variant
+
+        save_deck_variant(plt.gcf(), out, dpi=dpi)
     if close:
         plt.close()
     if verbose:
@@ -2790,6 +2809,7 @@ def footnotes(
             max(0.0, min(max_width_frac, 1.0) - 2 * x),
             text_w=notes_w,
         )
+        _mark_deck_strip(fig, deck_strip_before)
         if verify:
             verify_layout(fig)
         return

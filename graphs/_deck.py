@@ -22,9 +22,20 @@ import matplotlib.pyplot as plt
 
 
 def _strip_headline(fig) -> int:
-    """Remove every artist tagged by ``finalize``/``footnotes``; return the count."""
+    """Remove every artist tagged by ``finalize``/``footnotes``; return the count.
+
+    A figure ``suptitle`` is headline furniture too (scripts that title a
+    multi-panel figure with a raw ``fig.suptitle`` used to need a manual
+    ``_graphs_deck_strip`` tag) — it is removed unconditionally.
+    """
     removed = 0
+    suptitle = getattr(fig, "_suptitle", None)
+    if suptitle is not None and suptitle.get_text():
+        suptitle.remove()
+        removed += 1
     for artist in (*list(fig.texts), *list(fig.artists)):
+        if artist is suptitle:  # already gone; a manually tagged suptitle must not double-remove
+            continue
         if getattr(artist, "_graphs_deck_strip", False):
             artist.remove()
             removed += 1
