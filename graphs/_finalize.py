@@ -2424,8 +2424,8 @@ def _bottom_band_top(fig) -> float:
     Mirrors the ``base_y0`` computation the packed/legacy ``footnotes`` paths
     use: start at the lowest panel baseline, then drop below any x-tick labels
     and the xlabel so a footnote row can't overlap them. Returns a figure-y
-    fraction; the stacked layout anchors its bottom-most row a
-    ``SOURCE_Y_OFFSET`` below this.
+    fraction; the stacked layout anchors its top row a ``FOOTNOTES_STACK_GAP``
+    below this and descends from there.
     """
     axes_y0 = [a.get_position().y0 for a in fig.axes]
     base_y0 = min(axes_y0) if axes_y0 else 0.10
@@ -2460,8 +2460,9 @@ def _stack_footnotes(
     """Render each note on its own line, source on the bottom row, stacked downward.
 
     The stacked layout — ``footnotes(..., stack=True)``, or the ``stack=None``
-    auto default when there is more than one note or a single note that would
-    word-wrap: each ``note`` is a distinct entry (a definition line, a caveat)
+    auto default when there is more than one note, or a single note that
+    can't pack beside the source row (with no source: one that would
+    word-wrap): each ``note`` is a distinct entry (a definition line, a caveat)
     that must read as its own row rather than a dense inline run — plus the
     ``source`` line on the bottom-most row. The block anchors its *top* row a
     ``FOOTNOTES_STACK_GAP`` below the x-tick / xlabel band and descends one
@@ -2473,10 +2474,11 @@ def _stack_footnotes(
     The band is reserved automatically: every row is wrapped up front and the
     bottom margin grows (:func:`_ensure_bottom_clearance`) until the measured
     stack — wrapped continuation rows included — fits on-figure, so callers do
-    not pass ``finalize(footnote_lines=...)``. The exception is a multi-row
-    grid (growing its bottom margin post hoc would move the lower row's top
-    and detach ``panel_label`` headings): reserve those up front with
-    ``finalize(footnote_lines=<total wrapped rows>)``.
+    not pass ``finalize(footnote_lines=...)``. Two exceptions: an explicit
+    ``y`` skips the reservation (the caller owns placement), and a multi-row
+    grid can't grow (moving its bottom margin post hoc would shift the lower
+    row's top and detach ``panel_label`` headings) — reserve those up front
+    with ``finalize(footnote_lines=<total wrapped rows>)``.
     """
     fig.canvas.draw()
     rows = [strip_links(n) for n in notes]
@@ -2489,9 +2491,11 @@ def _stack_footnotes(
 
     # Wrap every row up front so the band reservation below sees the true
     # depth — a ~180-char note contributes its wrapped row count, not 1.
-    wrapped_rows: list[tuple[str, list, int]] = []
+    wrapped_rows: list[tuple[str, list[tuple[int, int, str]], int]] = []
     for text, urls in rows:
-        text_w = _text_width_fig(fig, text, fp) if text else 0.0
+        text_w = (
+            _text_width_fig(fig, text, fp, fontsize=FOOTNOTE_SIZE_PT) if text else 0.0
+        )
         per_char = text_w / len(text) if text else 0.0
         max_chars = int(avail_frac / per_char) if per_char > 0 else len(text)
         wrapped = _wrap_preserve_offsets(text, max_chars) if wrap else text
@@ -2509,12 +2513,18 @@ def _stack_footnotes(
         ]
         if stack_panel_y0s:
             tick_band = max(0.0, min(stack_panel_y0s) - _bottom_band_top(fig))
-            _ensure_bottom_clearance(
-                fig,
-                depth_below_panels=tick_band
-                + FOOTNOTES_STACK_GAP
-                + total_lines * line_h,
-            )
+            depth = tick_band + FOOTNOTES_STACK_GAP + total_lines * line_h
+            grew = _ensure_bottom_clearance(fig, depth_below_panels=depth)
+            nrows, _ = _gridspec_shape(fig)
+            short_of_room = min(stack_panel_y0s) < depth + AUTO_LAYOUT_BOTTOM_MARGIN
+            if not grew and nrows > 1 and short_of_room:
+                warnings.warn(
+                    f"graphs.footnotes: the stacked notes need more bottom room "
+                    f"than this multi-row grid reserved, and the margin cannot "
+                    f"grow after panel_label. Reserve it up front with "
+                    f"finalize(footnote_lines={total_lines}).",
+                    stacklevel=3,
+                )
 
     band_top = _bottom_band_top(fig)
     # Anchor the TOP row just below the x-tick/xlabel band, then descend — the
@@ -2598,7 +2608,10 @@ def _auto_stack(
         source_wraps = bool(source) and src_w > max(0.0, limit - x)
         fits = not source_wraps and (x + src_w + FOOTNOTES_PACK_GAP + note_w) <= limit
         return not fits
-    except Exception:
+    except AttributeError:
+        # Non-Agg backends have no ``get_renderer`` — can't measure, so fall
+        # back to packed (the historical default). Anything else raising above
+        # is a real bug in the fit logic and must surface.
         return False
 
 
@@ -2622,7 +2635,8 @@ def footnotes(
     Behaviour depends on ``stack`` and whether ``source`` is provided:
 
     * **Stacked layout** — ``stack=True``, or the ``stack=None`` default when
-      there is more than one note or a single note that would word-wrap: each
+      there is more than one note, or a single note that can't pack beside
+      the source row (with no ``source``: one that would word-wrap): each
       ``note`` renders on its OWN line with the ``source`` line on the
       bottom-most row — the whole block sits below the x-tick labels /
       xlabel, every row clear of the axis label and of each other. This is
@@ -2660,10 +2674,11 @@ def footnotes(
             (offset-preserving, so URL spans and superscript markers stay
             valid). Disable for fixed-width legacy layouts.
         stack: ``None`` (default) picks the layout: more than one note, or a
-            single note that would word-wrap, renders stacked (one row per
-            note, source on the bottom row); a single note that fits packed
-            keeps the one-row layout. ``True`` forces the stacked layout;
-            ``False`` forces the packed/legacy layout.
+            single note that can't pack beside the source row (with no
+            ``source``: one that would word-wrap), renders stacked (one row
+            per note, source on the bottom row); a single note that fits
+            packed keeps the one-row layout. ``True`` forces the stacked
+            layout; ``False`` forces the packed/legacy layout.
         check_anchors: When True (default), warn if any footnote's leading
             marker (``*``, ``†``, ``‡``, ``§``) isn't found in the title,
             descriptor, axis labels, legend entries (axes and figure-level),

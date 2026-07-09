@@ -834,6 +834,102 @@ def test_stacked_wrapped_notes_grow_bottom_band():
     plt.close(fig)
 
 
+def _legacy_footnoted_fig(*notes, **footnote_kwargs):
+    """A single-panel chart with no-source (legacy-anchor) ``footnotes`` applied."""
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xticks([1, 2, 3])
+    finalize(ax, title="T", descriptor="D", source="Source: test")
+    footnotes(fig, *notes, check_anchors=False, **footnote_kwargs)
+    return fig
+
+
+def test_auto_stack_no_source_single_short_note_stays_packed():
+    """With no ``source``, a single one-line note keeps the legacy anchor.
+
+    ``_auto_stack``'s source-less branch: a note that fits one row must
+    resolve packed (byte-similar to ``stack=False``), not stacked — the
+    discriminating case a regression to "always stack" would break.
+    """
+    note = "*short note"
+    auto = _bottom_row_geometry(_legacy_footnoted_fig(note))
+    packed = _bottom_row_geometry(_legacy_footnoted_fig(note, stack=False))
+    forced = _bottom_row_geometry(_legacy_footnoted_fig(note, stack=True))
+    assert auto == packed, f"auto != stack=False:\n{auto}\nvs\n{packed}"
+    assert auto != forced, "a single short no-source note should not auto-stack"
+    plt.close("all")
+
+
+def test_auto_stack_wrap_false_stays_packed():
+    """``stack=None`` + ``wrap=False`` resolves packed even for a wrapping-length note.
+
+    With wrapping disabled the packed path renders one (overflowing) row, so
+    the auto default must not silently switch layouts on the caller.
+    """
+    note = (
+        "*a very long definition that would certainly word-wrap on a single "
+        "footnote row if wrapping were enabled, spelling the condition out in full"
+    )
+    # verify=False: the un-wrapped row overflowing the right edge is the
+    # scenario itself, not a layout bug this test should warn about.
+    auto = _bottom_row_geometry(_legacy_footnoted_fig(note, wrap=False, verify=False))
+    packed = _bottom_row_geometry(
+        _legacy_footnoted_fig(note, wrap=False, stack=False, verify=False)
+    )
+    assert auto == packed, f"auto != stack=False:\n{auto}\nvs\n{packed}"
+    plt.close("all")
+
+
+def test_stacked_explicit_y_skips_band_growth():
+    """An explicit ``y`` pins placement: the stacked path must not grow the margin."""
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xticks([1, 2, 3])
+    finalize(ax, title="T", descriptor="D", source="")
+    bottom_before = fig.subplotpars.bottom
+    notes = ("*first definition", "†second definition", "‡third definition")
+    footnotes(
+        fig, *notes, source="Source: test", stack=True, y=0.12,
+        check_anchors=False, verify=False,
+    )
+    assert fig.subplotpars.bottom == pytest.approx(bottom_before), (
+        "explicit y must leave the bottom margin untouched "
+        f"(before={bottom_before:.4f}, after={fig.subplotpars.bottom:.4f})"
+    )
+    plt.close(fig)
+
+
+def test_multirow_grid_stacked_overflow_names_footnote_lines():
+    """On a multi-row grid the stack can't grow the margin — the warning must say so.
+
+    ``_ensure_bottom_clearance`` deliberately no-ops on ``nrows > 1``; when the
+    reserved band is too shallow the failure surfaces as warnings, and at least
+    one must name the actual remedy: ``finalize(footnote_lines=<rows>)``.
+    """
+    from graphs import subplots
+
+    long_notes = tuple(
+        f"{marker}a long definition that wraps to several continuation rows on "
+        "this figure width because it keeps going and going with the full "
+        "spelled-out condition and an example where one helps the reader"
+        for marker in ("*", "†", "‡")
+    )
+    fig, axes = subplots("wide", height=4.5, nrows=2)
+    for ax in axes:
+        ax.plot([1, 2, 3], [0, 1, 2])
+        ax.set_xticks([1, 2, 3])
+    finalize(axes[0], title="T", descriptor="D", source="", panel_labels=True)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        footnotes(fig, *long_notes, source="Source: test", check_anchors=False)
+    hints = [str(w.message) for w in caught if "footnote_lines=" in str(w.message)]
+    assert hints, (
+        "expected a warning naming finalize(footnote_lines=...) on a multi-row "
+        f"grid whose stacked notes overflow; got: {[str(w.message) for w in caught]}"
+    )
+    plt.close(fig)
+
+
 # --- legend-band vs footnotes call order (issue #15) --------------------------
 
 
