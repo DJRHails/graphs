@@ -1,6 +1,6 @@
 [project]
 name = "djrhails-graphs"
-version = "0.10.0"
+version = "0.10.1"
 authors = [
     { name="Daniel Hails", email="graphs@hails.info" },
 ]
@@ -27,7 +27,7 @@ readme = {file = ["README.md"], content-type = "text/markdown"}
 find = {}  # Scan the project directory with the default parameters
 
 [tool.bumpver]
-current_version = "0.10.0"
+current_version = "0.10.1"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
