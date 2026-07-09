@@ -50,6 +50,7 @@ from graphs._charts import (
     threshold_lollipop,
     trend_line,
 )
+from graphs._deck import save_deck_variant
 from graphs._finalize import (
     dark_zero_line,
     finalize,
@@ -99,7 +100,7 @@ from graphs._palette import (
 )
 from graphs._theme import FORMATS, set_theme, subplots
 
-__version__ = "0.9.0"
+__version__ = "0.11.1"
 
 __all__ = [
     # theme + finalize
@@ -111,6 +112,7 @@ __all__ = [
     "footnotes",
     "panel_label",
     "save_chart",
+    "save_deck_variant",
     "verify_layout",
     "x_axis_label",
     "x_axis_top",

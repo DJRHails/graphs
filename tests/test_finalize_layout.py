@@ -832,3 +832,251 @@ def test_stacked_wrapped_notes_grow_bottom_band():
     rows = _stacked_rows(fig)
     assert rows[0][2].startswith("Source"), f"bottom row should be the source: {rows}"
     plt.close(fig)
+
+
+def _legacy_footnoted_fig(*notes, **footnote_kwargs):
+    """A single-panel chart with no-source (legacy-anchor) ``footnotes`` applied."""
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xticks([1, 2, 3])
+    finalize(ax, title="T", descriptor="D", source="Source: test")
+    footnotes(fig, *notes, check_anchors=False, **footnote_kwargs)
+    return fig
+
+
+def test_auto_stack_no_source_single_short_note_stays_packed():
+    """With no ``source``, a single one-line note keeps the legacy anchor.
+
+    ``_auto_stack``'s source-less branch: a note that fits one row must
+    resolve packed (byte-similar to ``stack=False``), not stacked — the
+    discriminating case a regression to "always stack" would break.
+    """
+    note = "*short note"
+    auto = _bottom_row_geometry(_legacy_footnoted_fig(note))
+    packed = _bottom_row_geometry(_legacy_footnoted_fig(note, stack=False))
+    forced = _bottom_row_geometry(_legacy_footnoted_fig(note, stack=True))
+    assert auto == packed, f"auto != stack=False:\n{auto}\nvs\n{packed}"
+    assert auto != forced, "a single short no-source note should not auto-stack"
+    plt.close("all")
+
+
+def test_auto_stack_wrap_false_stays_packed():
+    """``stack=None`` + ``wrap=False`` resolves packed even for a wrapping-length note.
+
+    With wrapping disabled the packed path renders one (overflowing) row, so
+    the auto default must not silently switch layouts on the caller.
+    """
+    note = (
+        "*a very long definition that would certainly word-wrap on a single "
+        "footnote row if wrapping were enabled, spelling the condition out in full"
+    )
+    # verify=False: the un-wrapped row overflowing the right edge is the
+    # scenario itself, not a layout bug this test should warn about.
+    auto = _bottom_row_geometry(_legacy_footnoted_fig(note, wrap=False, verify=False))
+    packed = _bottom_row_geometry(
+        _legacy_footnoted_fig(note, wrap=False, stack=False, verify=False)
+    )
+    assert auto == packed, f"auto != stack=False:\n{auto}\nvs\n{packed}"
+    plt.close("all")
+
+
+def test_stacked_explicit_y_skips_band_growth():
+    """An explicit ``y`` pins placement: the stacked path must not grow the margin."""
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([1, 2, 3], [0, 1, 2])
+    ax.set_xticks([1, 2, 3])
+    finalize(ax, title="T", descriptor="D", source="")
+    bottom_before = fig.subplotpars.bottom
+    notes = ("*first definition", "†second definition", "‡third definition")
+    footnotes(
+        fig, *notes, source="Source: test", stack=True, y=0.12,
+        check_anchors=False, verify=False,
+    )
+    assert fig.subplotpars.bottom == pytest.approx(bottom_before), (
+        "explicit y must leave the bottom margin untouched "
+        f"(before={bottom_before:.4f}, after={fig.subplotpars.bottom:.4f})"
+    )
+    plt.close(fig)
+
+
+def test_multirow_grid_stacked_overflow_names_footnote_lines():
+    """On a multi-row grid the stack can't grow the margin — the warning must say so.
+
+    ``_ensure_bottom_clearance`` deliberately no-ops on ``nrows > 1``; when the
+    reserved band is too shallow the failure surfaces as warnings, and at least
+    one must name the actual remedy: ``finalize(footnote_lines=<rows>)``.
+    """
+    from graphs import subplots
+
+    long_notes = tuple(
+        f"{marker}a long definition that wraps to several continuation rows on "
+        "this figure width because it keeps going and going with the full "
+        "spelled-out condition and an example where one helps the reader"
+        for marker in ("*", "†", "‡")
+    )
+    fig, axes = subplots("wide", height=4.5, nrows=2)
+    for ax in axes:
+        ax.plot([1, 2, 3], [0, 1, 2])
+        ax.set_xticks([1, 2, 3])
+    finalize(axes[0], title="T", descriptor="D", source="", panel_labels=True)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        footnotes(fig, *long_notes, source="Source: test", check_anchors=False)
+    hints = [str(w.message) for w in caught if "footnote_lines=" in str(w.message)]
+    assert hints, (
+        "expected a warning naming finalize(footnote_lines=...) on a multi-row "
+        f"grid whose stacked notes overflow; got: {[str(w.message) for w in caught]}"
+    )
+    plt.close(fig)
+
+
+# --- legend-band vs footnotes call order (issue #15) --------------------------
+
+
+def _shrink_axes_for_legend_band(fig, ax, *, ncol: int | None = None):
+    """Downstream legend-band pattern (touchstone ``lab.utils.plotting.legend_band``).
+
+    Shrinks the axes top with ``ax.set_position`` to free a band between the
+    descriptor and the data, then anchors an explicit-``y`` :func:`top_legend`
+    at the *pre-shrink* axes top so the legend fills the freed band instead of
+    drawing over the data. ``finalize`` never re-anchors an explicit-``y``
+    legend, so the layout only holds if nothing snaps the axes back to its
+    gridspec position afterwards.
+    """
+    import math
+
+    handles, labels = ax.get_legend_handles_labels()
+    if ncol is None:
+        ncol = max(1, len(handles))
+    n_rows = math.ceil(len(handles) / ncol)
+    fig.canvas.draw()
+    pos = ax.get_position()
+    ax.set_position((pos.x0, pos.y0, pos.width, pos.height - 0.05 * n_rows))
+    return top_legend(fig, handles, labels, y=pos.y1, ncol=ncol)
+
+
+def _line_chart_with_series(figsize=(6.4, 4.6)):
+    """A line chart whose top series reaches the top of the y-range."""
+    fig, ax = plt.subplots(figsize=figsize)
+    for i in range(3):
+        ax.plot([0, 1, 2], [i, i + 1, i + 2], label=f"series {i}")
+    ax.set_ylim(0, 4)  # the top line touches y=4: any legend over the axes hits it
+    ax.set_xticks([0, 1, 2])
+    return fig, ax
+
+
+@pytest.mark.parametrize(
+    "notes",
+    [
+        pytest.param(
+            (
+                "*first definition on its own stacked row",
+                "†second definition on its own stacked row",
+            ),
+            id="stacked-band",
+        ),
+        pytest.param(("*short note",), id="packed-band"),
+    ],
+)
+def test_legend_band_before_footnotes_keeps_legend_above_axes(notes):
+    """legend-band first, footnotes second: the freed band must survive.
+
+    The v0.9.0 regression: ``footnotes``'s self-sizing bottom band grew the
+    margin through ``subplots_adjust``, which re-derives every axes position
+    from the gridspec — wiping the manual axes shrink and leaving the
+    explicit-``y`` legend hanging over the restored axes top (the
+    legend-over-line mis-render). Both footnote layouts (stacked and packed)
+    grow the band, so both must preserve the shrink.
+    """
+    fig, ax = _line_chart_with_series()
+    finalize(ax, title="T", descriptor="D", source="")
+    top_before_band = ax.get_position().y1
+
+    _shrink_axes_for_legend_band(fig, ax)
+    shrunk_top = ax.get_position().y1
+    assert shrunk_top < top_before_band - 0.01  # sanity: a band was freed
+
+    footnotes(fig, *notes, source="Source: test", check_anchors=False)
+
+    grown_y0 = ax.get_position().y0
+    assert ax.get_position().y1 == pytest.approx(shrunk_top, abs=1e-6), (
+        f"footnotes reset the axes top to {ax.get_position().y1:.4f}, undoing the "
+        f"legend-band shrink (expected {shrunk_top:.4f})"
+    )
+    leg = _legend_bbox(fig)
+    # The legend box grazes the axes top by ~1pt even in the documented
+    # footnotes-first order (the downstream 0.05-per-row band vs matplotlib's
+    # borderaxespad slack); the regression overlapped by the FULL 0.05 shrink.
+    assert leg.y0 >= ax.get_position().y1 - 0.005, (
+        f"legend bottom {leg.y0:.4f} overlaps the axes (top {ax.get_position().y1:.4f}) "
+        "— the legend is drawn over the data lines"
+    )
+    # The bottom band still did its job: footnote rows sit below the x-tick labels.
+    assert _bottom_band_top(fig) < _xtick_band_y0(fig, ax)
+    assert grown_y0 > 0.0
+    plt.close(fig)
+
+
+def test_legend_band_and_footnotes_order_independent():
+    """footnotes-then-legend-band and legend-band-then-footnotes match exactly.
+
+    Downstream (touchstone) hand-ordered 35 call sites footnotes-first to dodge
+    the reset; either order must now produce the same axes geometry, the same
+    legend box, and the same footnote rows.
+    """
+    notes = (
+        "*first definition on its own stacked row",
+        "†second definition on its own stacked row",
+    )
+
+    fig_doc, ax_doc = _line_chart_with_series()
+    finalize(ax_doc, title="T", descriptor="D", source="")
+    footnotes(fig_doc, *notes, source="Source: test", check_anchors=False)
+    _shrink_axes_for_legend_band(fig_doc, ax_doc)
+    pos_doc = ax_doc.get_position()
+    leg_doc = _legend_bbox(fig_doc)
+    rows_doc = _bottom_row_geometry(fig_doc)
+    plt.close(fig_doc)
+
+    fig_rev, ax_rev = _line_chart_with_series()
+    finalize(ax_rev, title="T", descriptor="D", source="")
+    _shrink_axes_for_legend_band(fig_rev, ax_rev)
+    footnotes(fig_rev, *notes, source="Source: test", check_anchors=False)
+    pos_rev = ax_rev.get_position()
+    leg_rev = _legend_bbox(fig_rev)
+    rows_rev = _bottom_row_geometry(fig_rev)
+    plt.close(fig_rev)
+
+    assert pos_rev.bounds == pytest.approx(pos_doc.bounds, abs=1e-4), (
+        f"axes geometry depends on call order: {pos_rev.bounds} vs {pos_doc.bounds}"
+    )
+    assert (leg_rev.x0, leg_rev.y0, leg_rev.x1, leg_rev.y1) == pytest.approx(
+        (leg_doc.x0, leg_doc.y0, leg_doc.x1, leg_doc.y1), abs=1e-4
+    ), "legend box depends on call order"
+    assert rows_rev == rows_doc, (
+        f"footnote rows depend on call order:\n{rows_rev}\nvs\n{rows_doc}"
+    )
+
+
+def test_bottom_clearance_growth_matches_subplots_adjust_when_untouched():
+    """No manual repositioning: the in-place growth equals the old gridspec path.
+
+    Guards the no-regression promise — a figure whose axes were only ever
+    placed by ``finalize`` must land exactly where ``subplots_adjust`` used to
+    put it, and the recorded ``subplotpars.bottom`` must stay in sync so a
+    caller's own ``subplots_adjust`` override after ``footnotes`` still starts
+    from the grown margin.
+    """
+    notes = ("*first definition row", "†second definition row")
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.plot([0, 1, 2], [0, 1, 2])
+    ax.set_xticks([0, 1, 2])
+    finalize(ax, title="T", descriptor="D", source="")
+    footnotes(fig, *notes, source="Source: test", check_anchors=False)
+
+    pos = ax.get_position()
+    assert fig.subplotpars.bottom == pytest.approx(pos.y0, abs=1e-9)
+    # A caller override that only touches wspace must not move the grown bottom.
+    fig.subplots_adjust(wspace=0.5)
+    assert ax.get_position().y0 == pytest.approx(pos.y0, abs=1e-9)
+    plt.close(fig)

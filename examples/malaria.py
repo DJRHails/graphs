@@ -135,8 +135,8 @@ finalize(
     y_axis_right=True,
     autoscale_y=False,
 )
-# At the 4.6in daily width, source + notes can never share a row, so the
-# stacked footer (one note per row above the source line) happens naturally.
+# Two notes, so the auto default stacks the footer unconditionally — one note
+# per row above the source line — regardless of the figure width.
 footnotes(
     fig,
     "*Global Technical Strategy for Malaria 2016-30",
