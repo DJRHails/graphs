@@ -836,6 +836,15 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     redraws when it grew the margin, ``False`` when the current margin already
     cleared the band (so callers skip the redraw).
 
+    The growth raises each panel's bottom edge *in place* rather than going
+    through ``subplots_adjust``, which re-derives every position from the
+    gridspec and so wipes any manual ``ax.set_position`` made after
+    ``finalize`` — e.g. a downstream legend-band helper that shrinks the axes
+    top to seat an explicit-``y`` ``top_legend``; snapping the axes back up
+    would leave that legend over the data (issue #15). ``subplotpars.bottom``
+    is still recorded so a caller's own ``subplots_adjust`` override after
+    ``footnotes`` starts from the grown margin.
+
     Skips multi-row grids: there, growing the bottom margin moves the lower
     row's *top* (a fraction of the redistributed height), which would detach an
     already-drawn ``panel_label`` — so ``finalize`` reserves their source band
@@ -844,21 +853,25 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     nrows, _ = _gridspec_shape(fig)
     if nrows > 1:
         return False
-    panel_y0s = [
-        a.get_position().y0 for a in fig.axes if a.get_subplotspec() is not None
-    ]
-    if not panel_y0s:
+    panels = [a for a in fig.axes if a.get_subplotspec() is not None]
+    if not panels:
         return False
-    lowest_panel_y0 = min(panel_y0s)
+    lowest_panel_y0 = min(a.get_position().y0 for a in panels)
 
     needed_y0 = depth_below_panels + AUTO_LAYOUT_BOTTOM_MARGIN
     if lowest_panel_y0 >= needed_y0 - 1e-6:
         return False
 
-    # Grow the bottom margin by the shortfall. subplots_adjust(bottom=) keeps
-    # the axes top fixed, so the title stack / panel labels stay put.
+    # Grow the bottom margin by the shortfall: raise each panel's bottom edge,
+    # keeping its top (and everything anchored to it) exactly where it is.
+    # ``_set_position`` is the same call ``subplots_adjust`` itself uses — the
+    # public ``set_position`` would also flip ``in_layout`` off and drop the
+    # axes from tight-bbox saves.
     grow = needed_y0 - lowest_panel_y0
-    fig.subplots_adjust(bottom=fig.subplotpars.bottom + grow)
+    for panel in panels:
+        pos = panel.get_position()
+        panel._set_position((pos.x0, pos.y0 + grow, pos.width, pos.height - grow))
+    fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
     fig.canvas.draw()
     return True
 
