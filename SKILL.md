@@ -8,7 +8,7 @@ description: >
   typography, titles/descriptors/sources, annotation conventions and chart-type
   selection. Not for non-matplotlib charting (d3, plotly, spreadsheets).
 license: MIT
-version: 0.9.0
+version: 0.11.1
 author: Daniel Hails <graphs@hails.info>
 tags: [matplotlib, seaborn, data-visualisation, charts, economist]
 metadata:
@@ -359,12 +359,13 @@ Style overrides to apply on top:
 | `dark_zero_line(ax)`                                                | Dark `C_SPINE` rule on the zero baseline the data straddles, under the data lines. Auto-applied by `finalize`; call per panel on facets. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, stack=None, check_anchors=True)` | Footnote strip + optional source line. `stack=None` (default) auto-picks the layout: several notes — or one that can't pack beside the source — stack one row per note with the source on the bottom row, and the bottom band self-sizes to the measured rows; a single short note packs beside the source. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long rows word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor/axis labels/legend entries (axes or figure-level)/in-chart text (`check_anchors=True`). |
-| `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. Call BEFORE `finalize` — it reserves a band under the descriptor and re-anchors the label to the final axes top, so a tall title stack never overlaps it. |
+| `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. Call BEFORE `finalize` — it reserves a band under the descriptor and re-anchors the label to the final axes top, clear of in-axes text poking past the axes edge and (for `side="left"`) above the `panel_label` band. |
 | `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
-| `save_chart(__file__)`                                              | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. |
+| `save_chart(__file__, *, deck=False)`                               | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. `deck=True` also writes `<script>_deck.png`. |
+| `save_deck_variant(fig, path, *, dpi=150)`                          | Deck variant beside the full chart: strips the tagged headline (marker, title, descriptor, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings; writes `<stem>_deck.png`. Call after saving the full chart. |
 
 ### Chart helpers
 
@@ -414,7 +415,7 @@ Style overrides to apply on top:
 | `color_axis(ax, side, color, *, spine=True, ticks=True)`            | Colour a spine + ticks + labels to match a series.     |
 | `right_axis(ax)`                                                    | Apply right-axis convention to a panel.                |
 | `smart_legend(ax)`                                                  | Frameless legend in the emptiest corner.               |
-| `top_legend(fig, handles, labels, *, x=0.02)`                       | Frameless top-anchored legend under the title-stack. Call BEFORE `finalize` (auto-`y`) and it reserves its own band — no `subplots_adjust`. |
+| `top_legend(ax_or_fig, handles?, labels?, *, x=0.02)`               | Frameless top-anchored legend under the title-stack. `top_legend(ax, ncol=2)` derives handles/labels from the axes. Call BEFORE `finalize` (auto-`y`) and it reserves its own band — no `subplots_adjust`. |
 
 ### Number formatting
 

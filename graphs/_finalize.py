@@ -77,6 +77,30 @@ def _autoscale_y(ax, *, headroom: float = 0.10, floor_frac: float = 0.40) -> Non
     ax.set_ylim(new_lo, new_hi)
 
 
+def _deck_strip_ids(fig) -> set[int]:
+    """Identity snapshot of the figure-level artists that exist right now.
+
+    Taken before ``finalize``/``footnotes`` draw their headline furniture;
+    ``_mark_deck_strip`` diffs against it to tag exactly the artists those
+    calls created (title stack, marker, source, footnote rows — including
+    superscript chunk artists), leaving pre-existing figure text such as
+    ``y_axis_label`` blocks and ``panel_label`` headings untouched.
+    """
+    return {id(artist) for artist in (*fig.texts, *fig.artists)}
+
+
+def _mark_deck_strip(fig, before_ids: set[int]) -> None:
+    """Tag every figure-level artist created since ``before_ids`` was taken.
+
+    Tagged artists (``_graphs_deck_strip = True``) are headline furniture
+    that :func:`graphs.save_deck_variant` removes when saving the deck
+    variant of a chart.
+    """
+    for artist in (*fig.texts, *fig.artists):
+        if id(artist) not in before_ids:
+            artist._graphs_deck_strip = True
+
+
 def _draw_rule(fig, tx: float, y_cursor: float) -> None:
     """Draw the short red rule above the title (legacy marker)."""
     rule_w = RULE_WIDTH_PX / (fig.get_figwidth() * fig.dpi)
@@ -398,6 +422,48 @@ def _y_axis_label_specs(fig) -> list[_YAxisLabelSpec]:
     return [s for s in specs if any(a in fig_texts for a in s.artists)]
 
 
+def _axes_top_protrusion_fig(fig, spec) -> float:
+    """How far in-axes text protrudes above ``spec.ax``'s top, under the label block.
+
+    Fanned ``annotate`` labels and direct line labels near the top edge poke
+    above the axes into the strip where the ``y_axis_label`` block seats (the
+    hatch-variants tradeoff collision: recall pinned ~100% fans its arm labels
+    straight into the marker). Measures every visible ``ax.texts`` artist whose
+    horizontal extent overlaps the block's span and returns the tallest
+    overshoot above the axes top in figure fraction — 0.0 when nothing
+    protrudes or no renderer is available. The caller lifts the label block
+    (and its reserved band) by this amount so the marker clears the labels.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return 0.0
+    inv = fig.transFigure.inverted()
+    span_x0: float | None = None
+    span_x1: float | None = None
+    for artist in spec.artists:
+        try:
+            bb = artist.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        span_x0 = bb.x0 if span_x0 is None else min(span_x0, bb.x0)
+        span_x1 = bb.x1 if span_x1 is None else max(span_x1, bb.x1)
+    if span_x0 is None or span_x1 is None:
+        return 0.0
+    axes_top = spec.ax.get_position().y1
+    protrusion = 0.0
+    for text in spec.ax.texts:
+        if not text.get_visible() or not text.get_text():
+            continue
+        try:
+            bb = text.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        if bb.x1 < span_x0 or bb.x0 > span_x1:
+            continue
+        protrusion = max(protrusion, bb.y1 - axes_top)
+    return max(0.0, protrusion)
+
+
 def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
     """Height of the tallest ``y_axis_label`` block, in figure fraction.
 
@@ -424,7 +490,8 @@ def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
             bottom = bb.y0 if bottom is None else min(bottom, bb.y0)
         if top is None or bottom is None:
             continue
-        band = max(band, (top - bottom) + Y_AXIS_LABEL_MARGIN)
+        lift = _axes_top_protrusion_fig(fig, spec)
+        band = max(band, (top - bottom) + lift + Y_AXIS_LABEL_MARGIN)
     return band
 
 
@@ -441,15 +508,22 @@ def _reanchor_y_axis_labels(fig) -> None:
     for spec in _y_axis_label_specs(fig):
         pos = spec.ax.get_position()
         new_anchor_x = pos.x1 if spec.side == "right" else pos.x0
+        # Seat the block above any in-axes text that pokes past the axes top
+        # (fanned annotations, direct labels) and, for LEFT-side blocks, above
+        # the panel_label band (the heading shares the left anchor) — the
+        # lifted anchor is stored so a repeated finalize stays a no-op shift.
+        lifted_top = pos.y1 + _axes_top_protrusion_fig(fig, spec)
+        if spec.side == "left":
+            lifted_top += getattr(fig, "_graphs_panel_label_band", 0.0)
         dx = new_anchor_x - spec.anchor_x
-        dy = pos.y1 - spec.axes_top
+        dy = lifted_top - spec.axes_top
         if abs(dx) < 1e-12 and abs(dy) < 1e-12:
             continue
         for artist in spec.artists:
             x_old, y_old = artist.get_position()
             artist.set_position((x_old + dx, y_old + dy))
         spec.anchor_x = new_anchor_x
-        spec.axes_top = pos.y1
+        spec.axes_top = lifted_top
 
 
 def _side_protrusions_fig(fig, ax) -> tuple[float, float] | None:
@@ -762,6 +836,15 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     redraws when it grew the margin, ``False`` when the current margin already
     cleared the band (so callers skip the redraw).
 
+    The growth raises each panel's bottom edge *in place* rather than going
+    through ``subplots_adjust``, which re-derives every position from the
+    gridspec and so wipes any manual ``ax.set_position`` made after
+    ``finalize`` — e.g. a downstream legend-band helper that shrinks the axes
+    top to seat an explicit-``y`` ``top_legend``; snapping the axes back up
+    would leave that legend over the data (issue #15). ``subplotpars.bottom``
+    is still recorded so a caller's own ``subplots_adjust`` override after
+    ``footnotes`` starts from the grown margin.
+
     Skips multi-row grids: there, growing the bottom margin moves the lower
     row's *top* (a fraction of the redistributed height), which would detach an
     already-drawn ``panel_label`` — so ``finalize`` reserves their source band
@@ -770,21 +853,25 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     nrows, _ = _gridspec_shape(fig)
     if nrows > 1:
         return False
-    panel_y0s = [
-        a.get_position().y0 for a in fig.axes if a.get_subplotspec() is not None
-    ]
-    if not panel_y0s:
+    panels = [a for a in fig.axes if a.get_subplotspec() is not None]
+    if not panels:
         return False
-    lowest_panel_y0 = min(panel_y0s)
+    lowest_panel_y0 = min(a.get_position().y0 for a in panels)
 
     needed_y0 = depth_below_panels + AUTO_LAYOUT_BOTTOM_MARGIN
     if lowest_panel_y0 >= needed_y0 - 1e-6:
         return False
 
-    # Grow the bottom margin by the shortfall. subplots_adjust(bottom=) keeps
-    # the axes top fixed, so the title stack / panel labels stay put.
+    # Grow the bottom margin by the shortfall: raise each panel's bottom edge,
+    # keeping its top (and everything anchored to it) exactly where it is.
+    # ``_set_position`` is the same call ``subplots_adjust`` itself uses — the
+    # public ``set_position`` would also flip ``in_layout`` off and drop the
+    # axes from tight-bbox saves.
     grow = needed_y0 - lowest_panel_y0
-    fig.subplots_adjust(bottom=fig.subplotpars.bottom + grow)
+    for panel in panels:
+        pos = panel.get_position()
+        panel._set_position((pos.x0, pos.y0 + grow, pos.width, pos.height - grow))
+    fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
     fig.canvas.draw()
     return True
 
@@ -1439,6 +1526,11 @@ def finalize(
         AUTO_LAYOUT_PANEL_LABEL_PT / 72.0 / fig_h_in if panel_labels else 0.0
     )
 
+    # Stash the panel band so ``_reanchor_y_axis_labels`` can lift left-side
+    # marker blocks clear of the panel_label heading drawn post-finalize (the
+    # two bands used to share the strip and collide).
+    fig._graphs_panel_label_band = top_panel_label_band
+
     # A pre-``finalize`` ``y_axis_label`` (tagged on the figure at render time)
     # occupies a strip just above the axes top. Measure the tallest block and
     # reserve a band for it so the descriptor — and the whole title stack —
@@ -1506,6 +1598,11 @@ def finalize(
     bbox = ax.get_position()
     tx = title_x if title_x is not None else bbox.x0
 
+    # Everything drawn between here and the end of the source block is
+    # headline furniture (marker, title, descriptor, source) — tag it so
+    # ``save_deck_variant`` can strip it from a deck variant of the chart.
+    deck_strip_before = _deck_strip_ids(fig)
+
     # Build title stack upward from just above the axes.
     # Gaps tuned against The Economist's web-styleguide reference: rule sits
     # ~6pt above the title cap-height, title sits ~3pt above the descriptor's
@@ -1545,8 +1642,15 @@ def finalize(
     # A re-anchored ``y_axis_label`` block sits immediately above the axes top.
     # Advance the title-stack cursor past its reserved band so the descriptor —
     # and an auto top legend — seat above the label instead of on top of it.
+    # A LEFT-side label block additionally sits above the panel_label band
+    # (the heading shares its left anchor), so the two bands stack, not share.
     if y_axis_label_band > 0.0:
-        y_cursor = max(y_cursor, bbox.y1 + y_axis_label_band)
+        label_base = bbox.y1
+        if top_panel_label_band > 0.0 and any(
+            spec.side == "left" for spec in y_label_specs
+        ):
+            label_base += top_panel_label_band
+        y_cursor = max(y_cursor, label_base + y_axis_label_band)
 
     # A top-row ``panel_label`` occupies the band immediately above the axes top
     # (rule + bold heading, drawn after ``finalize``). Advance the title-stack
@@ -1731,6 +1835,8 @@ def finalize(
             ha="left",
             url_spans=source_urls,
         )
+
+    _mark_deck_strip(fig, deck_strip_before)
 
     # Post-process axis labels so footnote markers in ``set_xlabel`` /
     # ``set_ylabel`` strings render as superscripts. Runs after the source
@@ -1945,7 +2051,7 @@ def y_axis_label(
 
 
 def save_chart(
-    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True
+    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True, deck: bool = False
 ):
     """Save the current figure next to ``script_file`` as ``<stem>.png``.
 
@@ -1968,6 +2074,10 @@ def save_chart(
 
     out = Path(script_file).resolve().with_suffix(".png")
     plt.savefig(out, bbox_inches="tight", dpi=dpi)
+    if deck:
+        from graphs._deck import save_deck_variant
+
+        save_deck_variant(plt.gcf(), out, dpi=dpi)
     if close:
         plt.close()
     if verbose:
@@ -2582,6 +2692,11 @@ def footnotes(
     if check_anchors:
         _check_footnote_anchors(fig, notes)
 
+    # Every artist footnotes() draws (note rows, the source row, wrapped
+    # continuations, superscript chunks) is headline furniture a deck
+    # variant drops — tag it for ``save_deck_variant``.
+    deck_strip_before = _deck_strip_ids(fig)
+
     if stack is None:
         stack = _auto_stack(
             fig, notes, source, x=x, max_width_frac=max_width_frac, wrap=wrap
@@ -2597,6 +2712,7 @@ def footnotes(
             wrap=wrap,
             verify=verify,
         )
+        _mark_deck_strip(fig, deck_strip_before)
         return
 
     fig.canvas.draw()
@@ -2721,6 +2837,7 @@ def footnotes(
             max(0.0, min(max_width_frac, 1.0) - 2 * x),
             text_w=notes_w,
         )
+        _mark_deck_strip(fig, deck_strip_before)
         if verify:
             verify_layout(fig)
         return
@@ -2826,6 +2943,8 @@ def footnotes(
             max(0.0, min(right_x, max_width_frac) - x),
             text_w=notes_w,
         )
+
+    _mark_deck_strip(fig, deck_strip_before)
 
     if verify:
         verify_layout(fig)

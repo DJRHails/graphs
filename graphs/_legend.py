@@ -238,8 +238,8 @@ def smart_legend(
 
 def top_legend(
     fig,
-    handles: Sequence,
-    labels: Sequence[str],
+    handles: Sequence | None = None,
+    labels: Sequence[str] | None = None,
     *,
     x: float = 0.02,
     y: float | None = None,
@@ -290,6 +290,18 @@ def top_legend(
         above_axes: Gap (figure coords) between the axes' top and the
             legend's top when ``y`` is auto-computed.
     """
+    # Axes shorthand: ``top_legend(ax)`` (or ``top_legend(ax, ncol=2)``) —
+    # derive the figure and the axes' own handles/labels, killing the
+    # three-line get_legend_handles_labels() idiom at every call site.
+    if hasattr(fig, "get_legend_handles_labels"):
+        ax = fig
+        fig = ax.get_figure()
+        if handles is None and labels is None:
+            handles, labels = ax.get_legend_handles_labels()
+    if handles is None or labels is None:
+        raise ValueError(
+            "top_legend needs handles+labels, or an Axes first argument to derive them from"
+        )
     if align not in ("left", "right"):
         raise ValueError(f"align must be 'left' or 'right', got {align!r}")
     auto_y = y is None
