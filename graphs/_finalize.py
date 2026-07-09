@@ -422,6 +422,48 @@ def _y_axis_label_specs(fig) -> list[_YAxisLabelSpec]:
     return [s for s in specs if any(a in fig_texts for a in s.artists)]
 
 
+def _axes_top_protrusion_fig(fig, spec) -> float:
+    """How far in-axes text protrudes above ``spec.ax``'s top, under the label block.
+
+    Fanned ``annotate`` labels and direct line labels near the top edge poke
+    above the axes into the strip where the ``y_axis_label`` block seats (the
+    hatch-variants tradeoff collision: recall pinned ~100% fans its arm labels
+    straight into the marker). Measures every visible ``ax.texts`` artist whose
+    horizontal extent overlaps the block's span and returns the tallest
+    overshoot above the axes top in figure fraction — 0.0 when nothing
+    protrudes or no renderer is available. The caller lifts the label block
+    (and its reserved band) by this amount so the marker clears the labels.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return 0.0
+    inv = fig.transFigure.inverted()
+    span_x0: float | None = None
+    span_x1: float | None = None
+    for artist in spec.artists:
+        try:
+            bb = artist.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        span_x0 = bb.x0 if span_x0 is None else min(span_x0, bb.x0)
+        span_x1 = bb.x1 if span_x1 is None else max(span_x1, bb.x1)
+    if span_x0 is None or span_x1 is None:
+        return 0.0
+    axes_top = spec.ax.get_position().y1
+    protrusion = 0.0
+    for text in spec.ax.texts:
+        if not text.get_visible() or not text.get_text():
+            continue
+        try:
+            bb = text.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        if bb.x1 < span_x0 or bb.x0 > span_x1:
+            continue
+        protrusion = max(protrusion, bb.y1 - axes_top)
+    return max(0.0, protrusion)
+
+
 def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
     """Height of the tallest ``y_axis_label`` block, in figure fraction.
 
@@ -448,7 +490,8 @@ def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
             bottom = bb.y0 if bottom is None else min(bottom, bb.y0)
         if top is None or bottom is None:
             continue
-        band = max(band, (top - bottom) + Y_AXIS_LABEL_MARGIN)
+        lift = _axes_top_protrusion_fig(fig, spec)
+        band = max(band, (top - bottom) + lift + Y_AXIS_LABEL_MARGIN)
     return band
 
 
@@ -465,15 +508,19 @@ def _reanchor_y_axis_labels(fig) -> None:
     for spec in _y_axis_label_specs(fig):
         pos = spec.ax.get_position()
         new_anchor_x = pos.x1 if spec.side == "right" else pos.x0
+        # Seat the block above any in-axes text that pokes past the axes top
+        # (fanned annotations, direct labels) — the lifted anchor is stored so
+        # a repeated finalize stays a no-op shift.
+        lifted_top = pos.y1 + _axes_top_protrusion_fig(fig, spec)
         dx = new_anchor_x - spec.anchor_x
-        dy = pos.y1 - spec.axes_top
+        dy = lifted_top - spec.axes_top
         if abs(dx) < 1e-12 and abs(dy) < 1e-12:
             continue
         for artist in spec.artists:
             x_old, y_old = artist.get_position()
             artist.set_position((x_old + dx, y_old + dy))
         spec.anchor_x = new_anchor_x
-        spec.axes_top = pos.y1
+        spec.axes_top = lifted_top
 
 
 def _side_protrusions_fig(fig, ax) -> tuple[float, float] | None:
