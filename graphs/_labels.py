@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import warnings
 from collections import defaultdict
 from typing import Iterable
@@ -230,6 +231,31 @@ def inset_tick_labels(ax, *, axis: str = "x") -> None:
     labels[-1].set_ha("right")
 
 
+_NUMERIC_TICK = re.compile(
+    r"""(?x)                    # verbose
+    ^
+    [\s$£€]*                    # optional currency prefix
+    [-−+]?                      # sign (ASCII hyphen or U+2212 minus)
+    (?=[\d.])                   # require at least one digit ahead
+    [\d,]*                      # integer digits, thousands separators
+    (?:\.\d+)?                  # decimal part
+    \s*
+    (?:[kKmMbBtT]|bn|tn)?       # compact magnitude suffix (format_count/_fmt_decade)
+    \s*%?                       # percent unit
+    $
+    """
+)
+
+
+def _ticks_are_numeric(labels: Iterable[str]) -> bool:
+    """True when every label reads as a number (with house units: %, $, k/M/B/T).
+
+    A single non-numeric or multi-line label marks the axis categorical —
+    ``y_labels_on_grid`` styling only suits numeric scale labels.
+    """
+    return all("\n" not in text and _NUMERIC_TICK.match(text.strip()) for text in labels)
+
+
 def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> None:
     """Sit y tick labels on top of gridlines that extend under them.
 
@@ -273,6 +299,15 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> 
     floor_loc = ax.get_ylim()[0]
     ticks = [(loc, label) for loc, label in ticks if y_lo <= loc <= y_hi]
     if not ticks:
+        return
+
+    # Categorical axes (bar rows, thermometer categories — anything whose tick
+    # text isn't a number) keep their native, tick-centred labels: lifting a
+    # category label onto its gridline reads as belonging to the row above,
+    # and a multi-line label overlaps it outright. The finalize gate checks
+    # y-gridline visibility, but a hand-rolled categorical chart that leaves
+    # the y-grid flag on would slip through — guard on the label text itself.
+    if not _ticks_are_numeric(label.get_text() for _, label in ticks):
         return
 
     # Clear any previous application (idempotent re-styling).

@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 from graphs import finalize, set_theme, y_labels_on_grid
+from graphs._labels import _ticks_are_numeric
 
 
 @pytest.fixture
@@ -78,6 +79,50 @@ def test_finalize_skips_on_grid_for_categorical_axes():
     plt.close(fig)
 
 
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ["12", "1.2k", "80%"],
+        ["$40", "−3", "1,200"],
+        ["2000", "2010", "2020"],
+        ["0", "3B", "1.5T"],
+    ],
+)
+def test_ticks_are_numeric_accepts_house_formats(labels):
+    assert _ticks_are_numeric(labels)
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ["France", "10", "20"],
+        ["banked sweep\n(all pairs)", "blend re-fire"],
+        ["Q1 2024", "Q2 2024"],
+    ],
+)
+def test_ticks_are_numeric_rejects_categories(labels):
+    assert not _ticks_are_numeric(labels)
+
+
+def test_on_grid_skips_categorical_labels_even_with_visible_y_grid():
+    """Regression: a hand-rolled categorical barh that leaves the y-grid flag on
+    used to slip past finalize's gridline-visibility gate; its labels were then
+    lifted onto their gridlines (``va="bottom"``), so each two-line row label
+    straddled the bar above it. The label-text guard must catch it."""
+    set_theme()
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    ax.barh([1, 0], [50, 80], height=0.5)
+    ax.set_yticks([1, 0])
+    ax.set_yticklabels(["banked sweep\n(all pairs)", "blend re-fire"], fontsize=8)
+    ax.grid(axis="x", linewidth=0.6)  # y-grid flag left untouched (theme default)
+    finalize(ax, title="Test", descriptor="Things, %", y_axis_right=False)
+    assert not _gid_artists(ax), "categorical labels must keep native placement"
+    assert [t.get_text() for t in ax.get_yticklabels() if t.get_text()], (
+        "native tick labels must survive finalize"
+    )
+    plt.close(fig)
+
+
 def test_left_side_labels_extend_leftward():
     set_theme()
     fig, ax = plt.subplots(figsize=(4.0, 3.0))
@@ -103,7 +148,6 @@ def test_baseline_extension_sits_at_floor_when_axis_inverted():
     ax.barh([0, 1, 2, 3], [0.8, 0.7, 0.5, 0.4])
     finalize(ax, title="Test", y_labels="ticks")
     ax.set_yticks([0, 1, 2, 3])
-    ax.set_yticklabels(["a", "b", "c", "d"])
     ax.set_ylim(-0.5, 3.5)
     ax.invert_yaxis()  # ylim -> (3.5, -0.5): the floor is 3.5, the ceiling -0.5
     y_labels_on_grid(ax)

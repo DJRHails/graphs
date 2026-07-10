@@ -1080,3 +1080,81 @@ def test_bottom_clearance_growth_matches_subplots_adjust_when_untouched():
     fig.subplots_adjust(wspace=0.5)
     assert ax.get_position().y0 == pytest.approx(pos.y0, abs=1e-9)
     plt.close(fig)
+
+
+def _fig_x0(fig, artist) -> float:
+    """Left edge of a text artist in figure fractions."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    return artist.get_window_extent(renderer=renderer).transformed(inv).x0
+
+
+def test_title_and_footnotes_align_with_left_label_column():
+    """A chart with a left category-label column anchors the title stack and the
+    footnotes at the labels' left edge (the chart's content-left), not at the
+    plot box — previously the title sat indented at ``bbox.x0`` while footnotes
+    used a fixed ``x=0.02``, three different left edges on one figure."""
+    fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    ax.barh([1, 0], [3, 83], height=0.5)
+    ax.set_yticks([1, 0])
+    ax.set_yticklabels(
+        ["banked sweep\n(all pairs, selection draw)", "blend re-fire\n(fired events)"],
+        fontsize=8,
+    )
+    finalize(
+        ax,
+        title="Title",
+        descriptor="Desc",
+        source="",
+        y_axis_right=False,
+        marker="rule",
+    )
+    footnotes(
+        fig,
+        "*first definition row",
+        "†second definition row",
+        source="Source: test",
+        check_anchors=False,
+    )
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+
+    content_left = fig._graphs_content_left
+    label_left = min(
+        t.get_window_extent(renderer=renderer).transformed(inv).x0
+        for t in ax.get_yticklabels()
+        if t.get_text()
+    )
+    assert content_left == pytest.approx(label_left, abs=5e-3), (
+        "title anchor must sit at the label column's left edge"
+    )
+    assert content_left < ax.get_position().x0, (
+        "content-left must be left of the plot box when labels protrude"
+    )
+
+    title = next(t for t in fig.texts if t.get_text() == "Title")
+    assert title.get_position()[0] == pytest.approx(content_left, abs=1e-9)
+    bottom_rows = [
+        t
+        for t in fig.texts
+        if t.get_text().startswith(("*first", "†second", "Source:"))
+    ]
+    assert bottom_rows, "footnote rows must exist"
+    for row in bottom_rows:
+        assert row.get_position()[0] == pytest.approx(content_left, abs=1e-9), (
+            f"footnote row {row.get_text()!r} must share the title anchor"
+        )
+    plt.close(fig)
+
+
+def test_title_anchor_unchanged_without_left_labels():
+    """Right-axis charts have no left-protruding text: the title stays at the
+    axes' left edge, exactly as before."""
+    fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    ax.plot([2000, 2010, 2020], [0, 50, 100])
+    finalize(ax, title="Title", descriptor="Desc", marker="rule")
+    title = next(t for t in fig.texts if t.get_text() == "Title")
+    assert title.get_position()[0] == pytest.approx(ax.get_position().x0, abs=1e-9)
+    plt.close(fig)
