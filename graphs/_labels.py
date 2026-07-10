@@ -266,6 +266,11 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> 
         if label.get_text() and label.get_visible()
     ]
     y_lo, y_hi = sorted(ax.get_ylim())
+    # The physical floor is whichever bound matplotlib draws at the bottom edge —
+    # always ``ylim[0]``, which is the numerical *max* on an inverted axis (e.g. a
+    # horizontal bar chart). Using ``y_lo`` here would put the dark baseline stub at
+    # the visual top on inverted axes.
+    floor_loc = ax.get_ylim()[0]
     ticks = [(loc, label) for loc, label in ticks if y_lo <= loc <= y_hi]
     if not ticks:
         return
@@ -316,7 +321,7 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> 
             grid = None
         color = grid.get_color() if grid is not None else "0.85"
         lw = grid.get_linewidth() if grid is not None else 0.6
-        on_baseline = bottom_spine.get_visible() and abs(loc - y_lo) <= 1e-9 * max(
+        on_baseline = bottom_spine.get_visible() and abs(loc - floor_loc) <= 1e-9 * max(
             1.0, abs(y_hi - y_lo)
         )
         if on_baseline:
@@ -354,13 +359,13 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> 
     # the gridlines. When a tick sits on the floor its extension above already
     # carries the dark baseline stroke, so only extend when the floor is bare.
     floor_has_tick = any(
-        abs(loc - y_lo) <= 1e-9 * max(1.0, abs(y_hi - y_lo)) for loc, _ in ticks
+        abs(loc - floor_loc) <= 1e-9 * max(1.0, abs(y_hi - y_lo)) for loc, _ in ticks
     )
     if bottom_spine.get_visible() and not floor_has_tick:
         ax.add_line(
             plt.Line2D(
                 [near_frac, edge_frac],
-                [y_lo, y_lo],
+                [floor_loc, floor_loc],
                 transform=trans,
                 color=bottom_spine.get_edgecolor(),
                 linewidth=bottom_spine.get_linewidth(),

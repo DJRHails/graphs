@@ -91,3 +91,35 @@ def test_left_side_labels_extend_leftward():
     assert all(line.get_xdata()[1] < 0.0 for line in lines)
     assert all(t.get_ha() == "left" for t in texts)
     plt.close(fig)
+
+
+def test_baseline_extension_sits_at_floor_when_axis_inverted():
+    """Regression: on an inverted axis (a horizontal bar chart) the dark baseline
+    stub extends at the physical floor (``ylim[0]``), never stranded at the visual
+    top. Previously the floor was taken as ``min(ylim)``, which is the visual *top*
+    once the axis is inverted, so the stub was drawn top-right."""
+    set_theme()
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    ax.barh([0, 1, 2, 3], [0.8, 0.7, 0.5, 0.4])
+    finalize(ax, title="Test", y_labels="ticks")
+    ax.set_yticks([0, 1, 2, 3])
+    ax.set_yticklabels(["a", "b", "c", "d"])
+    ax.set_ylim(-0.5, 3.5)
+    ax.invert_yaxis()  # ylim -> (3.5, -0.5): the floor is 3.5, the ceiling -0.5
+    y_labels_on_grid(ax)
+    lines = [a for a in _gid_artists(ax) if a in ax.lines]
+    tick_locs = list(ax.get_yticks())
+    extension_ys = [
+        float(line.get_ydata()[0])
+        for line in lines
+        if not any(abs(float(line.get_ydata()[0]) - t) < 1e-6 for t in tick_locs)
+    ]
+    floor, ceiling = ax.get_ylim()  # (3.5, -0.5) when inverted
+    assert extension_ys, "expected a baseline-extension stub off the tick locations"
+    assert all(abs(y - floor) < 1e-6 for y in extension_ys), (
+        f"baseline stub must sit at the physical floor {floor}, got {extension_ys}"
+    )
+    assert not any(abs(y - ceiling) < 1e-6 for y in extension_ys), (
+        f"baseline stub stranded at the visual top {ceiling}: {extension_ys}"
+    )
+    plt.close(fig)
