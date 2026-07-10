@@ -761,6 +761,22 @@ def _lowest_row_axes(fig) -> list:
     return rows[max(rows)]
 
 
+def _content_left_x(fig, ax, bbox) -> float:
+    """The chart's leftmost ink in figure coords — the title stack's anchor.
+
+    For a right-axis chart nothing protrudes left, so this is the axes edge
+    (``bbox.x0``, today's anchor). For a chart with a left-side label column
+    (horizontal bar categories, a left-mounted numeric axis) the Economist
+    convention is a title flush with those labels, not indented to the plot
+    box — anchor at the labels' measured left edge instead. Falls back to
+    ``bbox.x0`` when the renderer can't measure.
+    """
+    protrusions = _side_protrusions_fig(fig, ax)
+    if protrusions is None or protrusions[0] <= 0:
+        return bbox.x0
+    return max(0.0, bbox.x0 - protrusions[0])
+
+
 def _compute_side_margins(fig) -> tuple[float, float]:
     """Compute ``(left, right)`` figure-fraction margins from the y-axis text.
 
@@ -1624,7 +1640,10 @@ def finalize(
         _reanchor_y_axis_labels(fig)
 
     bbox = ax.get_position()
-    tx = title_x if title_x is not None else bbox.x0
+    tx = title_x if title_x is not None else _content_left_x(fig, ax, bbox)
+    # Stash the resolved anchor so ``footnotes`` (drawn after ``finalize``)
+    # defaults to the same left edge as the title stack.
+    fig._graphs_content_left = tx
 
     # Everything drawn between here and the end of the source block is
     # headline furniture (marker, title, descriptor, source) — tag it so
@@ -2652,7 +2671,7 @@ def footnotes(
     *notes: str,
     source: str | None = None,
     y: float | None = None,
-    x: float = 0.02,
+    x: float | None = None,
     max_width_frac: float = 0.95,
     wrap: bool = True,
     stack: bool | None = None,
@@ -2698,7 +2717,10 @@ def footnotes(
             owns rendering of both the notes and the source line.
         y: Explicit y in figure coords. When ``None``, the layout picks a
             sensible default just above the source-line band.
-        x: Left anchor in figure coords (matches ``finalize(title_x=0.02)``).
+        x: Left anchor in figure coords. ``None`` (default) aligns with the
+            title stack's resolved anchor from ``finalize`` (the chart's
+            content-left edge), falling back to ``0.02`` when ``footnotes``
+            runs on a figure ``finalize`` hasn't touched.
         max_width_frac: When ``source`` is provided, packing falls back to
             a stacked layout if source + notes would exceed this fraction
             of the figure width. Defaults to 0.95.
@@ -2721,6 +2743,8 @@ def footnotes(
     """
     if not notes and not source:
         return
+    if x is None:
+        x = getattr(fig, "_graphs_content_left", 0.02)
     if check_anchors:
         _check_footnote_anchors(fig, notes)
 
