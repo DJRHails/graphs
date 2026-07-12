@@ -343,6 +343,46 @@ def _get_renderer(fig):
             return None
 
 
+def _top_xtick_band_height_fig(fig, ax) -> float | None:
+    """Measure top-mounted x-tick labels' rendered height in figure fraction.
+
+    The top-axis counterpart to :func:`_xtick_band_height_fig`: the vertical
+    extent x-tick labels mounted above the axes (``xaxis.set_ticks_position
+    ("top")``, ``bar_h``, ``x_axis_top``, a ``secondary_xaxis("top")``) occupy
+    above the axes top (``bbox.y1``), as a figure fraction. ``_compute_auto_pads``
+    folds this into ``top_pad`` so a top-mounted axis doesn't compete with an
+    auto ``top_legend`` / the title stack for the same vertical space — without
+    this, the margin reserved room only for the title-stack/legend, and the
+    later exact-clearance pass further down ``finalize`` (which pushes the
+    title stack above the highest tick label) had no margin left to push into,
+    overflowing the title past the figure's top edge.
+
+    Returns:
+        The band height as a figure fraction. ``0.0`` when there are no visible
+        labels above the axes top (the common case: bottom-mounted or no x
+        ticks) — reserves nothing extra, so those charts are unaffected.
+        ``None`` when the renderer is unavailable (non-Agg backend), signalling
+        the caller to fall back to a fixed reserve.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
+    baseline_y1 = ax.get_position().y1
+    inv = fig.transFigure.inverted()
+    highest_y1 = baseline_y1
+    tick_labels = list(ax.get_xticklabels())
+    for child in getattr(ax, "child_axes", []):
+        tick_labels.extend(child.get_xticklabels())
+    for tl in tick_labels:
+        if not tl.get_text() or not tl.get_visible():
+            continue
+        tl_bb = tl.get_window_extent(renderer=renderer).transformed(inv)
+        if tl_bb.y1 <= baseline_y1:
+            continue  # bottom-mounted; the bottom band already covers it
+        highest_y1 = max(highest_y1, tl_bb.y1)
+    return max(0.0, highest_y1 - baseline_y1)
+
+
 def _top_legend(fig):
     """Return the auto-positioned :func:`top_legend` tagged on ``fig``, or None.
 
@@ -965,6 +1005,7 @@ def _compute_auto_pads(
     top_legend_band: float = 0.0,
     top_panel_label_band: float = 0.0,
     y_axis_label_band: float = 0.0,
+    top_tick_band: float = 0.0,
 ) -> tuple[float, float]:
     """Compute (top_pad, bottom_pad) for ``fig.subplots_adjust``.
 
@@ -980,7 +1021,13 @@ def _compute_auto_pads(
     margin rather than colliding with the axes or an overlying top legend.
     ``y_axis_label_band`` (measured block height plus a gap) reserves the strip
     a pre-``finalize`` :func:`y_axis_label` occupies just above the axes top, so
-    the descriptor seats above the label instead of on it.
+    the descriptor seats above the label instead of on it. ``top_tick_band``
+    (measured via :func:`_top_xtick_band_height_fig`, zero when the x-axis is
+    bottom-mounted) reserves room for top-mounted x-tick labels so they don't
+    compete with any of the bands above for the same space — the later
+    exact-clearance pass further down ``finalize`` still nudges the stack to
+    the precise measured tick top, but only within room this reservation
+    already budgeted, instead of overflowing past the figure's top edge.
 
     Bottom pad reserves room for the source line at its true depth below the
     axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
@@ -1022,6 +1069,7 @@ def _compute_auto_pads(
     stack_pt = title_block_pt + desc_block_pt + gap_pt + marker_pt
     top_pad = (
         y_start
+        + top_tick_band
         + top_legend_band
         + top_panel_label_band
         + y_axis_label_band
@@ -1546,12 +1594,23 @@ def finalize(
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
+    # A top-mounted x-axis (``xaxis.set_ticks_position("top")``, ``bar_h``,
+    # ``x_axis_top``, a ``secondary_xaxis("top")``) needs its own band in the
+    # top margin, or its tick labels compete with an overlying top_legend /
+    # the title stack for the same space (see ``_top_xtick_band_height_fig``).
+    fig_h_in = fig.get_figheight()
+    pt2fig_pre = 1.0 / 72.0 / fig_h_in
+    top_tick_band = _top_xtick_band_height_fig(fig, ax)
+    if top_tick_band is None:
+        top_tick_band = 0.0
+    elif top_tick_band > 0.0:
+        top_tick_band += TOP_TICK_CLEARANCE_PT * pt2fig_pre
+
     # An auto-positioned ``top_legend`` (tagged by ``top_legend`` when called
     # with no explicit ``y=``) sits in a band between the title-stack and the
     # axes. Measure its height now so the top margin reserves room for it; the
     # legend is re-anchored to the final axes top further below.
     top_legend = _top_legend(fig)
-    fig_h_in = fig.get_figheight()
     legend_gap = AUTO_LAYOUT_TOP_LEGEND_GAP_PT / 72.0 / fig_h_in
     top_legend_band = 0.0
     if top_legend is not None:
@@ -1605,6 +1664,7 @@ def finalize(
         top_legend_band=top_legend_band,
         top_panel_label_band=top_panel_label_band,
         y_axis_label_band=y_axis_label_band,
+        top_tick_band=top_tick_band,
     )
     left, right = _compute_side_margins(fig)
     adjust_kwargs = {
