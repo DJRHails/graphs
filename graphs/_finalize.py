@@ -361,8 +361,11 @@ def _top_xtick_band_height_fig(fig, ax) -> float | None:
         The band height as a figure fraction. ``0.0`` when there are no visible
         labels above the axes top (the common case: bottom-mounted or no x
         ticks) — reserves nothing extra, so those charts are unaffected.
-        ``None`` when the renderer is unavailable (non-Agg backend), signalling
-        the caller to fall back to a fixed reserve.
+        ``None`` when the renderer is unavailable (non-Agg backend).
+        ``finalize`` treats that as zero — unlike the bottom band's fixed
+        ``AUTO_LAYOUT_TICK_RESERVE_PT`` fallback, because without a renderer
+        the exact-clearance pass can't run either, and a blind reserve would
+        pad every renderer-less chart for the rare top-mounted case.
     """
     renderer = _get_renderer(fig)
     if renderer is None:
