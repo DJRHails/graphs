@@ -328,6 +328,15 @@ def top_legend(
         handlelength=handlelength,
         handletextpad=handletextpad,
         columnspacing=columnspacing,
+        # matplotlib's default (0.5 x fontsize) silently offsets the rendered legend
+        # away from an explicit ``bbox_to_anchor`` point — with the default fontsize
+        # (7.5pt) that is a 3.75pt gap this module's own spacing constants don't know
+        # about, which `finalize`'s auto band reservation (`AUTO_LAYOUT_TOP_LEGEND_GAP_PT`,
+        # and any caller-side clearance like `TOP_TICK_CLEARANCE_PT`) can't compensate
+        # for since it isn't measurable until after construction. Zero it so every
+        # anchor this module computes lands the legend exactly where asked, and every
+        # gap is the one this library named and sized on purpose.
+        borderaxespad=0,
     )
     # Tag an auto-positioned legend so a later ``finalize`` can reserve a band
     # for it under the title stack and re-anchor it to the final axes top. An

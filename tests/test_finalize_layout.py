@@ -525,6 +525,31 @@ def test_top_legend_explicit_y_is_not_repositioned():
     plt.close(fig)
 
 
+def test_top_legend_renders_exactly_at_its_anchor_y():
+    """The legend's rendered top sits at the requested anchor, not offset from it.
+
+    Regression for a real bug: matplotlib's default ``legend.borderaxespad``
+    (0.5 x fontsize) silently shifts a ``bbox_to_anchor``-positioned legend
+    away from the anchor point — 3.75pt at ``top_legend``'s default 7.5pt
+    fontsize. Every gap this module reserves (``AUTO_LAYOUT_TOP_LEGEND_GAP_PT``,
+    a caller's own tick clearance, ...) assumes the legend lands exactly where
+    it's told; an unaccounted-for 3.75pt silently eats into whichever gap is
+    tightest (see ``test_top_legend_clears_top_mounted_xtick_labels``, where it
+    ate the entire clearance and put the legend on top of the tick labels).
+    """
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    (line,) = ax.plot([0, 1, 2], [0, 1, 0], label="Series")
+    anchor_y = 0.82
+    leg = top_legend(fig, [line], ["Series"], y=anchor_y)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    rendered_top = leg.get_window_extent(renderer=renderer).transformed(
+        fig.transFigure.inverted()
+    ).y1
+    assert rendered_top == pytest.approx(anchor_y, abs=1e-6)
+    plt.close(fig)
+
+
 def test_no_top_legend_leaves_top_margin_unchanged():
     """A chart with no top_legend reserves no legend band (top margin unchanged).
 
@@ -545,6 +570,49 @@ def test_no_top_legend_leaves_top_margin_unchanged():
     plt.close(fig_b)
 
     assert top_a == pytest.approx(top_b, abs=1e-9)
+
+
+def test_top_legend_clears_top_mounted_xtick_labels():
+    """Auto top_legend + top-mounted x-ticks (the thermometer-chart convention):
+    legend sits above the tick-label row, not on top of it.
+
+    Regression for the code_correction figure bug: the top margin reserved room
+    for the legend and the title stack but not for a top-mounted x-axis's own
+    tick-label height, so the exact-clearance pass further down ``finalize``
+    (which pushes the stack above the highest tick label) had no room left and
+    the whole stack overflowed past the figure's top edge — visually, the
+    legend rendered on top of the tick-label row instead of above it.
+    """
+    fig, ax = plt.subplots(figsize=(7.0, 4.0))
+    (line,) = ax.plot([0, 20, 40, 60, 80, 100], [0, 1, 2, 1, 2, 3], label="Series")
+    ax.set_xlim(0, 100)
+    ax.xaxis.set_ticks_position("top")
+    ax.xaxis.set_label_position("top")
+    ax.tick_params(axis="x", top=True, bottom=False, labeltop=True, labelbottom=False)
+
+    top_legend(fig, [line], ["Series"])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        finalize(ax, title="T", descriptor="D", source="S", title_x=0.02)
+        from graphs._finalize import verify_layout
+
+        verify_layout(fig)
+    overflow = [str(w.message) for w in caught if "verify_layout" in str(w.message)]
+    assert not overflow, f"verify_layout flagged an overflow: {overflow}"
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    tick_top = max(
+        tl.get_window_extent(renderer=renderer).transformed(inv).y1
+        for tl in ax.get_xticklabels()
+        if tl.get_text()
+    )
+    legend_bottom = _legend_bbox(fig).y0
+    assert legend_bottom > tick_top, (
+        f"legend bottom {legend_bottom:.4f} overlaps the tick-label row (top {tick_top:.4f})"
+    )
+    plt.close(fig)
 
 
 def test_panel_labels_reserve_top_band():
