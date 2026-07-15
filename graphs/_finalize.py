@@ -3032,6 +3032,7 @@ def footnotes(
         )
 
     if not notes_clean:
+        _mark_deck_strip(fig, deck_strip_before)
         if verify:
             verify_layout(fig)
         return

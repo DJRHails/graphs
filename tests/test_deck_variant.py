@@ -95,6 +95,22 @@ def test_unpicklable_figure_falls_back_to_in_place(tmp_path):
     assert TITLE not in " ".join(_texts(fig))
 
 
+def test_empty_note_with_source_still_tagged_for_strip():
+    """``footnotes(fig, "", source=..., y=...)`` — an empty note plus an explicit source and y.
+
+    Regression: the source-aware branch's ``if not notes_clean: return`` used to return before
+    ``_mark_deck_strip``, so a source line rendered with no notes (a bare source string, common
+    when the caller has no footnote to add) survived into the deck variant untagged.
+    """
+    set_theme()
+    fig, ax = subplots("daily", height=3.4)
+    ax.plot(np.arange(6), np.arange(6) * 1.5)
+    finalize(ax, title=TITLE, descriptor=DESCRIPTOR, source="")
+    footnotes(fig, "", source=SOURCE, y=0.04, verify=False)
+    stripped = [t.get_text() for t in fig.texts if getattr(t, "_graphs_deck_strip", False)]
+    assert "Source: somewhere" in " ".join(stripped)
+
+
 def test_warns_when_nothing_to_strip(tmp_path):
     set_theme()
     fig, ax = plt.subplots()
