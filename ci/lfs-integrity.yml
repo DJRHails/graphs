@@ -1,0 +1,58 @@
+name: LFS integrity
+
+# Guards against the failure mode where a committed LFS pointer has no backing
+# blob on the LFS remote. When that happens, every fresh clone — including any
+# downstream `uv sync` that pins djrhails-graphs as a git dependency — aborts
+# with "smudge filter lfs failed: remote missing object <oid>" (this hit
+# examples/affordability_chart.png in July 2026). `git lfs fetch --all` asks
+# the server for every object reachable from every ref, so a pointer whose
+# blob was never uploaded (or was lost server-side) fails the build here
+# instead of in a consumer's install.
+#
+# Runs on PRs (catches a pointer committed without its blob before merge),
+# pushes to main and tags (the refs downstreams pin), and weekly (catches
+# server-side loss with no accompanying push).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify-lfs-objects:
+    name: Every LFS pointer has a blob on the remote
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (pointers only, no creds)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+
+      - name: Fetch every LFS object reachable from any ref
+        run: |
+          set -euo pipefail
+          git lfs fetch --all origin
+
+      - name: Verify HEAD and all tags resolve to local objects
+        run: |
+          set -euo pipefail
+          missing=0
+          for ref in HEAD $(git tag); do
+            while read -r oid _marker path; do
+              obj=".git/lfs/objects/${oid:0:2}/${oid:2:2}/${oid}"
+              if [ ! -f "$obj" ]; then
+                echo "::error::LFS object ${oid} for ${path} at ${ref} is missing from the remote"
+                missing=1
+              fi
+            done < <(git lfs ls-files --long "$ref")
+          done
+          exit "$missing"
