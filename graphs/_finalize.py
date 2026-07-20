@@ -2170,6 +2170,9 @@ def save_chart(
 
         save_chart(__file__)
 
+    Runs :func:`verify_graph_share` first — a figure whose graph fills less
+    than 75% of the rendered image warns before it is written.
+
     Args:
         script_file: Almost always ``__file__`` — the output lands beside
             the script, named after it.
@@ -2182,6 +2185,7 @@ def save_chart(
     """
     from pathlib import Path
 
+    verify_graph_share(plt.gcf())
     out = Path(script_file).resolve().with_suffix(".png")
     plt.savefig(out, bbox_inches="tight", dpi=dpi)
     if deck:
@@ -2472,6 +2476,76 @@ def verify_layout(fig, *, tolerance: float = 0.005) -> list[str]:
         warnings.warn(msg, stacklevel=3)
         issued.append(msg)
     return issued
+
+
+GRAPH_SHARE_MIN = 0.75
+
+
+def graph_area_fraction(fig) -> float:
+    """Fraction of the rendered (tight-cropped) figure the graph occupies.
+
+    "Graph" is the union of every visible axes' tight bbox — the data region
+    plus its tick labels, axis labels and in-axes legends. Everything else is
+    the headline stack (title marker, title, descriptor) and the bottom
+    source/footnote band. The denominator is the figure's own tight bbox, i.e.
+    the canvas ``savefig(bbox_inches="tight")`` actually writes.
+
+    Returns:
+        The area fraction in ``[0, 1]``; ``0.0`` when the figure has no
+        visible axes or can't be rendered (non-Agg backend).
+    """
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        return 0.0
+    boxes = []
+    for axes in fig.axes:
+        if not axes.get_visible():
+            continue
+        bb = axes.get_tightbbox(renderer)
+        if bb is not None and bb.width > 0 and bb.height > 0:
+            boxes.append(bb)
+    if not boxes:
+        return 0.0
+    union = mtransforms.Bbox.union(boxes)  # display pixels
+    full = fig.get_tightbbox(renderer)  # inches — scale to pixels to match
+    full_area = full.width * full.height * fig.dpi**2
+    if full_area <= 0:
+        return 0.0
+    return float(union.width * union.height / full_area)
+
+
+def verify_graph_share(fig=None, *, min_fraction: float = GRAPH_SHARE_MIN) -> str | None:
+    """Warn when the graph fills less than ``min_fraction`` of the figure.
+
+    A rendered chart should be mostly chart: when the title stack, legend
+    text and footnotes outweigh the plot, the reader gets a paragraph with a
+    graph attached. This check measures :func:`graph_area_fraction` and emits
+    one ``UserWarning`` below the threshold (75% by default).
+
+    Auto-called by ``save_chart()``. Call it manually before a bare
+    ``fig.savefig`` epilogue.
+
+    Args:
+        fig: Figure to inspect (current figure when omitted).
+        min_fraction: Minimum acceptable graph-area fraction.
+
+    Returns:
+        The warning message emitted, or ``None`` when the figure passes.
+    """
+    fig = fig or plt.gcf()
+    fraction = graph_area_fraction(fig)
+    if fraction == 0.0 or fraction >= min_fraction:
+        return None
+    msg = (
+        f"graphs.verify_graph_share: the graph fills {fraction:.0%} of the rendered "
+        f"figure (minimum {min_fraction:.0%}). Cut figure text — one-line title and "
+        f"descriptor, one-line legend entries, definitions and conditions moved to "
+        f"the writeup — or grow the plot with subplots(height=...)."
+    )
+    warnings.warn(msg, stacklevel=3)
+    return msg
 
 
 _LEADING_MARKERS = ("**", "††", "‡‡", "§§", "*", "†", "‡", "§")

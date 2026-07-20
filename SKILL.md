@@ -108,6 +108,14 @@ treatment below; the ✗ is the mistake the rule prevents.
   hand-set `subplots_adjust` before it.
 - **Read the rendered PNG back** and check it tells its story at a glance, every
   element earns its place, and it's the right chart type. → [Review](#review)
+- **The rendered figure is ≥75% graph.** The plot region (axes + tick labels +
+  in-axes legend) must fill at least 75% of the saved image; the headline stack
+  and footnote band share the remaining quarter. Budget: one-line title,
+  one-line descriptor, one-line legend entries, source row — definitions and
+  conditions go to the writeup, not the figure. ✗ a 2-line title + 3-line
+  descriptor + 5-line footnote wrapped around a half-height plot. `save_chart()`
+  measures this and **warns** below 75% (`verify_graph_share`); a bare
+  `fig.savefig` epilogue should call `verify_graph_share(fig)` itself.
 - **Line plots show uncertainty as a `ci_fill` band, never error-bar whiskers.**
   A connected series over a continuous/ordinal x (a sweep, a trend, a depth
   curve) gets a translucent band via `ci_fill(ax, x, lo, hi, color=line_col)`,
@@ -364,7 +372,7 @@ Style overrides to apply on top:
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
-| `save_chart(__file__, *, deck=False)`                               | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. `deck=True` also writes `<script>_deck.png`. |
+| `save_chart(__file__, *, deck=False)`                               | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. Runs `verify_graph_share` first (warns when the graph is <75% of the image). `deck=True` also writes `<script>_deck.png`. |
 | `save_deck_variant(fig, path, *, dpi=150)`                          | Deck variant beside the full chart: strips the tagged headline (marker, title, descriptor, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings; writes `<stem>_deck.png`. Call after saving the full chart. |
 
 ### Chart helpers
@@ -430,6 +438,8 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `verify_layout(fig, *, tolerance=0.005)`                            | Warn when any text artist (tick labels, titles, legends, footnotes) extends past the figure bounds. Catches the class of bug where `savefig(bbox_inches="tight")` silently expands the saved canvas to fit overflow. Auto-called by `footnotes()`. |
+| `verify_graph_share(fig=None, *, min_fraction=0.75)`                | Warn when the graph (union of axes tight bboxes) fills less than 75% of the rendered figure — the text-heavy-chart guard. Auto-called by `save_chart()`; call manually before a bare `fig.savefig`. |
+| `graph_area_fraction(fig)`                                          | The measured graph-area fraction behind `verify_graph_share` — the axes-union area over the tight-cropped canvas area. |
 | `finalize(..., allow_ylabel=False)`                                 | Runtime guard: `finalize()` **raises `ValueError`** when the axes carries a hardcoded non-empty `ax.set_ylabel(...)` (the descriptor should carry the quantity). Pass `allow_ylabel=True` for a coordinate plot (ROC/scatter) or a `twinx()` secondary axis. |
 | `enforcement/rules/no-hardcoded-ylabel.yml`                               | Lint-time twin of the above: ast-grep rule (`severity: error`) that flags a hardcoded non-empty `ax.set_ylabel(...)`, with a `# ast-grep-ignore: no-hardcoded-ylabel` escape for twin/coordinate axes. See [`enforcement/README.md`](./enforcement/README.md). |
 
@@ -472,7 +482,10 @@ For each rendered figure, answer three questions before moving on:
    read, decimal places past the data's precision — cut them. **Less data
    often makes the point sharper.** A six-row table reduced to its three
    meaningful rows is a better chart, not a smaller one. Apply the
-   "Every element earns its place" core principle ruthlessly.
+   "Every element earns its place" core principle ruthlessly. The measurable
+   floor: the graph fills ≥75% of the rendered image (`verify_graph_share`,
+   auto-run by `save_chart`) — below it, the figure is a paragraph with a
+   chart attached, and the fix is cutting text, not shrinking the plot.
 
 3. **Is this the right chart type?**
    Switching costs nothing — the script is ten lines.
