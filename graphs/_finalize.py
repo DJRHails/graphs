@@ -279,19 +279,21 @@ def _draw_delta(fig, tx: float, y_cursor: float) -> None:
 
 
 def _xtick_band_height_fig(fig, ax) -> float | None:
-    """Measure the bottom x-tick labels' rendered height in figure fraction.
+    """Measure the bottom x-axis text band's rendered height in figure fraction.
 
-    Returns the vertical extent the *bottom* x-axis tick labels occupy below
-    the axes baseline (``bbox.y0``), expressed as a fraction of the figure
-    height. Categorical bar charts put category names here (``forced`` /
-    ``calibrated`` / …); the auto-layout must reserve this band so a
-    ``footnotes()``/source line drawn below it can't overlap the labels.
+    Returns the vertical extent the *bottom* x-axis tick labels and the
+    x-axis label (``ax.xaxis.label``, set via :func:`x_axis_label` /
+    ``ax.set_xlabel``) occupy below the axes baseline (``bbox.y0``),
+    expressed as a fraction of the figure height. Categorical bar charts put
+    category names here (``forced`` / ``calibrated`` / …) and the xlabel
+    seats below them; the auto-layout must reserve this whole band so a
+    ``footnotes()``/source line drawn below it can't overlap either.
 
     Mirrors the renderer-based measurement the title-stack and source-line
     placement already use (``get_window_extent`` transformed through
-    ``transFigure``). Tick labels that sit *above* the axes (``bar_h`` /
-    ``x_axis_top`` / a ``secondary_xaxis("top")``) are ignored — those are
-    handled by the top-stack clearance, not the bottom band.
+    ``transFigure``). Tick labels (or an xlabel) that sit *above* the axes
+    (``bar_h`` / ``x_axis_top`` / a ``secondary_xaxis("top")``) are ignored —
+    those are handled by the top-stack clearance, not the bottom band.
 
     Returns:
         The band height as a figure fraction. ``0.0`` when there are no
@@ -301,14 +303,9 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
         (non-Agg backend), signalling the caller to fall back to a fixed
         reserve since the labels couldn't be measured.
     """
-    try:
-        renderer = fig.canvas.get_renderer()
-    except AttributeError:
-        fig.canvas.draw()
-        try:
-            renderer = fig.canvas.get_renderer()
-        except AttributeError:
-            return None
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
 
     baseline_y0 = ax.get_position().y0
     inv = fig.transFigure.inverted()
@@ -322,6 +319,24 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
         if tl_bb.y0 >= baseline_y0:
             continue
         lowest_y0 = min(lowest_y0, tl_bb.y0)
+
+    # The x-axis label seats below the tick band. Its rendered *position* is
+    # only set during a real draw (Agg's ``get_renderer()`` hands back a
+    # renderer without drawing), so a freshly set label measures at a stale
+    # place — but its HEIGHT is reliable, and matplotlib puts the label's top
+    # a ``labelpad`` below the lowest tick label (or the axes bottom when no
+    # ticks render there). Compute the band analytically from those instead
+    # of trusting a possibly stale bbox.
+    xlabel = ax.xaxis.label
+    if (
+        xlabel.get_text()
+        and xlabel.get_visible()
+        and ax.xaxis.get_label_position() == "bottom"
+    ):
+        label_h = xlabel.get_window_extent(renderer=renderer).transformed(inv).height
+        pad_fig = ax.xaxis.labelpad / 72.0 / fig.get_figheight()
+        lowest_y0 = min(lowest_y0, lowest_y0 - pad_fig - label_h)
+
     return max(0.0, baseline_y0 - lowest_y0)
 
 
@@ -1032,19 +1047,23 @@ def _compute_auto_pads(
     the precise measured tick top, but only within room this reservation
     already budgeted, instead of overflowing past the figure's top edge.
 
-    Bottom pad reserves room for the source line at its true depth below the
-    axes baseline, ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``,
-    where ``tick_band`` is the *measured* height of the bottom x-tick labels
-    (``_xtick_band_height_fig`` — zero when there are none, so line/scatter
-    charts are unaffected). Short numeric ticks leave the ``SOURCE_Y_OFFSET``
-    term winning (charts unchanged); tall category labels make the tick term
-    win, lifting the source clear of them. Extra ``footnotes()`` rows that
-    stack above the source deepen the reservation further, so a categorical
-    chart with multi-line footnotes no longer collides its category labels
-    with the first footnote row. A breathing margin is added below.
+    Bottom pad (delegated to :func:`_compute_bottom_pad`) reserves room for
+    the source line at its true depth below the axes baseline,
+    ``max(SOURCE_Y_OFFSET, tick_band + SOURCE_TICK_CLEARANCE)``, where
+    ``tick_band`` is the *measured* height of the bottom x-tick labels plus
+    the x-axis label below them (``_xtick_band_height_fig`` — zero when there
+    are none, so line/scatter charts are unaffected). Short numeric ticks
+    leave the ``SOURCE_Y_OFFSET`` term winning (charts unchanged); tall
+    category labels or an ``x_axis_label`` make the band term win, lifting
+    the source clear of them. Extra ``footnotes()`` rows that stack above the
+    source deepen the reservation further, so a categorical chart with
+    multi-line footnotes no longer collides its category labels with the
+    first footnote row. A breathing margin is added below.
     """
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
+
+    bottom_pad = _compute_bottom_pad(fig, ax, source=source, footnote_lines=footnote_lines)
 
     title_block_pt = 0.0
     if title:
@@ -1080,12 +1099,27 @@ def _compute_auto_pads(
         + AUTO_LAYOUT_TOP_PAD_PT * pt2fig
     )
 
-    # Reserve the measured height of the bottom x-tick labels (category names
-    # on a vertical bar chart). A measured 0.0 means there are genuinely no
-    # bottom labels (line/scatter charts, top-mounted ticks) — reserve nothing
-    # so those charts are unaffected. Only fall back to the fixed single-row
-    # reserve when the renderer couldn't measure at all (``None``, non-Agg).
-    #
+    return top_pad, bottom_pad
+
+
+def _compute_bottom_pad(fig, ax, *, source: str, footnote_lines: int) -> float:
+    """Bottom margin that seats the x-tick/xlabel band and the source block.
+
+    Reserves the measured height of the bottom x-axis text band — the x-tick
+    labels (category names on a vertical bar chart) plus the x-axis label
+    below them (:func:`_xtick_band_height_fig`). A measured 0.0 means there is
+    genuinely no bottom text (line/scatter charts with top-mounted ticks) —
+    reserve nothing so those charts are unaffected. Only fall back to the
+    fixed single-row reserve when the renderer couldn't measure at all
+    (``None``, non-Agg).
+
+    Shared by ``_compute_auto_pads`` (the ``finalize`` reservation) and
+    :func:`_reserve_xlabel_band` (an ``x_axis_label`` set *after*
+    ``finalize``), so both call orders reserve the identical bottom margin.
+    """
+    fig_h_in = fig.get_figheight()
+    pt2fig = 1.0 / 72.0 / fig_h_in
+
     # On a multi-row grid the bottom margin governs the *lowest* row's baseline,
     # so measure that row's x-tick band, not the (usually top) anchor row's.
     band_axes = _lowest_row_axes(fig) or [ax]
@@ -1106,13 +1140,11 @@ def _compute_auto_pads(
     source_h_fig = SOURCE_SIZE_PT * pt2fig
     footnotes_source = nrows > 1 and not source and footnote_lines == 0
     if footnotes_source:
-        return top_pad, _footnotes_band_depth(
-            fig, (), "src"
-        ) + AUTO_LAYOUT_BOTTOM_MARGIN
+        return _footnotes_band_depth(fig, (), "src") + AUTO_LAYOUT_BOTTOM_MARGIN
 
     has_source_band = bool(source) or footnote_lines > 0
     if not has_source_band:
-        return top_pad, tick_band + AUTO_LAYOUT_BOTTOM_MARGIN
+        return tick_band + AUTO_LAYOUT_BOTTOM_MARGIN
 
     # The source line is placed below the lowest of ``bbox.y0 - SOURCE_Y_OFFSET``
     # and ``(bbox.y0 - tick_band) - SOURCE_TICK_CLEARANCE`` (see the source
@@ -1137,9 +1169,123 @@ def _compute_auto_pads(
         )
         source_depth = max(source_depth, wrap_depth)
 
-    bottom_pad = source_depth + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
+    return source_depth + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
 
-    return top_pad, bottom_pad
+
+def _source_line_y(fig, ax) -> float:
+    """The source line's anchor y (its top edge, ``va="top"``) in figure coords.
+
+    Places the source below the lowest of the axes baseline minus
+    ``SOURCE_Y_OFFSET`` and the lowest x-tick label / xlabel minus
+    ``SOURCE_TICK_CLEARANCE`` — wrapped multi-line x-tick labels and the
+    x-axis label both extend below the baseline and previously caused the
+    source line to overlap them. Matches the reservation
+    :func:`_compute_bottom_pad` makes, so the line lands inside the reserved
+    band. Falls back to the plain offset when the renderer can't measure
+    (non-Agg backend).
+    """
+    bbox = ax.get_position()
+    source_y = bbox.y0 - SOURCE_Y_OFFSET
+    try:
+        renderer = fig.canvas.get_renderer()
+        inv = fig.transFigure.inverted()
+        lowest_fig_y = bbox.y0
+        xlabel = ax.xaxis.label
+        if xlabel.get_text():
+            lowest_fig_y = min(
+                lowest_fig_y,
+                xlabel.get_window_extent(renderer=renderer).transformed(inv).y0,
+            )
+        for tl in ax.get_xticklabels():
+            if not tl.get_text():
+                continue
+            lowest_fig_y = min(
+                lowest_fig_y,
+                tl.get_window_extent(renderer=renderer).transformed(inv).y0,
+            )
+        source_y = min(source_y, lowest_fig_y - SOURCE_TICK_CLEARANCE)
+    except Exception:
+        pass
+    return source_y
+
+
+@dataclass(kw_only=True)
+class _FinalizeRecord:
+    """What a post-``finalize`` :func:`x_axis_label` needs to re-open the layout.
+
+    ``finalize`` reserves the bottom band from what is measurable at call
+    time; an x-axis label set *afterwards* paints into room that was never
+    reserved — directly over the source line. ``finalize`` tags this record
+    on the figure so :func:`_reserve_xlabel_band` can re-run the bottom
+    reservation with the label now present and shift the source artists to
+    the anchor ``finalize`` would have chosen had the label existed up front.
+
+    Attributes:
+        ax: The axes ``finalize`` was anchored on.
+        source: The ``source=`` string ``finalize`` received (reservation
+            input — empty means no source band was reserved).
+        footnote_lines: The ``footnote_lines=`` value ``finalize`` received.
+        source_artists: Every ``Text`` artist the source line rendered
+            (superscript chunks included); empty when there was no source.
+        source_y: The source line's anchor y at render time (``None`` when
+            no source was drawn).
+    """
+
+    ax: object
+    source: str
+    footnote_lines: int
+    source_artists: list = field(default_factory=list)
+    source_y: float | None = None
+
+
+def _reserve_xlabel_band(fig, ax) -> None:
+    """Grow the bottom margin and re-seat the source under a late x-axis label.
+
+    Called by :func:`x_axis_label` when ``finalize`` has already run on
+    ``ax``: the bottom band was reserved without the label, so the freshly
+    set label would paint over the source line. Recomputes the bottom pad
+    with the label now measurable (:func:`_compute_bottom_pad` — the same
+    reservation ``finalize`` makes), raises the panels in place (tops stay
+    put, mirroring :func:`_ensure_bottom_clearance`, so the title stack and
+    any re-anchored furniture are untouched), and shifts the source artists
+    to the anchor :func:`_source_line_y` now picks. Both call orders
+    therefore land on identical layouts.
+
+    Multi-row grids skip the growth (moving their bottom margin post hoc
+    shifts the lower row's top and detaches ``panel_label`` headings — the
+    same constraint ``_ensure_bottom_clearance`` documents) but still move
+    the source clear of the label.
+    """
+    record = getattr(fig, "_graphs_finalize_record", None)
+    if record is None or record.ax is not ax:
+        return
+    fig.canvas.draw()
+
+    nrows, _ = _gridspec_shape(fig)
+    panels = [a for a in fig.axes if a.get_subplotspec() is not None]
+    if panels and nrows == 1:
+        needed_bottom = _compute_bottom_pad(
+            fig, ax, source=record.source, footnote_lines=record.footnote_lines
+        )
+        lowest_panel_y0 = min(a.get_position().y0 for a in panels)
+        grow = needed_bottom - lowest_panel_y0
+        if grow > 1e-6:
+            for panel in panels:
+                pos = panel.get_position()
+                panel._set_position(
+                    (pos.x0, pos.y0 + grow, pos.width, pos.height - grow)
+                )
+            fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
+            fig.canvas.draw()
+
+    if record.source_artists and record.source_y is not None:
+        new_source_y = _source_line_y(fig, ax)
+        dy = new_source_y - record.source_y
+        if abs(dy) > 1e-9:
+            for artist in record.source_artists:
+                x_old, y_old = artist.get_position()
+                artist.set_position((x_old, y_old + dy))
+            record.source_y = new_source_y
 
 
 def _superscript_axis_label(ax, axis: str) -> None:
@@ -1905,34 +2051,13 @@ def finalize(
     elif marker == "rule":
         _draw_rule(fig, tx, y_cursor)
 
+    source_artists: list = []
+    source_y: float | None = None
     if source:
-        # Place source below the lowest of: xlabel, x-tick labels.
-        # Wrapped multi-line x-tick labels can extend further down than the
-        # xlabel and previously caused the source line to overlap them.
-        source_y = bbox.y0 - SOURCE_Y_OFFSET
-        try:
-            renderer = fig.canvas.get_renderer()
-            lowest_fig_y = bbox.y0
-            xlabel = ax.xaxis.label
-            if xlabel.get_text():
-                xlbl_bbox = xlabel.get_window_extent(renderer=renderer)
-                lowest_fig_y = min(
-                    lowest_fig_y,
-                    xlbl_bbox.transformed(fig.transFigure.inverted()).y0,
-                )
-            for tl in ax.get_xticklabels():
-                if not tl.get_text():
-                    continue
-                tl_bb = tl.get_window_extent(renderer=renderer)
-                lowest_fig_y = min(
-                    lowest_fig_y,
-                    tl_bb.transformed(fig.transFigure.inverted()).y0,
-                )
-            source_y = min(source_y, lowest_fig_y - SOURCE_TICK_CLEARANCE)
-        except Exception:
-            pass
+        source_y = _source_line_y(fig, ax)
         fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
         source_clean, source_urls = strip_links(source)
+        texts_before_source = set(fig.texts)
         render_text_with_superscripts(
             fig,
             tx,
@@ -1945,6 +2070,18 @@ def finalize(
             ha="left",
             url_spans=source_urls,
         )
+        source_artists = [t for t in fig.texts if t not in texts_before_source]
+
+    # Record what a post-``finalize`` ``x_axis_label`` needs to re-open the
+    # bottom band (see ``_reserve_xlabel_band``): the anchor axes, the source
+    # reservation inputs, and the source artists with their current anchor.
+    fig._graphs_finalize_record = _FinalizeRecord(
+        ax=ax,
+        source=source,
+        footnote_lines=footnote_lines,
+        source_artists=source_artists,
+        source_y=source_y,
+    )
 
     _mark_deck_strip(fig, deck_strip_before)
 
@@ -2035,12 +2172,21 @@ def x_axis_label(
     and the standard axis-label point size. Footnote markers (``*``, ``†``,
     ``‡``, ``§``) in ``text`` are auto-superscripted by ``finalize`` via its
     post-processing pass — no separate call needed.
+
+    Call order doesn't matter: set *before* ``finalize``, the label is part
+    of the measured bottom band its auto-layout reserves; set *after*, the
+    already-finalized layout re-opens (:func:`_reserve_xlabel_band`) — the
+    bottom margin grows and the source line re-seats below the label — so
+    both orders produce the same layout. (Superscript markers are still only
+    processed by ``finalize``, so a marker-carrying label should be set
+    before it.)
     """
     color = color if color is not None else C_SPINE
     kwargs: dict = {"color": color, "fontsize": fontsize}
     if labelpad is not None:
         kwargs["labelpad"] = labelpad
     ax.set_xlabel(text, **kwargs)
+    _reserve_xlabel_band(ax.get_figure(), ax)
 
 
 def y_axis_label(
