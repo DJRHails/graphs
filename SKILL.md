@@ -203,14 +203,14 @@ Behaviour that's automatic unless you override it:
   left, a plain right-axis chart keeps a tight left + a measured right);
   **`wspace`/`hspace` size a grid of panels** (wspace from the inter-column
   y-label width, hspace from the x-tick band + `panel_label` height — pass
-  `finalize(panel_labels=True)`
-  for a multi-row faceted layout that adds `panel_label` headings after
-  finalize). On a non-Agg backend the side margins and spacing fall back to
-  fixed constants. A caller may still `fig.subplots_adjust(...)` *after*
-  `finalize` to override a specific value, but the everyday faceted / wide-left
-  charts no longer need to. Don't restore `top=` after finalize — it anchors
-  the title to its own auto top, so overriding `top` detaches the title; raise
-  `y_start` instead to reserve more headroom.
+  `finalize(panel_labels=True)` for a multi-row faceted layout that adds
+  `panel_label` headings after finalize). On a non-Agg backend the side
+  margins and spacing fall back to fixed constants. A caller may still
+  `fig.subplots_adjust(...)` *after* `finalize` to override a specific value,
+  but the everyday faceted / wide-left charts no longer need to. Don't restore
+  `top=` after finalize — it anchors the title to its own auto top, so
+  overriding `top` detaches the title; raise `y_start` instead to reserve more
+  headroom.
 - **Multi-note footnotes stack by default.** `footnotes(stack=None)` (the
   default) renders more than one note — or a single note that can't pack
   beside the source row — as a term-definition stack: one row per note, source on the

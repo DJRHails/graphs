@@ -461,8 +461,13 @@ def test_multirow_reseat_warns_when_source_hits_manual_note():
         source=SOURCE,
     )
     source_bb = _source_bbox(fig)
-    fig.text(source_bb.x0, source_bb.y0 - 0.004, "Note: manual footnote",
-             fontsize=7, va="top")
+    fig.text(
+        source_bb.x0,
+        source_bb.y0 - 0.004,
+        "Note: manual footnote",
+        fontsize=7,
+        va="top",
+    )
     with pytest.warns(UserWarning, match="caller-placed figure text"):
         x_axis_label(axes[1], XLABEL)
     plt.close(fig)

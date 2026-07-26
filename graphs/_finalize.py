@@ -1267,10 +1267,7 @@ def _refresh_on_grid_labels(ax) -> None:
     # ``y_labels_on_grid`` records the side it detected; fall back to the
     # frozen artists' alignment for figures styled before that attribute
     # existed (an unpickled figure).
-    side = getattr(ax, "_graphs_on_grid_side", None)
-    if side is None:
-        side = "right" if frozen[0].get_ha() == "right" else "left"
-    side_right = side == "right"
+    side_right = getattr(ax, "_graphs_on_grid_side", frozen[0].get_ha()) == "right"
     ax.tick_params(axis="y", labelright=side_right, labelleft=not side_right)
     from graphs._labels import y_labels_on_grid
 
@@ -1290,9 +1287,9 @@ def _foreign_band_bboxes(fig, ax, record, renderer, inv) -> list:
     ours = set(record.source_artists)
     foreign = []
     for t in fig.texts:
-        if t in ours or not t.get_text() or not t.get_visible():
+        if t in ours or t.get_gid() == "axis-label-superscript":
             continue
-        if t.get_gid() == "axis-label-superscript":
+        if not t.get_text() or not t.get_visible():
             continue
         bb = t.get_window_extent(renderer=renderer).transformed(inv)
         if bb.y1 < baseline:
@@ -1345,82 +1342,6 @@ def _warn_late_label_intrusion(fig, ax, record, *, source_moved: bool) -> None:
             return
 
 
-def _reserve_xlabel_band(fig, ax) -> None:
-    """Grow the bottom margin and re-seat the source under a late x-axis label.
-
-    Called by :func:`x_axis_label` when ``finalize`` has already run on the
-    figure: the bottom band was reserved without the label, so the freshly
-    set label would paint over the source line. Recomputes the bottom pad
-    with the label now measurable (:func:`_compute_bottom_pad` — the same
-    reservation ``finalize`` makes), raises the panels in place (tops stay
-    put, mirroring :func:`_ensure_bottom_clearance`, so the title stack and
-    any re-anchored furniture are untouched), re-applies the on-grid y
-    labels the resize invalidates (:func:`_refresh_on_grid_labels`), and
-    shifts the source artists *down* to the anchor :func:`_source_line_y`
-    now picks. Both call orders therefore land on identical layouts. The
-    label may sit on any lowest-row panel, not just the ``finalize`` anchor
-    — the band measurement and the source scan both cover the whole row.
-
-    Warns instead of silently degrading in the cases re-opening can't cover:
-
-    * a label on an axes above the lowest row — its clearance is inter-row
-      ``hspace``, settled at ``finalize`` time;
-    * multi-row grids and bare ``add_axes`` figures — growth is skipped
-      (moving a multi-row grid's bottom margin post hoc shifts the lower
-      row's top and detaches ``panel_label`` headings, the same constraint
-      ``_ensure_bottom_clearance`` documents; a no-gridspec figure has no
-      panels to move); the ``finalize``-drawn source still moves clear of
-      the label — a source drawn later by ``footnotes()`` is out of reach —
-      and the warning fires when the move pushes it off-canvas;
-    * a band drawn by ``footnotes()`` — invisible to the record, so it is
-      warned about on actual intrusion (:func:`_warn_late_label_intrusion`).
-    """
-    record = getattr(fig, "_graphs_finalize_record", None)
-    if record is None:
-        return
-    xlabel = ax.xaxis.label
-    if (
-        not xlabel.get_text()
-        or not xlabel.get_visible()
-        or ax.xaxis.get_label_position() != "bottom"
-    ):
-        # Clearing a label, or a top-mounted one, needs no bottom-band room.
-        return
-    nrows, _ = _gridspec_shape(fig)
-    if nrows > 1 and ax not in _lowest_row_axes(fig):
-        warnings.warn(
-            "graphs.x_axis_label: the label was set after finalize on an axes "
-            "above the lowest row; its inter-row clearance (hspace) cannot be "
-            "re-opened post hoc. Set the label before finalize.",
-            stacklevel=3,
-        )
-        return
-    fig.canvas.draw()
-
-    panels = [a for a in fig.axes if a.get_subplotspec() is not None]
-    if panels and nrows == 1:
-        needed_bottom = _compute_bottom_pad(
-            fig, record.ax, source=record.source, footnote_lines=record.footnote_lines
-        )
-        lowest_panel_y0 = min(a.get_position().y0 for a in panels)
-        grow = needed_bottom - lowest_panel_y0
-        if grow > 1e-6:
-            for panel in panels:
-                pos = panel.get_position()
-                panel._set_position(
-                    (pos.x0, pos.y0 + grow, pos.width, pos.height - grow)
-                )
-            fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
-            # The resize re-derives every panel's y locator, not just the
-            # anchor's — refresh them all (no-op without frozen labels).
-            for panel in panels:
-                _refresh_on_grid_labels(panel)
-            fig.canvas.draw()
-
-    source_moved = _reseat_source_below_label(fig, record)
-    _warn_late_label_intrusion(fig, ax, record, source_moved=source_moved)
-
-
 def _reseat_source_below_label(fig, record) -> bool:
     """Shift the recorded source artists down clear of a late x-axis label.
 
@@ -1455,6 +1376,82 @@ def _reseat_source_below_label(fig, record) -> bool:
             stacklevel=4,
         )
     return moved
+
+
+def _reserve_xlabel_band(fig, ax) -> None:
+    """Grow the bottom margin and re-seat the source under a late x-axis label.
+
+    Called by :func:`x_axis_label` when ``finalize`` has already run on the
+    figure: the bottom band was reserved without the label, so the freshly
+    set label would paint over the source line. Recomputes the bottom pad
+    with the label now measurable (:func:`_compute_bottom_pad` — the same
+    reservation ``finalize`` makes), raises the panels in place (tops stay
+    put, mirroring :func:`_ensure_bottom_clearance`, so the title stack and
+    any re-anchored furniture are untouched), re-applies the on-grid y
+    labels the resize invalidates (:func:`_refresh_on_grid_labels`), and
+    shifts the source artists *down* to the anchor :func:`_source_line_y`
+    now picks. Both call orders therefore land on identical layouts. The
+    label may sit on any lowest-row panel, not just the ``finalize`` anchor
+    — the band measurement and the source scan both cover the whole row.
+
+    Warns instead of silently degrading in the cases re-opening can't cover:
+
+    * a label on an axes above the lowest row — its clearance is inter-row
+      ``hspace``, settled at ``finalize`` time;
+    * multi-row grids and bare ``add_axes`` figures — growth is skipped
+      (moving a multi-row grid's bottom margin post hoc shifts the lower
+      row's top and detaches ``panel_label`` headings, the same constraint
+      ``_ensure_bottom_clearance`` documents; a no-gridspec figure has no
+      panels to move); the ``finalize``-drawn source still moves clear of
+      the label — a source drawn later by ``footnotes()`` is out of reach —
+      and the warning fires when the move pushes it off-canvas;
+    * a band drawn by ``footnotes()`` — invisible to the record, so it is
+      warned about on actual intrusion (:func:`_warn_late_label_intrusion`).
+    """
+    record = getattr(fig, "_graphs_finalize_record", None)
+    if record is None:
+        return
+    # Clearing a label, or a top-mounted one, needs no bottom-band room.
+    xlabel = ax.xaxis.label
+    if (
+        not xlabel.get_text()
+        or not xlabel.get_visible()
+        or ax.xaxis.get_label_position() != "bottom"
+    ):
+        return
+    nrows, _ = _gridspec_shape(fig)
+    if nrows > 1 and ax not in _lowest_row_axes(fig):
+        warnings.warn(
+            "graphs.x_axis_label: the label was set after finalize on an axes "
+            "above the lowest row; its inter-row clearance (hspace) cannot be "
+            "re-opened post hoc. Set the label before finalize.",
+            stacklevel=3,
+        )
+        return
+    fig.canvas.draw()
+
+    panels = [a for a in fig.axes if a.get_subplotspec() is not None]
+    if panels and nrows == 1:
+        needed_bottom = _compute_bottom_pad(
+            fig, record.ax, source=record.source, footnote_lines=record.footnote_lines
+        )
+        lowest_panel_y0 = min(a.get_position().y0 for a in panels)
+        grow = needed_bottom - lowest_panel_y0
+        if grow > 1e-6:
+            for panel in panels:
+                pos = panel.get_position()
+                panel._set_position(
+                    (pos.x0, pos.y0 + grow, pos.width, pos.height - grow)
+                )
+            fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
+            # The resize re-derives every panel's y locator, not just the
+            # anchor's — refresh them all (no-op without frozen labels).
+            for panel in panels:
+                _refresh_on_grid_labels(panel)
+            fig.canvas.draw()
+
+    source_moved = _reseat_source_below_label(fig, record)
+    _warn_late_label_intrusion(fig, ax, record, source_moved=source_moved)
 
 
 def _superscript_axis_label(ax, axis: str) -> None:
@@ -1553,6 +1550,23 @@ def _superscript_axis_label(ax, axis: str) -> None:
     label_artist.set_alpha(0.0)
     label_artist._graphs_superscripted = True
     label_artist._graphs_superscript_artists = overlay_artists
+
+
+def _drop_superscript_overlay(label_artist) -> None:
+    """Undo :func:`_superscript_axis_label` on one axis-label artist.
+
+    The overlay leaves the native artist hidden (``alpha=0``) beneath its
+    chunks, so writing fresh text into that artist would render invisible
+    under a stale overlay. Remove the chunks and un-hide the artist. No-op
+    on a label ``finalize`` never superscripted.
+    """
+    if not getattr(label_artist, "_graphs_superscripted", False):
+        return
+    for overlay in getattr(label_artist, "_graphs_superscript_artists", []):
+        overlay.remove()
+    label_artist.set_alpha(None)
+    label_artist._graphs_superscripted = False
+    label_artist._graphs_superscript_artists = []
 
 
 def _figure_legends(fig) -> list:
@@ -2368,17 +2382,10 @@ def x_axis_label(
     kwargs: dict = {"color": color, "fontsize": fontsize}
     if labelpad is not None:
         kwargs["labelpad"] = labelpad
-    # Replacing a marker label that finalize already superscripted: the
-    # native artist is hidden (``alpha=0``) behind overlay chunks, so the
-    # new text would render invisible under the stale overlay. Restore the
-    # native artist and drop the overlay first.
-    old_label = ax.xaxis.label
-    if getattr(old_label, "_graphs_superscripted", False):
-        for overlay in getattr(old_label, "_graphs_superscript_artists", []):
-            overlay.remove()
-        old_label.set_alpha(None)
-        old_label._graphs_superscripted = False
-        old_label._graphs_superscript_artists = []
+    # ``set_xlabel`` writes into the existing artist, so a label finalize
+    # already superscripted must shed its overlay first or the new text
+    # renders invisible underneath it.
+    _drop_superscript_overlay(ax.xaxis.label)
     ax.set_xlabel(text, **kwargs)
     fig = ax.get_figure()
     if _has_marker(text) and getattr(fig, "_graphs_finalize_record", None) is not None:
