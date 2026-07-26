@@ -39,7 +39,10 @@ panels = {
     "Sexual": np.cumsum(np.random.randn(80) * 0.006),
 }
 
-fig, axes = subplots("wide", height=3.9, ncols=3, sharey=False)
+# 4.3 rather than 3.9: the auto-layout reserves the per-panel x-axis labels'
+# band since the xlabel-reservation fix, and the shorter figure dipped under
+# the 75% graph-share floor.
+fig, axes = subplots("wide", height=4.3, ncols=3, sharey=False)
 
 for ax, (panel_name, y) in zip(axes, panels.items()):
     ci = np.abs(np.random.randn(len(x))) * 0.025 + 0.01

@@ -232,7 +232,7 @@ finalize(
     source="Sources: [US Census Bureau](https://www.census.gov/); [The Economist](https://www.economist.com/)",
     y_axis_right=True,
     autoscale_y=False,
-    footnote_lines=2,  # right-anchored footnote sits below source + xlabel
+    footnote_lines=2,  # deepens the band for the manual footnote at y0 - 0.075 below
 )
 
 # Broken-axis heartbeat mark, auto-aligned to the y-tick-label column.

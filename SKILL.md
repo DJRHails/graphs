@@ -198,7 +198,7 @@ Behaviour that's automatic unless you override it:
   `subplots_adjust` margins AND the inter-panel `wspace`/`hspace` from the
   renderer — there is no opt-out and, in the common cases, nothing to set by
   hand. Top/bottom fit the title-stack and the source/footnote band over the
-  measured x-tick labels; **left/right are measured from the actual y-axis
+  measured x-tick labels and x-axis label; **left/right are measured from the actual y-axis
   text** (a chart with long left-hung category labels gets a wide left, a plain
   right-axis chart keeps a tight left + a measured right); **`wspace`/`hspace`
   size a grid of panels** (wspace from the inter-column y-label width, hspace
@@ -368,7 +368,7 @@ Style overrides to apply on top:
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
 | `footnotes(fig, *notes, source=None, wrap=True, stack=None, check_anchors=True)` | Footnote strip + optional source line. `stack=None` (default) auto-picks the layout: several notes — or one that can't pack beside the source — stack one row per note with the source on the bottom row, and the bottom band self-sizes to the measured rows; a single short note packs beside the source. Auto-superscripts `*, †, ‡, §, **, ††, ‡‡, §§`. Long rows word-wrap to fit the figure (`wrap=True`, default). Warns when a leading marker has no anchor in the title/descriptor/axis labels/legend entries (axes or figure-level)/in-chart text (`check_anchors=True`). |
 | `y_axis_label(ax, text, *, unit=None)`                              | Horizontal title above the y-axis; `unit=` renders below in muted colour. Call BEFORE `finalize` — it reserves a band under the descriptor and re-anchors the label to the final axes top, clear of in-axes text poking past the axes edge and (for `side="left"`) above the `panel_label` band. |
-| `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. Order-independent: `finalize` reserves the label's bottom band; set after `finalize`, the band re-opens and the source line re-seats below the label. |
+| `x_axis_label(ax, text, *, labelpad=None)`                          | Project-styled `set_xlabel` (`C_SPINE`, 8.5pt); footnote markers superscripted by `finalize`. Order-independent on single-row figures: `finalize` reserves the label's bottom band; set after `finalize`, the band re-opens and the source line re-seats below the label (any lowest-row panel). Set BEFORE `finalize` on multi-row grids, when `footnotes()` owns the bottom band, or when the label carries a footnote marker — a late label warns in those cases. |
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
