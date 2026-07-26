@@ -198,11 +198,12 @@ Behaviour that's automatic unless you override it:
   `subplots_adjust` margins AND the inter-panel `wspace`/`hspace` from the
   renderer — there is no opt-out and, in the common cases, nothing to set by
   hand. Top/bottom fit the title-stack and the source/footnote band over the
-  measured x-tick labels and x-axis label; **left/right are measured from the actual y-axis
-  text** (a chart with long left-hung category labels gets a wide left, a plain
-  right-axis chart keeps a tight left + a measured right); **`wspace`/`hspace`
-  size a grid of panels** (wspace from the inter-column y-label width, hspace
-  from the x-tick band + `panel_label` height — pass `finalize(panel_labels=True)`
+  measured x-tick labels and x-axis label; **left/right are measured from the
+  actual y-axis text** (a chart with long left-hung category labels gets a wide
+  left, a plain right-axis chart keeps a tight left + a measured right);
+  **`wspace`/`hspace` size a grid of panels** (wspace from the inter-column
+  y-label width, hspace from the x-tick band + `panel_label` height — pass
+  `finalize(panel_labels=True)`
   for a multi-row faceted layout that adds `panel_label` headings after
   finalize). On a non-Agg backend the side margins and spacing fall back to
   fixed constants. A caller may still `fig.subplots_adjust(...)` *after*

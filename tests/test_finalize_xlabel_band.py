@@ -15,6 +15,8 @@ Both orders must now produce the same layout, with the label and the
 source line fully on-canvas and clear of each other.
 """
 
+import warnings
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -300,6 +302,7 @@ def test_on_grid_ylabels_match_between_orders():
         return labels
 
     before, after = frozen_labels("before"), frozen_labels("after")
+    assert before, "chart produced no on-grid labels — the comparison is vacuous"
     assert before == after, (
         f"frozen on-grid y labels differ between orders: {before} vs {after}"
     )
@@ -353,5 +356,229 @@ def test_label_shrink_after_finalize_keeps_source_seated():
     assert abs(after_clear.y0 - seated.y0) < 1e-6, (
         f"clearing the label re-raised the source: {seated.y0:.4f} -> "
         f"{after_clear.y0:.4f}"
+    )
+    plt.close(fig)
+
+
+def _late_label_warnings(caught):
+    """The subset of ``caught`` warnings emitted by the late-label paths."""
+    return [w for w in caught if "graphs.x_axis_label" in str(w.message)]
+
+
+def test_late_label_refreshes_on_grid_labels_on_all_panels():
+    """The post-hoc resize moves EVERY panel; every panel must refresh.
+
+    Per-panel ``y_labels_on_grid`` is the documented facet pattern
+    (``examples/faceted_chart.py``). A late label's band growth re-derives
+    each panel's y locator, so a sibling refreshed only on the anchor keeps
+    frozen labels floating over gridlines that no longer exist.
+    """
+    from graphs import y_labels_on_grid
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+    axes[0].plot([0, 1, 2, 3], [1, 3, 2.5, 4])
+    axes[1].plot([0, 1, 2, 3], [10, 45, 30, 62])
+    finalize(
+        axes[0],
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+        source=SOURCE,
+    )
+    for panel in axes:
+        y_labels_on_grid(panel)
+    x_axis_label(axes[1], "Sweep budget\nsamples per monitor")
+    fig.canvas.draw()
+    for idx, panel in enumerate(axes):
+        lo, hi = sorted(panel.get_ylim())
+        tick_ys = {round(y, 6) for y in panel.get_yticks() if lo <= y <= hi}
+        frozen_ys = {
+            round(t.get_position()[1], 6)
+            for t in panel.texts
+            if t.get_gid() == "y-labels-on-grid"
+        }
+        assert frozen_ys, f"panel {idx} lost its on-grid labels"
+        assert frozen_ys <= tick_ys, (
+            f"panel {idx} keeps frozen labels at {sorted(frozen_ys)} but its "
+            f"gridline ticks are at {sorted(tick_ys)}"
+        )
+    plt.close(fig)
+
+
+def test_late_marker_label_warns():
+    """Superscripts are only processed by finalize's post-pass."""
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    finalize(ax, title="Recall rises with sweep budget", source=SOURCE)
+    with pytest.warns(UserWarning, match="footnote marker"):
+        x_axis_label(ax, "Sweep budget*")
+    plt.close(fig)
+
+
+def test_late_label_replacing_marker_label_renders_visible():
+    """Replacing a finalize-superscripted label must restore visibility.
+
+    finalize hides a marker-carrying native artist (``alpha=0``) behind
+    overlay chunks; writing new text into that artist rendered it invisible
+    under the stale overlay, and the stale overlay tripped the foreign-text
+    intrusion warning with a bogus footnotes() diagnosis.
+    """
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    x_axis_label(ax, "Sweep budget*")
+    finalize(
+        ax,
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+        source=SOURCE,
+    )
+    assert ax.xaxis.label.get_alpha() == 0.0, "finalize did not superscript"
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        x_axis_label(ax, "Fresh unmarked label")
+    assert not _late_label_warnings(caught), (
+        f"replacing the label misfired: {[str(w.message) for w in caught]}"
+    )
+    assert ax.xaxis.label.get_alpha() is None, "the new label is still hidden"
+    stale = [t for t in fig.texts if t.get_gid() == "axis-label-superscript"]
+    assert not stale, "the old superscript overlay was left on screen"
+    plt.close(fig)
+
+
+def test_multirow_reseat_warns_when_source_hits_manual_note():
+    """The re-seated source must not silently paint over caller figure text.
+
+    Multi-row grids skip band growth, so the source drops by the label
+    height; a caller note placed just below it (the ``age_gap_chart``
+    manual-footnote pattern) was silently overpainted.
+    """
+    fig, axes = plt.subplots(2, 1, figsize=(5.0, 7.0))
+    for panel in axes:
+        panel.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    finalize(
+        axes[1],
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+        source=SOURCE,
+    )
+    source_bb = _source_bbox(fig)
+    fig.text(source_bb.x0, source_bb.y0 - 0.004, "Note: manual footnote",
+             fontsize=7, va="top")
+    with pytest.warns(UserWarning, match="caller-placed figure text"):
+        x_axis_label(axes[1], XLABEL)
+    plt.close(fig)
+
+
+def test_negative_labelpad_does_not_shrink_band():
+    """A negative labelpad lifts the label, never shrinks the tick band."""
+
+    def reserved_bottom(with_label):
+        fig, ax = plt.subplots(figsize=(5.0, 3.4))
+        ax.bar(range(5), [3, 5, 2, 6, 4])
+        ax.set_xticks(range(5))
+        ax.set_xticklabels(
+            ["forced", "calibrated", "audited", "unmonitored", "baseline"],
+            rotation=40,
+            ha="right",
+        )
+        if with_label:
+            x_axis_label(ax, XLABEL, labelpad=-15)
+        finalize(
+            ax,
+            title="Recall rises with sweep budget",
+            descriptor="Monitor recall",
+            source=SOURCE,
+        )
+        bottom = ax.get_position().y0
+        plt.close(fig)
+        return bottom
+
+    with_label, without = reserved_bottom(True), reserved_bottom(False)
+    assert with_label >= without - 1e-6, (
+        f"labelpad=-15 shrank the reserved band: {with_label:.4f} < {without:.4f}"
+    )
+
+
+def test_fitting_late_label_with_footnotes_stays_quiet():
+    """The footnotes-intrusion warning must not fire on a label that fits."""
+    from graphs import footnotes
+
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    finalize(
+        ax,
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+    )
+    footnotes(fig, source=SOURCE)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        x_axis_label(ax, "Sweep budget")
+    assert not _late_label_warnings(caught), (
+        f"a fitting single-line label misfired: {[str(w.message) for w in caught]}"
+    )
+    plt.close(fig)
+
+
+def test_late_label_without_source_grows_band():
+    """The grow path must not depend on a finalize-drawn source existing."""
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    ax.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    finalize(
+        ax,
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+    )
+    bottom_before = ax.get_position().y0
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        x_axis_label(ax, "Sweep budget\nsamples per monitor")
+    assert not _late_label_warnings(caught)
+    assert ax.get_position().y0 > bottom_before + 1e-6, "band did not grow"
+    label_bb = _fig_bbox(fig, ax.xaxis.label)
+    assert label_bb.y0 >= 0.0, "label ran off-canvas"
+    plt.close(fig)
+
+
+def test_repeated_late_labels_are_idempotent():
+    """A second late label on a sibling panel must not re-grow or misfire."""
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.4))
+    for panel in axes:
+        panel.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    finalize(
+        axes[0],
+        title="Recall rises with sweep budget",
+        descriptor="Monitor recall",
+        source=SOURCE,
+    )
+    x_axis_label(axes[0], XLABEL)
+    bottom_first = axes[0].get_position().y0
+    source_first = _source_bbox(fig).y0
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        x_axis_label(axes[1], XLABEL)
+    assert not _late_label_warnings(caught)
+    assert abs(axes[0].get_position().y0 - bottom_first) < 1e-6, (
+        "an equal-height second label re-grew the band"
+    )
+    assert abs(_source_bbox(fig).y0 - source_first) < 1e-6, (
+        "an equal-height second label moved the source"
+    )
+    plt.close(fig)
+
+
+def test_clearing_or_top_mounting_late_label_stays_quiet():
+    """Labels that need no bottom-band room must not trip the warnings."""
+    fig, axes = plt.subplots(2, 1, figsize=(5.0, 3.4))
+    for panel in axes:
+        panel.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    x_axis_label(axes[0], XLABEL)
+    finalize(axes[1], title="Recall rises with sweep budget", source=SOURCE)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        x_axis_label(axes[0], "")
+        axes[0].xaxis.set_label_position("top")
+        x_axis_label(axes[0], "Top-mounted label")
+    assert not _late_label_warnings(caught), (
+        f"no-bottom-band labels misfired: {[str(w.message) for w in caught]}"
     )
     plt.close(fig)
