@@ -1939,6 +1939,7 @@ def finalize(
         y_cursor += top_legend_band
 
     if descriptor:
+        n_texts_before_descriptor = len(fig.texts)
         desc_lines = descriptor.split("\n")
         n_desc_lines = len(desc_lines)
         fp_desc = fm.FontProperties(family=_get_font_condensed(), weight="normal")
@@ -1989,6 +1990,11 @@ def finalize(
                 ha="left",
                 linespacing=DESCRIPTOR_LINESPACING,
             )
+        # The descriptor doubles as the y-axis label, so save_deck_variant
+        # keeps these artists when the chart has no other y-axis labelling
+        # (graphs/_deck.py) — tag them distinctly from the rest of the stack.
+        for descriptor_artist in fig.texts[n_texts_before_descriptor:]:
+            descriptor_artist._graphs_deck_descriptor = True
         # Descriptor line box ≈ 9.5pt × 1.20 ≈ 11.4pt for each line.
         y_cursor += DESCRIPTOR_LINE_BOX_PT * pt2fig * n_desc_lines + line_gap
 

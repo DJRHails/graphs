@@ -373,7 +373,7 @@ Style overrides to apply on top:
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
 | `save_chart(__file__, *, deck=False)`                               | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. Runs `verify_graph_share` first (warns when the graph is <75% of the image). `deck=True` also writes `<script>_deck.png`. |
-| `save_deck_variant(fig, path, *, dpi=150)`                          | Deck variant beside the full chart: strips the tagged headline (marker, title, descriptor, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings; writes `<stem>_deck.png`. Call after saving the full chart. |
+| `save_deck_variant(fig, path, *, dpi=150)`                          | Deck variant beside the full chart: strips the tagged headline (marker, title, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings — and keeps the descriptor when the chart has no `y_axis_label` block and no axes ylabel, since the descriptor is the house y-axis label; writes `<stem>_deck.png`. Call after saving the full chart. |
 
 ### Chart helpers
 
