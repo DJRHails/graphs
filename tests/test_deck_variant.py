@@ -4,6 +4,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import pickle
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -19,6 +21,7 @@ from graphs import (
     subplots,
     y_axis_label,
 )
+from graphs._deck import _has_y_axis_labelling
 
 TITLE = "Bold headline claim"
 DESCRIPTOR = "Metric* and unit"
@@ -119,16 +122,19 @@ def test_warns_when_nothing_to_strip(tmp_path):
         save_deck_variant(fig, tmp_path / "bare.png")
 
 
-def _descriptor_only_chart(*, ylabel: str | None = None):
+def _descriptor_only_chart(*, ylabel: str | None = None, picklable: bool = False):
     """A chart whose ONLY y-axis labelling is the descriptor (no y_axis_label block).
 
-    The ``FuncFormatter`` lambda makes the figure unpicklable, forcing the
-    in-place strip path so tests can inspect the live figure as the deck state.
+    By default the ``FuncFormatter`` lambda makes the figure unpicklable,
+    forcing the in-place strip path so tests can inspect the live figure as
+    the deck state; ``picklable=True`` skips the formatter so the figure
+    takes ``save_deck_variant``'s default pickle-clone path.
     """
     set_theme()
     fig, ax = subplots("daily", height=3.4)
     ax.plot(np.arange(6), np.arange(6) * 1.5)
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.0f}%"))
+    if not picklable:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.0f}%"))
     if ylabel is not None:
         ax.set_ylabel(ylabel)
     finalize(
@@ -183,6 +189,34 @@ def test_descriptor_stripped_when_axes_ylabel_allowed(tmp_path):
     joined = " ".join(_texts(fig))
     assert "Metric" not in joined
     assert ax.get_ylabel() == "true-positive rate"
+
+
+def test_descriptor_decision_survives_pickle_clone(tmp_path):
+    """The default clone path: the keep/strip decision's inputs survive pickle.
+
+    ``save_deck_variant`` decides ``keep_descriptor`` on a pickled clone, so it
+    depends on two custom attributes surviving the round-trip — the
+    ``_graphs_deck_descriptor`` tag on the descriptor's artists and
+    ``fig._graphs_y_axis_labels`` behind ``_has_y_axis_labelling``. Matplotlib's
+    ``__getstate__`` happens to preserve both today; pin that, in both
+    directions of the decision, so a pickling change can't silently flip deck
+    variants while the in-place-path tests stay green.
+    """
+    fig, _ = _descriptor_only_chart(picklable=True)
+    full = tmp_path / "chart.png"
+    fig.savefig(full, dpi=150, bbox_inches="tight")
+
+    deck = save_deck_variant(fig, full)
+
+    assert deck.is_file()
+    assert TITLE in " ".join(_texts(fig))  # live figure untouched: the clone path ran
+    clone = pickle.loads(pickle.dumps(fig))
+    assert not _has_y_axis_labelling(clone)  # descriptor-only chart: keep
+    assert any(getattr(t, "_graphs_deck_descriptor", False) for t in clone.texts)
+
+    fig_block, _ = _chart()  # y_axis_label block: the clone must still say strip
+    clone_block = pickle.loads(pickle.dumps(fig_block))
+    assert _has_y_axis_labelling(clone_block)
 
 
 def test_descriptor_artists_carry_both_deck_tags():
