@@ -158,6 +158,8 @@ PANEL_RULE_Y_OFFSET = 0.052  # rule offset above axes top (figure coords)
 PANEL_LABEL_Y_OFFSET = 0.010  # label offset above axes top (figure coords)
 
 # --- Source / footnotes vertical positions (figure coords) ---
+SOURCE_RIGHT_MARGIN = 0.01  # keep the wrapped source clear of the right edge
+_SOURCE_RIGHT_MARGIN = SOURCE_RIGHT_MARGIN
 SOURCE_Y_OFFSET = 0.06  # source line offset below bbox.y0
 SOURCE_TICK_CLEARANCE = 0.015  # extra clearance below lowest tick label/xlabel
 Y_AXIS_LABEL_MARGIN = 0.005  # y-axis label offset above bbox.y1
@@ -1169,7 +1171,20 @@ def _compute_bottom_pad(fig, ax, *, source: str, footnote_lines: int) -> float:
         )
         source_depth = max(source_depth, wrap_depth)
 
-    return source_depth + source_h_fig + AUTO_LAYOUT_BOTTOM_MARGIN
+    # One line box per *wrapped* source row. Reserving a single row while the renderer wraps to
+    # two drops the tail off the bottom of the figure, which is the same silent truncation the
+    # wrap exists to prevent — just on the other axis.
+    source_rows = _source_row_count(fig, source, x=_content_left_x(fig, ax, ax.get_position()))
+    return source_depth + source_h_fig * source_rows + AUTO_LAYOUT_BOTTOM_MARGIN
+
+
+def _source_row_count(fig, source: str, *, x: float) -> int:
+    """How many lines the source will occupy once wrapped to the figure width."""
+    if not source:
+        return 1
+    fp = fm.FontProperties(family=_get_font_condensed(), weight="light")
+    clean, _ = strip_links(source)
+    return _wrap_source_to_width(fig, clean, fp, x=x).count("\n") + 1
 
 
 def _source_line_y(fig, ax) -> float:
@@ -2063,6 +2078,16 @@ def finalize(
         source_y = _source_line_y(fig, ax)
         fp_src = fm.FontProperties(family=_get_font_condensed(), weight="light")
         source_clean, source_urls = strip_links(source)
+        # Wrap to the figure width, as the descriptor and the footnote band already do. A long
+        # provenance line ("#2341 planted grid + the two real pools, Claude Opus 4.8
+        # thinking-off, deletion-rendered rows, auto-stopped; joint_family_corpus.py") otherwise
+        # renders as one line and runs off the right edge, silently truncating the very
+        # attribution the source line exists to carry.
+        #
+        # ``_wrap_preserve_offsets`` and not ``textwrap``: it turns an inter-word space into a
+        # newline one-for-one, so the character offsets that ``url_spans`` and the superscript
+        # renderer index against stay valid. A length-changing wrap would shift every link.
+        source_clean = _wrap_source_to_width(fig, source_clean, fp_src, x=tx)
         texts_before_source = set(fig.texts)
         render_text_with_superscripts(
             fig,
@@ -2504,6 +2529,25 @@ def _wrap_to_fig_width(
                 lines[-2], lines[-1] = head, rebalanced
         out_lines.extend(lines)
     return "\n".join(out_lines)
+
+
+def _wrap_source_to_width(fig, text: str, fp, *, x: float) -> str:
+    """Word-wrap the source line to the figure width, preserving character offsets.
+
+    Mirrors the footnote band's sizing: measure the single-line width, derive a per-character
+    pitch from it, and wrap to the space actually available from ``x`` to the right edge. Returns
+    ``text`` unchanged when it already fits or cannot be measured, so a short source line keeps
+    its exact bytes.
+    """
+    if not text:
+        return text
+    avail = max(0.0, 1.0 - x - _SOURCE_RIGHT_MARGIN)
+    width = _text_width_fig(fig, text, fp, fontsize=SOURCE_SIZE_PT)
+    if width <= avail or width <= 0:
+        return text
+    per_char = width / len(text)
+    max_chars = int(avail / per_char) if per_char > 0 else len(text)
+    return _wrap_preserve_offsets(text, max_chars) if max_chars > 0 else text
 
 
 def _wrap_preserve_offsets(text: str, max_chars: int) -> str:
