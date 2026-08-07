@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pytest
 
-from graphs import finalize, footnotes, panel_label, set_theme, top_legend
+from graphs import finalize, footnotes, panel_label, set_theme, subplots, top_legend
 from graphs._finalize import (
     AUTO_LAYOUT_LEFT,
     AUTO_LAYOUT_RIGHT,
@@ -1225,4 +1225,43 @@ def test_title_anchor_unchanged_without_left_labels():
     finalize(ax, title="Title", descriptor="Desc", marker="rule")
     title = next(t for t in fig.texts if t.get_text() == "Title")
     assert title.get_position()[0] == pytest.approx(ax.get_position().x0, abs=1e-9)
+    plt.close(fig)
+
+
+def test_long_source_wraps_and_stays_inside_the_figure():
+    """A long provenance line must wrap, not run off the right edge.
+
+    The source line is the figure's attribution — where the data came from, which model, which
+    script. Rendered as one unwrapped line it silently loses its tail past the right edge, so the
+    reader sees a truncated provenance and cannot tell it is truncated. The descriptor and the
+    footnote band already wrap; the source did not.
+    """
+    set_theme()
+    fig, ax = subplots("daily", height=4.4)
+    ax.plot([1, 2, 3], [1, 4, 2])
+    long_source = (
+        "#2341 planted grid + the two real pools, Claude Opus 4.8 thinking-off, "
+        "deletion-rendered rows, auto-stopped; joint_family_corpus.py"
+    )
+    finalize(ax, title="T", descriptor="d", source=long_source)
+    fig.canvas.draw()
+    rendered = [t for t in fig.texts if long_source.split(",")[0] in t.get_text()]
+    assert rendered, "source line was not rendered"
+    assert "\n" in rendered[0].get_text(), "long source did not wrap"
+    right = rendered[0].get_window_extent(fig.canvas.get_renderer()).x1
+    assert right <= fig.get_window_extent().x1 + 1.0, "wrapped source still overflows the figure"
+    bottom = rendered[0].get_window_extent(fig.canvas.get_renderer()).y0
+    assert bottom >= -1.0, "wrapped source fell off the bottom — the band was under-reserved"
+    plt.close(fig)
+
+
+def test_short_source_is_left_exactly_as_given():
+    """Wrapping must not touch a source that already fits: same bytes, one line."""
+    set_theme()
+    fig, ax = subplots("daily", height=4.4)
+    ax.plot([1, 2], [1, 2])
+    finalize(ax, title="T", descriptor="d", source="joint_family_corpus.py")
+    fig.canvas.draw()
+    rendered = [t for t in fig.texts if "joint_family_corpus.py" in t.get_text()]
+    assert rendered and rendered[0].get_text() == "joint_family_corpus.py"
     plt.close(fig)
