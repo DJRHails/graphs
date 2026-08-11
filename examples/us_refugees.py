@@ -70,7 +70,6 @@ finalize(
     ax,
     title="The days when America settled more refugees than anywhere else are over",
     descriptor="United States, refugee resettlement, ’000",
-    footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
 # finalize auto-layouts the right margin from the measured right-hand y-tick
 # labels, so they fit on this narrow figure — no manual subplots_adjust needed.

@@ -111,7 +111,6 @@ finalize(
     title="America is the biggest polluter of CO₂ per person",
     descriptor="CO₂ emissions per person, 2017, tonnes",
     autoscale_y=False,
-    footnote_lines=2,  # x-axis label sits between the ticks and the source
 )
 footnotes(fig, source="Sources: GCP; CDIAC; UN")
 

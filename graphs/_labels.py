@@ -327,6 +327,10 @@ def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> 
         if sum(centres) / len(centres) < (ax_bbox.x0 + ax_bbox.x1) / 2
         else "right"
     )
+    # Record the detected side explicitly: ``_finalize._refresh_on_grid_labels``
+    # needs it to re-enable the right native label column, and the frozen
+    # artists' ``ha`` is a rendering choice, not a side contract.
+    ax._graphs_on_grid_side = side
 
     # Common outer edge: pad + widest label, converted to axes-x fraction.
     axes_w_px = ax_bbox.width
