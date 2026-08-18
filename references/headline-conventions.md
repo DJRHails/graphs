@@ -10,7 +10,7 @@ next question, and every fact sits on the lowest row that still serves it:
 
 | Row | Question it answers | Carries | Never carries |
 |---|---|---|---|
-| Title | What did you find? | One plain-language claim (or the question, if the intervals can't back a claim). Quantified where the chart is. Coined terms starred\* or rewritten away. | New winks, second clauses, condition tags, methodology. |
+| Title | What question does this graph answer? | The graph's question, simple and specific, in plain reader-facing language. Coined terms starred\* or rewritten away. | Takeaway claims (brittle — they rot on a re-run), new winks, second clauses, condition tags, methodology. |
 | Descriptor | What exactly is plotted? | Measured quantity + axis mapping, one sentence — or nothing, if an on-chart label already names it. | Model ids, protocol knobs, sample sizes, condition tags, CI machinery. |
 | Footnotes | What do the words mean; under what conditions? | Starred definitions first (with a concrete example), then conditions + model. | CI/whisker mechanics, epistemic status tags, project-internal commentary. |
 | Source | Where is this from? | `Source: <dataset> (N=…); <script>` | A bare filename; an unnamed dataset; a placeholder N. |
@@ -27,44 +27,47 @@ Two global bans cut across every row:
   confidence live in the research doc, not on the figure. If a footnote
   needs the lab notebook to parse, rewrite or cut it.
 
-## Title — one plain claim the chart can defend
+## Title — the graph's question, simple and specific
 
-- **State the finding in plain reader-facing language.**
-  - ✗ `"Outclassing the guardians"` → ✓ `"Claude Opus 4.8 outscores the
-    specialised guard models"`
-  - ✗ `"Per-decoy false positives: the independent mode pays a constant
-    premium (semantic, thinking off)"` → ✓ `"Number of harms under watch
-    does not increase false positives"`
+Titles pose the graph's question, not a takeaway claim. A claim title
+("Claude Opus 4.8 outscores the specialised guard models") is brittle —
+a data-derived title rots the moment a re-run, a model bump, or a new
+slice moves the number, to the point of needing verb hacks
+(`"lifts" if b >= f else "drops"`) to stay honest — and it duplicates the
+finding that already lives in the chart and the surrounding prose. The
+question form names what the graph is *for* and stays true on every
+re-render.
+
+- **Pose the question in plain reader-facing language.**
+  - ✗ `"Outclassing the guardians"` (wink, topic-only)
+  - ✗ `"Claude Opus 4.8 outscores the specialised guard models"`
+    (takeaway claim — brittle)
+  - ✓ `"How do the guard models compare on policy-violation F1?"`
+  - ✗ `"The budgeted watchlist lifts mismatch AUROC from 0.967 to 0.987"`
+    → ✓ `"How well does each arm separate matched harm from its
+    negatives?"`
+- **Specific enough that the chart visibly answers it.** "How does
+  category distance influence cross-firing?" is answerable by the drawn
+  panels; "What about cross-firing?" is not. If the drawn data can't
+  settle the question, it's the wrong question (or the wrong chart).
+- **One question.** No appendix clauses, no stacked sub-questions.
+- **Where the finding goes instead:** the chart itself (emphasis colour,
+  direct labels, callouts on the load-bearing comparison) and the caption
+  or surrounding prose, which can carry the quantified claim and be
+  updated with the text around it.
 - **Don't write winks.** The Economist house wink ("Eastern promise",
   "Bremorse") survives in the `examples/` replica gallery, not on research
-  figures — a generated wink is nearly always worse than the plain claim.
-  An *existing* wink survives review only when it decodes on sight into
-  the exact mechanism: "Marking your own homework" stayed (it *is*
-  self-review, the experiment's manipulation), while "Anatomy of a miss" —
-  a strong wink, but topic-only — lost to `"Sonnet 4.6 misses by running
-  out of tokens; Opus 4.8 by misjudging"`. The test: does the wink carry
-  the story, or just gesture at the subject?
-- **Quantify what the chart quantifies.** `"Crossfire* concentrates in
-  9 categories"`, not "a few"; `"96% of cross-fires* cite a harm that is
-  really present"`; `"Static inputs overstate recall — buried harm drops
-  to 54%"`. Data-derived numbers in titles are good; compute them in the
-  script, don't hand-type them.
-- **Claim strength = evidence strength.** Overlapping intervals demote the
-  claim to a question — `"Only fine same-category referents cross-fire
-  under load"` became `"How does category distance influence
-  cross-firing?"` with the hedge moved into the descriptor. A real but
-  scoped effect gets a modest verb — "can be worse", not "is far more
-  evadable". And the *chart* must be able to defend the title: if the
-  title says an arm "holds", that arm's CI band must be drawn and visibly
-  support it.
-- **One claim.** Cut appendix clauses: `"Resolution is signal up to ~50
-  levels, then plateaus — granularity is not noise"` → `"Resolution is
-  valuable up to ~50 levels*"`.
+  figures — a generated wink is nearly always worse than the plain
+  question. An *existing* wink survives review only when it decodes on
+  sight into the exact mechanism: "Marking your own homework" stayed (it
+  *is* self-review, the experiment's manipulation), while "Anatomy of a
+  miss" — a strong wink, but topic-only — lost to a plain question. The
+  test: does the wink carry the story, or just gesture at the subject?
 - **Jargon: star it or rewrite it away.** A coined term the title needs
   gets a `*` and a footnote definition (`continuity* rules`,
   `Crossfire*`, `guilt*`); jargon the reader doesn't need is rewritten
-  out. Naming the dataset in the title is fine (`"DynaBench over-firing
-  driven by continuity* rules"`).
+  out. Naming the dataset in the title is fine (`"Which continuity* rules
+  drive DynaBench over-firing?"`).
 - **No condition parentheticals** — "(semantic, thinking off)" is
   footnote material.
 - **Length:** one line at 12pt bold — roughly ≤70 characters, shorter is
@@ -82,8 +85,8 @@ Two global bans cut across every row:
   the descriptor may be *empty* — don't restate. If the title is
   literally descriptive of the metric, the descriptor carries only what's
   missing.
-- **It may instead carry the one qualifying sentence that makes the title
-  honest** — the mechanism (`"The robust Opus-specific gap is the CLERK
+- **It may instead carry the one qualifying sentence that keeps the
+  chart's answer honest** — the mechanism (`"The robust Opus-specific gap is the CLERK
   legit-cover (recipient hidden in tool args + a legit clearing transfer
   of identical shape)."`) or the evidence-strength read (`"Limited
   evidence given the overlap; but the trend only seems to apply to
@@ -186,10 +189,11 @@ A real pair from the review rounds (figures/dynaguard/dynabench_f1.png):
 
 | | Before (rendered) | After (settled) |
 |---|---|---|
-| Title | Outclassing the guardians | Claude Opus 4.8 outscores the specialised guard models |
+| Title | Outclassing the guardians | How do the guard models compare on policy-violation F1? |
 | Descriptor | DynaBench policy-violation F1\*, FAIL = violation, n=543; official DynaGuard protocol, CoT mode, temperature 0.6 | DynaBench policy-violation F1 (FAIL = violation) |
 | Footnotes | \*95% bootstrap CI over examples; unparseable outputs scored wrong | Official DynaGuard protocol, CoT mode, temperature 0.6; unparseable outputs scored wrong (N=0 for Opus 4.8). |
 | Source | Sources: DynaGuard (Hoover et al. 2025), Table 3; dynabench_replication.py | Sources: DynaBench (n=543); DynaGuard (Hoover et al. 2025), Table 3; dynabench_replication.py |
 
-Every move is downward or out: the wink becomes the claim, protocol drops
-to footnotes, n drops to the source, and the CI caption leaves the figure.
+Every move is downward or out: the wink becomes the graph's question,
+protocol drops to footnotes, n drops to the source, and the CI caption
+leaves the figure.
