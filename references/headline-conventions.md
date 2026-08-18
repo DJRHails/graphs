@@ -29,11 +29,10 @@ Two global bans cut across every row:
 
 ## Title — the graph's question, simple and specific
 
-Revised 2026-08-18 (maintainer review): titles pose the graph's question;
-they no longer state the takeaway claim. The earlier claim-title convention
-("Claude Opus 4.8 outscores the specialised guard models") proved brittle
-in practice — a data-derived title rots the moment a re-run, a model bump,
-or a new slice moves the number, to the point of needing verb hacks
+Titles pose the graph's question, not a takeaway claim. A claim title
+("Claude Opus 4.8 outscores the specialised guard models") is brittle —
+a data-derived title rots the moment a re-run, a model bump, or a new
+slice moves the number, to the point of needing verb hacks
 (`"lifts" if b >= f else "drops"`) to stay honest — and it duplicates the
 finding that already lives in the chart and the surrounding prose. The
 question form names what the graph is *for* and stays true on every
@@ -190,7 +189,7 @@ A real pair from the review rounds (figures/dynaguard/dynabench_f1.png):
 
 | | Before (rendered) | After (settled) |
 |---|---|---|
-| Title | Outclassing the guardians | How do the guard models compare on policy-violation F1?† |
+| Title | Outclassing the guardians | How do the guard models compare on policy-violation F1? |
 | Descriptor | DynaBench policy-violation F1\*, FAIL = violation, n=543; official DynaGuard protocol, CoT mode, temperature 0.6 | DynaBench policy-violation F1 (FAIL = violation) |
 | Footnotes | \*95% bootstrap CI over examples; unparseable outputs scored wrong | Official DynaGuard protocol, CoT mode, temperature 0.6; unparseable outputs scored wrong (N=0 for Opus 4.8). |
 | Source | Sources: DynaGuard (Hoover et al. 2025), Table 3; dynabench_replication.py | Sources: DynaBench (n=543); DynaGuard (Hoover et al. 2025), Table 3; dynabench_replication.py |
@@ -198,7 +197,3 @@ A real pair from the review rounds (figures/dynaguard/dynabench_f1.png):
 Every move is downward or out: the wink becomes the graph's question,
 protocol drops to footnotes, n drops to the source, and the CI caption
 leaves the figure.
-
-†This pair pre-dates the 2026-08-18 question-title revision; the review
-round originally settled on the claim title "Claude Opus 4.8 outscores the
-specialised guard models", shown here updated to the question form.
