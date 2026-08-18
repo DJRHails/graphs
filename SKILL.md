@@ -85,10 +85,12 @@ treatment below; the ✗ is the mistake the rule prevents.
   pass `finalize(..., allow_ylabel=True)`. `finalize()` **raises** on a
   non-empty y-label (the ast-grep rule catches it too), so this isn't a style
   nicety you can skip. → [Headline conventions](#headline-conventions)
-- **Title states one plain claim, quantified, no wink.** ✗ "Outclassing the
-  guardians" → ✓ "Claude Opus 4.8 outscores the specialised guard models";
-  ✗ "a few categories" → ✓ "9 categories". If the intervals can't back a
-  claim, title the question instead. → [Headline conventions](#headline-conventions)
+- **Title poses the graph's question, plainly — no takeaway claims, no wink.**
+  ✗ "Outclassing the guardians" → ✗ "Claude Opus 4.8 outscores the specialised
+  guard models" → ✓ "How do the guard models compare on policy-violation F1?".
+  A claim title is brittle — it rots the moment a re-run moves the number —
+  where the question stays true; the finding lives in the chart and the
+  surrounding prose. → [Headline conventions](#headline-conventions)
 - **Descriptor names the quantity + axis mapping, one sentence — nothing else.**
   ✗ "…F1, n=543; official protocol, CoT mode, temperature 0.6" →
   ✓ "DynaBench policy-violation F1 (FAIL = violation)". Model, conditions →
@@ -250,8 +252,8 @@ auto-pads the x-tick labels down so the sublabel band doesn't collide.
 
 Rules the helpers were built to enforce. When in doubt, satisfy the most.
 
-- **Title does the talking** — state the finding, not the topic. Subtitle
-  carries units, geography, time range.
+- **Title does the talking** — pose the exact question the chart answers,
+  not a vague topic. Subtitle carries units, geography, time range.
 - **Every element earns its place** — if removing it doesn't hurt
   comprehension, remove it.
 - **Put information where the reader's eye is already going** — labels next
@@ -291,15 +293,19 @@ next question, and every fact sits on the lowest row that still serves it.
 Get them wrong and a technically correct chart still reads as a draft.
 The essentials:
 
-- **Title: one plain claim the chart can defend** — "Claude Opus 4.8
-  outscores the specialised guard models", not "Outclassing the guardians".
-  Quantify what the chart quantifies ("9 categories", "96% of
-  cross-fires*"); star coined terms and define them in a footnote, or
-  rewrite them away; match claim strength to the drawn evidence (weak
-  intervals → title the *question*). Don't write winks — an existing wink
-  survives only if it decodes on sight into the exact mechanism ("Marking
-  your own homework" for self-review); the replica gallery keeps its
-  Economist winks, research figures don't get new ones.
+- **Title: the graph's question, simple and specific** — "How does category
+  distance influence cross-firing?", not "Crossfire concentrates in 9
+  categories" and not "Outclassing the guardians". A takeaway-claim title is
+  brittle: it rots when a re-run, a model bump, or a new slice moves the
+  number (data-driven titles need verb hacks like `"lifts" if b >= f else
+  "drops"` just to stay honest), and it duplicates the finding that belongs
+  in the chart itself and the surrounding prose. The question form states
+  what the graph is *for* and stays true on every re-render. Keep it
+  specific enough that the chart visibly answers it; star coined terms and
+  define them in a footnote, or rewrite them away. Don't write winks — an
+  existing wink survives only if it decodes on sight into the exact
+  mechanism ("Marking your own homework" for self-review); the replica
+  gallery keeps its Economist winks, research figures don't get new ones.
 - **Descriptor: the measured quantity + axis mapping, one sentence — or
   empty when an on-chart label already names the metric** (name it exactly
   once). Model ids, protocol knobs and condition tags go to footnotes;
@@ -470,12 +476,14 @@ and evaluated against the story it was made to tell. Don't ship a draft.
 
 For each rendered figure, answer three questions before moving on:
 
-1. **Does the chart tell its intended story at a glance?**
+1. **Does the chart answer its title's question at a glance?**
    If the reader needs body text to know what to look at, the title is
-   doing too little. Re-read the title — does it state the *finding*, or
-   only the topic? "Claude Opus 4.8 outscores the specialised guard
-   models" tells you what to see; "GDP growth, 2010–2024" doesn't.
-   Iterate until the title carries the story alone.
+   doing too little. Re-read the title — does it pose the *specific
+   question* the chart answers, or only name a topic? "How do the guard
+   models compare on policy-violation F1?" tells you what to look for;
+   "GDP growth, 2010–2024" doesn't. Then check the chart visibly answers
+   it — a question the drawn data can't settle is the wrong question.
+   Iterate until title and chart form a question-and-answer pair.
 
 2. **Is every element earning its place?**
    Bars at the rounding-noise threshold, legends that duplicate direct
