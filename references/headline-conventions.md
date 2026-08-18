@@ -67,8 +67,8 @@ re-render.
 - **Jargon: star it or rewrite it away.** A coined term the title needs
   gets a `*` and a footnote definition (`continuity* rules`,
   `Crossfire*`, `guilt*`); jargon the reader doesn't need is rewritten
-  out. Naming the dataset in the title is fine (`"DynaBench over-firing
-  driven by continuity* rules"`).
+  out. Naming the dataset in the title is fine (`"Which continuity* rules
+  drive DynaBench over-firing?"`).
 - **No condition parentheticals** — "(semantic, thinking off)" is
   footnote material.
 - **Length:** one line at 12pt bold — roughly ≤70 characters, shorter is
@@ -86,8 +86,8 @@ re-render.
   the descriptor may be *empty* — don't restate. If the title is
   literally descriptive of the metric, the descriptor carries only what's
   missing.
-- **It may instead carry the one qualifying sentence that makes the title
-  honest** — the mechanism (`"The robust Opus-specific gap is the CLERK
+- **It may instead carry the one qualifying sentence that keeps the
+  chart's answer honest** — the mechanism (`"The robust Opus-specific gap is the CLERK
   legit-cover (recipient hidden in tool args + a legit clearing transfer
   of identical shape)."`) or the evidence-strength read (`"Limited
   evidence given the overlap; but the trend only seems to apply to
