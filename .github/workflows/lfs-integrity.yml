@@ -33,9 +33,18 @@ jobs:
     # FORK is kept on GitHub-hosted runners: a fork PR can run arbitrary code,
     # which must never reach taffy. Same-repo PRs, pushes, the weekly cron and
     # manual dispatches are all trusted and use the pool.
+    #
+    # This routing alone cannot enforce that: a pull_request run executes the
+    # PR's own copy of this file, so a fork PR could edit runs-on right back.
+    # The enforcing control is the repo's fork-PR approval policy, set to
+    # all_external_contributors — review the workflow diff before approving a
+    # fork PR's run. The head.repo comparison fails closed: a null head.repo
+    # (deleted fork) routes to GitHub-hosted, and non-PR events skip the check.
     # Escape hatch: set the CI_FALLBACK repo variable to 'true'.
     runs-on: >-
-      ${{ (github.event.pull_request.head.repo.fork || vars.CI_FALLBACK == 'true')
+      ${{ ((github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name != github.repository)
+      || vars.CI_FALLBACK == 'true')
       && 'ubuntu-latest'
       || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
     steps:
