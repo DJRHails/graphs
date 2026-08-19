@@ -28,7 +28,16 @@ permissions:
 jobs:
   verify-lfs-objects:
     name: Every LFS pointer has a blob on the remote
-    runs-on: ubuntu-latest
+    # taffy's self-hosted pool — GitHub-hosted minutes are billed. This repo is
+    # PUBLIC and this workflow runs on pull_request, so a pull request from a
+    # FORK is kept on GitHub-hosted runners: a fork PR can run arbitrary code,
+    # which must never reach taffy. Same-repo PRs, pushes, the weekly cron and
+    # manual dispatches are all trusted and use the pool.
+    # Escape hatch: set the CI_FALLBACK repo variable to 'true'.
+    runs-on: >-
+      ${{ (github.event.pull_request.head.repo.fork || vars.CI_FALLBACK == 'true')
+      && 'ubuntu-latest'
+      || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
     steps:
       - name: Checkout (pointers only, no creds)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

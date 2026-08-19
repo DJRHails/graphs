@@ -27,6 +27,12 @@ permissions:
 jobs:
   release:
     name: Tag (if needed) + publish to PyPI
+    # DELIBERATELY GitHub-hosted, unlike lfs-integrity.yml. This job mints an
+    # OIDC token that PyPI exchanges for publish rights to `djrhails-graphs`.
+    # taffy is a persistent host running 18 other repos' CI as the same `actions`
+    # user, so a publishing credential should not live there alongside unrelated
+    # jobs — and tagging and publishing are one job here, so it cannot be split.
+    # It fires only on a version bump, so the paid minutes are rare.
     runs-on: ubuntu-latest
     environment:
       name: pypi
