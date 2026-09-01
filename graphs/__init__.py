@@ -102,7 +102,7 @@ from graphs._palette import (
 )
 from graphs._theme import FORMATS, set_theme, subplots
 
-__version__ = "0.15.1"
+__version__ = "0.16.0"
 
 __all__ = [
     # theme + finalize
