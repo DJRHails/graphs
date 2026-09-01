@@ -138,6 +138,7 @@ TITLE_LINE_BOX_PT = 14.0  # TITLE_SIZE_PT × TITLE_LINESPACING
 INTER_BLOCK_GAP_PT = 3.5  # gap between title and descriptor blocks
 RULE_GAP_PT = 2.0  # gap between title and red rule (marker="rule")
 TOP_TICK_CLEARANCE_PT = 6.0  # padding above top-axis tick labels
+X_AXIS_UNIT_GAP_PT = 2.0  # gap between the x-axis label and its unit line
 
 # --- Marker (delta / favicon triangle) ---
 MARKER_SIZE_RATIO = 0.80  # marker_size / title_size
@@ -348,6 +349,14 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
         # ``min`` (not plain subtraction) so a negative ``labelpad`` that
         # lifts the label into the tick band can't shrink the band itself.
         lowest_y0 = min(lowest_y0, seat_y0 - pad_fig - label_h)
+        # An ``x_axis_label(unit=…)`` line hangs below the label; its anchored
+        # *position* is as stale as the label's, but its HEIGHT is reliable —
+        # extend the band analytically, mirroring the label treatment above.
+        unit = getattr(ax, "_graphs_xlabel_unit", None)
+        if unit is not None and unit.get_visible() and unit.get_text():
+            unit_h = unit.get_window_extent(renderer=renderer).transformed(inv).height
+            gap_fig = X_AXIS_UNIT_GAP_PT / 72.0 / fig.get_figheight()
+            lowest_y0 -= gap_fig + unit_h
 
     return max(0.0, baseline_y0 - lowest_y0)
 
@@ -1224,6 +1233,12 @@ def _source_line_y(fig, ax) -> float:
             lowest_fig_y = min(
                 lowest_fig_y,
                 xlabel.get_window_extent(renderer=renderer).transformed(inv).y0,
+            )
+        unit = getattr(row_ax, "_graphs_xlabel_unit", None)
+        if unit is not None and unit.get_text() and unit.get_visible():
+            lowest_fig_y = min(
+                lowest_fig_y,
+                unit.get_window_extent(renderer=renderer).transformed(inv).y0,
             )
         for tl in row_ax.get_xticklabels():
             if not tl.get_text() or not tl.get_visible():
@@ -2385,7 +2400,9 @@ def x_axis_label(
     ax,
     text: str,
     *,
+    unit: str | None = None,
     color: str | None = None,
+    unit_color: str | None = None,
     fontsize: float = Y_AXIS_LABEL_SIZE_PT,
     labelpad: float | None = None,
 ) -> None:
@@ -2395,6 +2412,14 @@ def x_axis_label(
     and the standard axis-label point size. Footnote markers (``*``, ``†``,
     ``‡``, ``§``) in ``text`` are auto-superscripted by ``finalize`` via its
     post-processing pass — no separate call needed.
+
+    When ``unit`` is provided, it is rendered on a second line below ``text``
+    in a lighter colour (``C_LABEL_MUTED`` by default) — the same
+    "metric / unit" stacked convention as :func:`y_axis_label`. The unit
+    line is an annotation anchored to the label artist, so it follows every
+    re-layout, survives the deck strip with the label, and the bottom band
+    reserves its height (:func:`_xtick_band_height_fig`). Markers in
+    ``unit`` are not superscripted — keep markers in ``text``.
 
     Call order doesn't matter on single-row gridspec figures
     (``subplots``-created): set *before* ``finalize``, the label is part of
@@ -2418,6 +2443,27 @@ def x_axis_label(
     # renders invisible underneath it.
     _drop_superscript_overlay(ax.xaxis.label)
     ax.set_xlabel(text, **kwargs)
+    # A re-call must replace the previous unit line, never stack a second.
+    previous_unit = getattr(ax, "_graphs_xlabel_unit", None)
+    if previous_unit is not None:
+        previous_unit.remove()
+        ax._graphs_xlabel_unit = None
+    if unit:
+        # Anchored to the label artist's bbox (bottom-centre), so the unit
+        # rides the label through tick-band and margin changes. The overlay
+        # in ``_superscript_axis_label`` hides the label with ``alpha=0``
+        # but keeps it visible/positioned, so the anchor stays valid.
+        ax._graphs_xlabel_unit = ax.annotate(
+            unit,
+            xy=(0.5, 0.0),
+            xycoords=ax.xaxis.label,
+            xytext=(0.0, -X_AXIS_UNIT_GAP_PT),
+            textcoords="offset points",
+            ha="center",
+            va="top",
+            fontsize=fontsize,
+            color=unit_color if unit_color is not None else C_LABEL_MUTED,
+        )
     fig = ax.get_figure()
     if _has_marker(text) and getattr(fig, "_graphs_finalize_record", None) is not None:
         warnings.warn(
