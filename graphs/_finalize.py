@@ -349,11 +349,18 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
         # ``min`` (not plain subtraction) so a negative ``labelpad`` that
         # lifts the label into the tick band can't shrink the band itself.
         lowest_y0 = min(lowest_y0, seat_y0 - pad_fig - label_h)
-        # An ``x_axis_label(unit=…)`` line hangs below the label; its anchored
-        # *position* is as stale as the label's, but its HEIGHT is reliable —
-        # extend the band analytically, mirroring the label treatment above.
+        # A *stacked* ``x_axis_label(unit=…)`` line hangs below the label; its
+        # anchored *position* is as stale as the label's, but its HEIGHT is
+        # reliable — extend the band analytically, mirroring the label
+        # treatment above. An inline unit shares the label's line and needs
+        # no extra band.
         unit = getattr(ax, "_graphs_xlabel_unit", None)
-        if unit is not None and unit.get_visible() and unit.get_text():
+        if (
+            unit is not None
+            and not getattr(ax, "_graphs_xlabel_inline", False)
+            and unit.get_visible()
+            and unit.get_text()
+        ):
             unit_h = unit.get_window_extent(renderer=renderer).transformed(inv).height
             gap_fig = X_AXIS_UNIT_GAP_PT / 72.0 / fig.get_figheight()
             lowest_y0 -= gap_fig + unit_h
@@ -2396,6 +2403,89 @@ def panel_label(ax, label: str, *, fontsize: int = PANEL_LABEL_SIZE_PT) -> None:
     )
 
 
+def _drop_xlabel_unit(ax) -> None:
+    """Remove a previous ``x_axis_label(unit=…)`` rendering from ``ax``.
+
+    Both unit modes leave artists behind — the stacked mode one annotation,
+    the inline mode two chunks over an ``alpha=0`` native label — and a
+    re-labelling call must shed them (and restore the label's alpha) or the
+    stale unit stays on screen under the new text.
+    """
+    for artist in getattr(ax, "_graphs_xlabel_chunks", ()):
+        artist.remove()
+    if getattr(ax, "_graphs_xlabel_inline", False):
+        ax.xaxis.label.set_alpha(None)
+    ax._graphs_xlabel_chunks = ()
+    ax._graphs_xlabel_inline = False
+    ax._graphs_xlabel_unit = None
+
+
+def _render_xlabel_unit(
+    ax, text: str, unit: str, *, fontsize: float, color: str, unit_color: str
+) -> None:
+    """Render the muted unit — inline after the label when the composite fits.
+
+    Inline mode mirrors the superscript overlay: the native label carries the
+    full ``"text, unit"`` composite (so centring, the band measurement, and
+    the deck strip all see the real one-line extent) at ``alpha=0``, and two
+    annotations anchored to its bbox tile it — the metric text left-aligned,
+    the ``", unit"`` tail right-aligned, both ``va="bottom"`` (single-line
+    ``Text`` bboxes are font-metric boxes, so equal-size chunks share a
+    baseline). Stacked mode hangs the unit centred below the label. The fit
+    check compares the composite's rendered width against the axes width *at
+    call time*; a marker-carrying ``text`` always stacks, since the
+    superscript overlay owns the label line.
+    """
+    fig = ax.get_figure()
+    label = ax.xaxis.label
+    inline = False
+    renderer = _get_renderer(fig)
+    if renderer is not None and not _has_marker(text):
+        prop = label.get_fontproperties().copy()
+        prop.set_size(fontsize)
+        width_px, _, _ = renderer.get_text_width_height_descent(
+            f"{text}, {unit}", prop, ismath=False
+        )
+        inline = width_px <= ax.get_window_extent(renderer).width
+    if inline:
+        label.set_text(f"{text}, {unit}")
+        label.set_alpha(0.0)
+        main_chunk = ax.annotate(
+            text,
+            xy=(0.0, 0.0),
+            xycoords=label,
+            ha="left",
+            va="bottom",
+            fontsize=fontsize,
+            color=color,
+        )
+        unit_chunk = ax.annotate(
+            f", {unit}",
+            xy=(1.0, 0.0),
+            xycoords=label,
+            ha="right",
+            va="bottom",
+            fontsize=fontsize,
+            color=unit_color,
+        )
+        ax._graphs_xlabel_chunks = (main_chunk, unit_chunk)
+    else:
+        unit_chunk = ax.annotate(
+            unit,
+            xy=(0.5, 0.0),
+            xycoords=label,
+            xytext=(0.0, -X_AXIS_UNIT_GAP_PT),
+            textcoords="offset points",
+            ha="center",
+            va="top",
+            fontsize=fontsize,
+            color=unit_color,
+        )
+        ax._graphs_xlabel_chunks = (unit_chunk,)
+    ax._graphs_xlabel_inline = inline
+    ax._graphs_xlabel_unit = unit_chunk
+
+
 def x_axis_label(
     ax,
     text: str,
@@ -2413,13 +2503,17 @@ def x_axis_label(
     ``‡``, ``§``) in ``text`` are auto-superscripted by ``finalize`` via its
     post-processing pass — no separate call needed.
 
-    When ``unit`` is provided, it is rendered on a second line below ``text``
-    in a lighter colour (``C_LABEL_MUTED`` by default) — the same
-    "metric / unit" stacked convention as :func:`y_axis_label`. The unit
-    line is an annotation anchored to the label artist, so it follows every
-    re-layout, survives the deck strip with the label, and the bottom band
-    reserves its height (:func:`_xtick_band_height_fig`). Markers in
-    ``unit`` are not superscripted — keep markers in ``text``.
+    When ``unit`` is provided, it is rendered in a lighter colour
+    (``C_LABEL_MUTED`` by default) — the same "metric / unit" convention as
+    :func:`y_axis_label`. It joins the label line as a ``", unit"``
+    continuation when the one-line composite fits the axes width (measured
+    at call time); a composite too wide for the axes stacks the unit on a
+    second line below the label instead. Either way the unit is an
+    annotation anchored to the label artist, so it follows every re-layout,
+    survives the deck strip with the label, and the bottom band reserves
+    the stacked form's extra height (:func:`_xtick_band_height_fig`). A
+    marker-carrying ``text`` always stacks (the superscript overlay owns
+    the label line); markers in ``unit`` itself are never superscripted.
 
     Call order doesn't matter on single-row gridspec figures
     (``subplots``-created): set *before* ``finalize``, the label is part of
@@ -2440,29 +2534,19 @@ def x_axis_label(
         kwargs["labelpad"] = labelpad
     # ``set_xlabel`` writes into the existing artist, so a label finalize
     # already superscripted must shed its overlay first or the new text
-    # renders invisible underneath it.
+    # renders invisible underneath it. A re-call must likewise shed the
+    # previous unit artists, never stack a second set.
     _drop_superscript_overlay(ax.xaxis.label)
+    _drop_xlabel_unit(ax)
     ax.set_xlabel(text, **kwargs)
-    # A re-call must replace the previous unit line, never stack a second.
-    previous_unit = getattr(ax, "_graphs_xlabel_unit", None)
-    if previous_unit is not None:
-        previous_unit.remove()
-        ax._graphs_xlabel_unit = None
     if unit:
-        # Anchored to the label artist's bbox (bottom-centre), so the unit
-        # rides the label through tick-band and margin changes. The overlay
-        # in ``_superscript_axis_label`` hides the label with ``alpha=0``
-        # but keeps it visible/positioned, so the anchor stays valid.
-        ax._graphs_xlabel_unit = ax.annotate(
+        _render_xlabel_unit(
+            ax,
+            text,
             unit,
-            xy=(0.5, 0.0),
-            xycoords=ax.xaxis.label,
-            xytext=(0.0, -X_AXIS_UNIT_GAP_PT),
-            textcoords="offset points",
-            ha="center",
-            va="top",
             fontsize=fontsize,
-            color=unit_color if unit_color is not None else C_LABEL_MUTED,
+            color=color,
+            unit_color=unit_color if unit_color is not None else C_LABEL_MUTED,
         )
     fig = ax.get_figure()
     if _has_marker(text) and getattr(fig, "_graphs_finalize_record", None) is not None:
