@@ -3055,11 +3055,11 @@ def _check_footnote_anchors(fig, notes: tuple[str, ...]) -> None:
 
 
 def _bottom_band_top(fig) -> float:
-    """Top of the bottom band — just under the lowest x-tick label / xlabel.
+    """Top of the bottom band — just under the lowest x-tick label / xlabel / unit line.
 
     Mirrors the ``base_y0`` computation the packed/legacy ``footnotes`` paths
-    use: start at the lowest panel baseline, then drop below any x-tick labels
-    and the xlabel so a footnote row can't overlap them. Returns a figure-y
+    use: start at the lowest panel baseline, then drop below any x-tick labels,
+    the xlabel, and its unit line so a footnote row can't overlap them. Returns a figure-y
     fraction; the stacked layout anchors its top row a ``FOOTNOTES_STACK_GAP``
     below this and descends from there.
     """
@@ -3076,6 +3076,11 @@ def _bottom_band_top(fig) -> float:
         if xlabel.get_text():
             lowest = min(
                 lowest, xlabel.get_window_extent(renderer=renderer).transformed(inv).y0
+            )
+        unit = getattr(a, "_graphs_xlabel_unit", None)
+        if unit is not None and unit.get_text() and unit.get_visible():
+            lowest = min(
+                lowest, unit.get_window_extent(renderer=renderer).transformed(inv).y0
             )
         for tl in a.get_xticklabels():
             if not tl.get_text() or not tl.get_visible():
@@ -3389,6 +3394,13 @@ def footnotes(
                 lowest_fig_y = min(
                     lowest_fig_y,
                     xlbl_bbox.transformed(fig.transFigure.inverted()).y0,
+                )
+            unit = getattr(a, "_graphs_xlabel_unit", None)
+            if unit is not None and unit.get_text() and unit.get_visible():
+                unit_bb = unit.get_window_extent(renderer=renderer)
+                lowest_fig_y = min(
+                    lowest_fig_y,
+                    unit_bb.transformed(fig.transFigure.inverted()).y0,
                 )
             for tl in a.get_xticklabels():
                 if not tl.get_text() or not tl.get_visible():

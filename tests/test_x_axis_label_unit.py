@@ -108,6 +108,32 @@ def test_relabelling_without_a_unit_clears_the_previous_one():
     assert not [t for t in ax.texts if t.get_text() == "%"]
 
 
+def test_unit_and_footnote_rows_do_not_overlap():
+    """``footnotes()`` must drop its rows below the unit line, not just the label."""
+    from graphs import footnotes
+
+    fig, ax = plt.subplots(figsize=(7.0, 5.4))
+    ax.plot([0, 1, 2, 3], [10, 30, 25, 40])
+    ax.set_xticks([0, 1, 2, 3])  # pin ticks inside the data range: no phantom edge labels
+    x_axis_label(ax, XLABEL, unit=UNIT)
+    finalize(ax, title="Recall rises with sweep budget", footnote_lines=2)
+    footnotes(
+        fig,
+        "first note: a definition long enough to need its own row in the stack.",
+        "second note: another definition row beneath the first.",
+        source=SOURCE,
+    )
+    unit_bb = _fig_bbox(fig, _unit_artist(ax))
+    rows = [
+        t
+        for t in fig.texts
+        if "note" in t.get_text() or SOURCE.split()[0] in t.get_text()
+    ]
+    assert rows, "footnote rows were not rendered"
+    highest_row_top = max(_fig_bbox(fig, t).y1 for t in rows)
+    assert highest_row_top <= unit_bb.y0 + 1e-6, "footnote rows paint over the unit line"
+
+
 def test_deck_variant_save_carries_the_unit(tmp_path):
     """The unit is an axes-level artist, so the deck strip must leave it alone."""
     fig, ax = _labelled_chart(label_when="before")
