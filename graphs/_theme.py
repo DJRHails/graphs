@@ -125,7 +125,7 @@ def subplots(format: str = "wide", *, height: float | None = None, **kwargs):
     editorial choice. Defaults: ``daily`` 4.6x5.2in, ``manuscript`` 5.5x3.6in,
     ``wide`` 7.0x4.4in. A figure embedded at its own physical width keeps its
     type at the size it was set in; ``manuscript`` is the width a paper's
-    ``\textwidth`` embed occupies, so 9pt tick labels read as 9pt on the page
+    ``\\textwidth`` embed occupies, so 9pt tick labels read as 9pt on the page
     (a ``wide`` render scaled into that column reads at ~7pt).
 
         fig, ax = subplots("daily", height=5.6)
