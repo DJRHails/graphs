@@ -102,7 +102,7 @@ treatment below; the ✗ is the mistake the rule prevents.
 - **Source = `Source: <dataset> (N=…); <script>`** — dataset named by entity,
   its computed N attached, generating script last. ✗ a bare
   `crossfire_correlates.py`. → [Headline conventions](#headline-conventions)
-- **Size with `subplots("daily"|"wide")`, never `figsize=`.** Fixed widths keep
+- **Size with `subplots("daily"|"manuscript"|"wide")`, never `figsize=`.** Fixed widths keep
   a set consistent; ad-hoc widths make a gallery ragged.
   → [Default conventions](#default-visual-conventions)
 - **Call `finalize(ax, title, descriptor, source)` last** — it auto-sizes every
@@ -130,9 +130,11 @@ treatment below; the ✗ is the mistake the rule prevents.
 
 Behaviour that's automatic unless you override it:
 
-- **Charts come in two widths — size with `subplots()`, never a raw
+- **Charts come in three widths — size with `subplots()`, never a raw
   `figsize=`.** Create figures with
-  `subplots("daily")` (4.6in column, portrait-leaning) or
+  `subplots("daily")` (4.6in column, portrait-leaning),
+  `subplots("manuscript")` (5.5in, a paper's full text width — embed it at
+  `\textwidth` and its 9pt type reads as 9pt on the page) or
   `subplots("wide")` (7.0in article format) — like a newspaper's column
   formats, the width is fixed by the medium and only the height is the
   per-chart choice (`height=`). Fixed widths keep the type-to-chart
@@ -369,7 +371,7 @@ Style overrides to apply on top:
 | Function                                                            | Purpose                                                |
 |---------------------------------------------------------------------|--------------------------------------------------------|
 | `set_theme(bg=None, transparent=False)`                             | Apply theme globally. Call once. White background by default; pass `C_BG_TRANSPARENT` + `transparent=True` for transparent output. |
-| `subplots(format="daily", *, height=None, **kwargs)`                | `plt.subplots` at a standard chart width — `"daily"` 4.6in / `"wide"` 7.0in; height is the per-chart choice. |
+| `subplots(format="daily", *, height=None, **kwargs)`                | `plt.subplots` at a standard chart width — `"daily"` 4.6in / `"manuscript"` 5.5in / `"wide"` 7.0in; height is the per-chart choice. |
 | `finalize(ax, title, descriptor, source, *, marker="delta", y_labels="on_grid", panel_labels=False, zero_rule=True, …)` | Title stack (auto-wrapped), optional marker, source line, y-axis right, on-grid y labels, and a dark zero centreline when the y-range straddles 0 (`zero_rule`). Auto-sizes ALL margins + inter-panel `wspace`/`hspace` from the renderer (left/right from the y-axis text, spacing from a grid); `panel_labels=True` for multi-row facets that add `panel_label` after. Override a specific value with `subplots_adjust` after if ever needed. |
 | `dark_zero_line(ax)`                                                | Dark `C_SPINE` rule on the zero baseline the data straddles, under the data lines. Auto-applied by `finalize`; call per panel on facets. |
 | `panel_label(ax, label)`                                            | Bold sub-heading + dark rule (faceted charts).         |
