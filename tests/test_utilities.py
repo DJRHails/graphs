@@ -54,6 +54,9 @@ def test_subplots_fixes_width_per_format():
     fig, _ = subplots("wide", height=5.0)
     assert tuple(fig.get_size_inches()) == (FORMATS["wide"], 5.0)
     plt.close(fig)
+    fig, _ = subplots("manuscript")
+    assert tuple(fig.get_size_inches()) == (FORMATS["manuscript"], 3.6)
+    plt.close(fig)
 
 
 def test_subplots_rejects_figsize_and_unknown_format():

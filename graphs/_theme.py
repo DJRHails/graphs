@@ -112,22 +112,28 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
 # ~40% in apparent type size, which is what makes a gallery look ragged.
 FORMATS: dict[str, float] = {
     "daily": 4.6,  # daily-chart / mobile column (portrait-leaning)
+    "manuscript": 5.5,  # a paper's full text width (ICLR / NeurIPS single column)
     "wide": 7.0,  # article / landscape format
 }
-_DEFAULT_HEIGHTS: dict[str, float] = {"daily": 5.2, "wide": 4.4}
+_DEFAULT_HEIGHTS: dict[str, float] = {"daily": 5.2, "manuscript": 3.6, "wide": 4.4}
 
 
 def subplots(format: str = "wide", *, height: float | None = None, **kwargs):
     """``plt.subplots`` at a standard chart width.
 
     Standardises the width (the format); height stays the per-chart
-    editorial choice. Defaults: ``daily`` 4.6x5.2in, ``wide`` 7.0x4.4in.
+    editorial choice. Defaults: ``daily`` 4.6x5.2in, ``manuscript`` 5.5x3.6in,
+    ``wide`` 7.0x4.4in. A figure embedded at its own physical width keeps its
+    type at the size it was set in; ``manuscript`` is the width a paper's
+    ``\textwidth`` embed occupies, so 9pt tick labels read as 9pt on the page
+    (a ``wide`` render scaled into that column reads at ~7pt).
 
         fig, ax = subplots("daily", height=5.6)
         fig, axes = subplots("wide", ncols=3, sharey=True)
 
     Args:
-        format: ``"daily"`` (4.6in column) or ``"wide"`` (7.0in article).
+        format: ``"daily"`` (4.6in column), ``"manuscript"`` (5.5in paper text
+            width) or ``"wide"`` (7.0in article).
         height: Figure height in inches; per-format default when omitted.
         **kwargs: Forwarded to ``plt.subplots`` (nrows, ncols, sharex, …).
 
