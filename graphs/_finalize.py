@@ -930,14 +930,37 @@ def _compute_wspace(fig) -> float | None:
     return max_gap / avg_w
 
 
+def _lower_row_label_band_fig(fig) -> float:
+    """Band of the tallest ``y_axis_label`` block on a row below the top one.
+
+    A lower row's block seats in the inter-row gap above its own axes (block,
+    seat margin and any tick-column lift, as :func:`_y_axis_label_band_fig`
+    measures them), so the gap must hold it — the top row's block is budgeted
+    by the top margin instead. ``0.0`` when no lower row carries a block.
+    """
+    lower = []
+    for spec in _y_axis_label_specs(fig):
+        subplotspec = (
+            spec.ax.get_subplotspec() if hasattr(spec.ax, "get_subplotspec") else None
+        )
+        if subplotspec is not None and subplotspec.rowspan.start > 0:
+            lower.append(spec)
+    if not lower:
+        return 0.0
+    return _y_axis_label_band_fig(fig, lower)
+
+
 def _compute_hspace(fig, *, has_panel_labels: bool) -> float | None:
     """Inter-row ``hspace`` so a row's x-ticks (and panel label) clear the next.
 
     ``hspace`` is matplotlib's inter-row gap as a fraction of the *average axes
     height*. A row boundary must hold the upper row's bottom x-tick band plus,
     when panels carry ``panel_label`` headings, the rule-and-label height that
-    sits above the lower row. Returns ``None`` for a single row or a non-Agg
-    backend (caller leaves ``hspace`` untouched).
+    sits above the lower row, plus a lower row's ``y_axis_label`` block (it
+    seats above its own axes, i.e. inside this gap; a left-side block under
+    ``panel_labels`` lifts over the heading band too, so the two add). Returns
+    ``None`` for a single row or a non-Agg backend (caller leaves ``hspace``
+    untouched).
     """
     nrows, _ = _gridspec_shape(fig)
     if nrows < 2:
@@ -964,6 +987,7 @@ def _compute_hspace(fig, *, has_panel_labels: bool) -> float | None:
     gap = band + AUTO_LAYOUT_HSPACE_GUTTER_PT * pt2fig_h
     if has_panel_labels:
         gap += AUTO_LAYOUT_PANEL_LABEL_PT * pt2fig_h
+    gap += _lower_row_label_band_fig(fig)
     return gap / avg_h
 
 
@@ -2882,10 +2906,10 @@ def y_axis_label(
 
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
-    # Line box ≈ fontsize * 1.2 points; advance the cursor by one line per
-    # wrapped text line so the unit sits just below the main label.
+    # Line box ≈ fontsize * 1.2 points. The text block is bottom-anchored at
+    # ``y_text`` however many lines it wraps to; the unit line sits one line
+    # box below that anchor, on the seat.
     line_h = fontsize * Y_AXIS_LABEL_LINESPACING * pt2fig
-    n_text_lines = wrapped.count("\n") + 1
     y_text = seat_top + Y_AXIS_LABEL_MARGIN
     if unit:
         y_text += line_h  # leave room below for the unit line
@@ -2904,8 +2928,10 @@ def y_axis_label(
     )
 
     if unit:
-        # Anchor the unit line directly under the wrapped text block.
-        y_unit = y_text - line_h * n_text_lines
+        # Directly under the text block's bottom-anchored edge — one line box,
+        # whatever the block wrapped to (scaling by the line count put a
+        # two-line label's unit a whole line inside the axes).
+        y_unit = y_text - line_h
         render_text_with_superscripts(
             fig,
             x,
