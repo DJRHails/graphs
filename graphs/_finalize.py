@@ -694,8 +694,12 @@ def _tick_column_protrusion_fig(fig, ax, side: str, renderer) -> float:
     top = _tick_column_top_fig(fig, ax, side, renderer)
     if top is None:
         return 0.0
-    clearance = COLUMN_TOP_CLEARANCE_PT / 72.0 / fig.get_figheight()
-    return max(0.0, top + clearance - ax.get_position().y1)
+    return max(0.0, top + _column_top_clearance_fig(fig) - ax.get_position().y1)
+
+
+def _column_top_clearance_fig(fig) -> float:
+    """``COLUMN_TOP_CLEARANCE_PT`` as a figure-height fraction."""
+    return COLUMN_TOP_CLEARANCE_PT / 72.0 / fig.get_figheight()
 
 
 def _tick_column_top_fig(fig, ax, side: str, renderer) -> float | None:
@@ -1060,29 +1064,55 @@ def _compute_side_margins(fig) -> tuple[float, float]:
     return left, right
 
 
-def _hold_tick_columns(fig, tops_before) -> None:
-    """Lower each labelled panel's top so its y tick-label column's top stays put.
+def _held_column_tops(fig) -> list[tuple[object, str, float]]:
+    """``(ax, side, held_top)`` per ``y_axis_label`` column, measured before a shrink.
 
-    ``tops_before`` maps ``id(ax)`` to ``(ax, side, top_fig)`` measured before
-    the panels shrank. Raising a panel's bottom edge compresses its data range,
-    so the top tick's label climbs toward the axes top — into the
-    ``y_axis_label`` block heading the column. Lowering the top by the rise
-    puts the column back where the block was seated for; the lowering itself
-    moves the column a little, so two passes converge.
+    ``held_top`` is the highest figure-y the column's top may reach without
+    lifting the block heading it above its current seat: the column's top today,
+    or ``COLUMN_TOP_CLEARANCE_PT`` under the axes top when the column still has
+    air below the block — the block sits on the axes top then, and the column
+    may climb into that air freely.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return []
+    held = []
+    for spec in _y_axis_label_specs(fig):
+        top = _tick_column_top_fig(fig, spec.ax, spec.side, renderer)
+        if top is None:
+            continue
+        seat_top = spec.ax.get_position().y1 - _column_top_clearance_fig(fig)
+        held.append((spec.ax, spec.side, max(top, seat_top)))
+    return held
+
+
+def _hold_tick_columns(fig, panels, held_tops) -> None:
+    """Lower the row's tops so no y tick-label column climbs past its held top.
+
+    Raising a panel's bottom edge compresses its data range, so the top tick's
+    label climbs toward the axes top — into the ``y_axis_label`` block heading
+    the column, which then lifts into the band reserved above it. Lowering the
+    tops by the largest overshoot puts every column back under its held top
+    (from :func:`_held_column_tops`); the lowering itself moves the columns a
+    little, so two passes converge. Every panel in the row moves by the same
+    amount so facet tops stay level, and ``subplotpars.top`` records the move
+    for the same reason ``_ensure_bottom_clearance`` records ``bottom``.
     """
     renderer = _get_renderer(fig)
     if renderer is None:
         return
     for _ in range(2):
-        for ax, side, top_before in tops_before.values():
+        rise = 0.0
+        for ax, side, held_top in held_tops:
             top_after = _tick_column_top_fig(fig, ax, side, renderer)
-            if top_after is None:
-                continue
-            rise = top_after - top_before
-            if rise <= 1e-6:
-                continue
-            pos = ax.get_position()
-            ax._set_position((pos.x0, pos.y0, pos.width, pos.height - rise))
+            if top_after is not None:
+                rise = max(rise, top_after - held_top)
+        if rise <= 1e-6:
+            return
+        for panel in panels:
+            pos = panel.get_position()
+            panel._set_position((pos.x0, pos.y0, pos.width, pos.height - rise))
+        fig.subplotpars.update(top=fig.subplotpars.top - rise)
         fig.canvas.draw()
 
 
@@ -1114,9 +1144,10 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     labels; on a faceted figure (or one that draws its source via ``footnotes``
     rather than ``finalize``) the band can fall off the bottom because
     ``finalize`` — told ``source=""`` — reserved no source room. This grows the
-    figure's bottom margin (which only moves the lower axes edge up, leaving the
-    axes *top* and anything anchored to it untouched) so the band's lowest point
-    lands at ``AUTO_LAYOUT_BOTTOM_MARGIN`` above the figure floor.
+    figure's bottom margin (moving the lower axes edge up; the axes *top* moves
+    only when a ``y_axis_label`` column would otherwise climb into its block —
+    see :func:`_hold_tick_columns`) so the band's lowest point lands at
+    ``AUTO_LAYOUT_BOTTOM_MARGIN`` above the figure floor.
 
     ``depth_below_panels`` is the band's full reach below the lowest panel
     baseline (x-tick band + source offset + block height). Returns ``True`` and
@@ -1155,13 +1186,7 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     # public ``set_position`` would also flip ``in_layout`` off and drop the
     # axes from tight-bbox saves.
     grow = needed_y0 - lowest_panel_y0
-    renderer = _get_renderer(fig)
-    tops_before = {}
-    if renderer is not None:
-        for spec in _y_axis_label_specs(fig):
-            top = _tick_column_top_fig(fig, spec.ax, spec.side, renderer)
-            if top is not None:
-                tops_before[id(spec.ax)] = (spec.ax, spec.side, top)
+    held_tops = _held_column_tops(fig)
     for panel in panels:
         pos = panel.get_position()
         panel._set_position((pos.x0, pos.y0 + grow, pos.width, pos.height - grow))
@@ -1170,9 +1195,9 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     # The shrink compressed each panel's data range: data-anchored tick labels
     # climbed toward the axes top and the legend's axes-fraction anchor slid.
     # Hold the tick columns so the ``y_axis_label`` blocks heading them stay
-    # clear, re-anchor the blocks, and put the legend back at its figure y.
-    if tops_before:
-        _hold_tick_columns(fig, tops_before)
+    # seated, re-anchor the blocks, and put the legend back at its figure y.
+    if held_tops:
+        _hold_tick_columns(fig, panels, held_tops)
         _reanchor_y_axis_labels(fig)
     _reseat_top_legend(fig)
     return True
