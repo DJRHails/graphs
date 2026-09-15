@@ -168,3 +168,36 @@ def test_wide_legend_still_stacks_above_the_label():
         "overlapping legend must stack"
     )
     assert not any(legend_bb.overlaps(bb) for bb in label)
+
+
+def test_shared_strip_legend_clears_the_panel_label_band():
+    """Sharing the strip with a left-hand block, a legend placed clear of it on
+    the right must still seat above the top-row ``panel_label`` band — the
+    heading's rule spans the row, not just the label's side."""
+    from graphs._finalize import AUTO_LAYOUT_PANEL_LABEL_PT
+
+    fig, ax = _bar_fig()
+    handles = [Patch(facecolor="C0") for _ in range(2)]
+    top_legend(fig, handles, ["no lever", "label competition"], x=0.55)
+    y_axis_label(ax, LABEL, unit=UNIT, side="left")
+    finalize(
+        ax,
+        title=TITLE,
+        descriptor=DESCRIPTOR,
+        zero_rule=False,
+        y_axis_right=False,
+        panel_labels=True,
+    )
+
+    legend_bb = _fig_bboxes(fig, [fig.legends[0]])[0]
+    label = _label_bboxes(fig)
+    assert legend_bb.x0 > max(bb.x1 for bb in label), (
+        "precondition: legend clears the block"
+    )
+    panel_band = AUTO_LAYOUT_PANEL_LABEL_PT * PT / 5.0
+    assert legend_bb.y0 >= ax.get_position().y1 + panel_band - 1e-4, (
+        f"legend bottom {legend_bb.y0:.4f} sits inside the panel_label band"
+    )
+    descriptor = next(t for t in fig.texts if t.get_text().startswith("Recall"))
+    desc_bb = _fig_bboxes(fig, [descriptor])[0]
+    assert desc_bb.y0 >= legend_bb.y1, "descriptor overlaps the legend"

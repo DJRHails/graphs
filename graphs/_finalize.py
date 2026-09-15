@@ -2300,13 +2300,22 @@ def finalize(
     # collision this reserves against. An axes-relative y crops in lockstep with
     # the axes and the descriptor, so the gap survives the tight save.
     #
-    # Sharing a strip with a y_axis_label block, the legend's bottom sits on the
-    # label's own seat instead — level with it, under the same cursor advance.
+    # Sharing a strip with a y_axis_label block, the legend's bottom sits just
+    # above the axes top instead (the label's own seat, before any tick-column
+    # or protrusion lift the block alone takes), under the same cursor advance.
+    # A top-row panel_label band still owns the strip immediately above the
+    # axes, so the legend seats above it — the band spans the row, not just the
+    # label's side — and the cursor advances past the legend if it now stands
+    # taller than the shared strip.
     if top_legend is not None and top_legend_band > 0.0:
         spec = top_legend._graphs_top_legend
         legend_h = top_legend_band - legend_gap
         if legend_shares_label_strip:
-            anchor_fig_y = bbox.y1 + Y_AXIS_LABEL_MARGIN + legend_h
+            legend_seat = bbox.y1 + Y_AXIS_LABEL_MARGIN
+            if top_panel_label_band > 0.0:
+                legend_seat = bbox.y1 + top_panel_label_band
+                y_cursor = max(y_cursor, legend_seat + top_legend_band)
+            anchor_fig_y = legend_seat + legend_h
         else:
             anchor_fig_y = y_cursor + legend_h
             y_cursor += top_legend_band
