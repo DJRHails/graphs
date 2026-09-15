@@ -16,6 +16,7 @@ import pytest
 from matplotlib.ticker import PercentFormatter
 
 from graphs import finalize, panel_label, set_theme, y_axis_label
+from graphs._finalize import AUTO_LAYOUT_HSPACE_GUTTER_PT
 
 PT = 1.0 / 72.0
 TITLE = "Does one global cut hold across context lengths?"
@@ -42,8 +43,9 @@ def _texts(fig, *needles):
 
 def test_lower_row_label_gets_its_own_room_in_the_row_gap():
     """A y_axis_label on the second row must not overprint the first row's axes
-    or its x-tick labels — the inter-row gap has to grow for it."""
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(7.0, 6.0), sharex=True)
+    or its x-tick labels — the inter-row gap has to grow for it. Independent x
+    axes, so the upper row keeps its tick labels and the check is live."""
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(7.0, 6.0))
     xs = [30e3, 60e3, 120e3, 240e3, 480e3, 800e3]
     top.plot(xs, [0.95, 0.95, 0.9, 0.85, 0.7, 0.45], marker="o")
     top.set_ylim(0, 1.03)
@@ -64,9 +66,14 @@ def test_lower_row_label_gets_its_own_room_in_the_row_gap():
         f"(bottom {top_axes_bottom:.4f})"
     )
     upper_ticks = [t for t in top.get_xticklabels() if t.get_visible() and t.get_text()]
+    assert upper_ticks, "precondition: the upper row shows x-tick labels"
+    # The gap is budgeted against the *final* axes height: the ticks clear the
+    # block by the full gutter, not a fraction of it.
+    gutter = AUTO_LAYOUT_HSPACE_GUTTER_PT * PT / 6.0
     for bb in _bboxes(fig, upper_ticks):
-        assert not any(bb.overlaps(lb) for lb in lower), (
-            "lower label overlaps upper x-ticks"
+        assert bb.y0 >= lower_top + gutter - 1e-4, (
+            f"upper x-tick (bottom {bb.y0:.4f}) sits within the gutter of the lower "
+            f"label (top {lower_top:.4f})"
         )
     bottom_axes_top = bottom.get_position().y1
     assert min(bb.y0 for bb in lower) >= bottom_axes_top - 1e-4, (
@@ -96,9 +103,34 @@ def test_lower_row_label_with_panel_labels_clears_both_bands():
 
     lower = _bboxes(fig, _texts(fig, "monitor score", "0–100"))
     assert max(bb.y1 for bb in lower) <= top.get_position().y0 + 1e-4
-    heading = _bboxes(fig, [t for t in bottom.texts if t.get_text() == "Score"])
-    if heading:  # the heading sits under the block on the same left anchor
-        assert min(bb.y0 for bb in lower) >= heading[0].y1 - 1e-4
+    # ``panel_label`` draws its heading as figure text on the same left anchor;
+    # the block must sit above it.
+    heading = _bboxes(fig, [t for t in fig.texts if t.get_text() == "Score"])
+    assert heading, "precondition: the panel heading rendered"
+    assert min(bb.y0 for bb in lower) >= heading[0].y1 - 1e-4, (
+        "label block overlaps the panel heading"
+    )
+
+
+def test_lower_row_only_label_leaves_the_top_margin_alone():
+    """A block on the second row alone seats in the inter-row gap; it must not
+    also push the title stack up as if it headed the top row."""
+
+    def descriptor_gap(with_label: bool) -> float:
+        fig, (top, bottom) = plt.subplots(2, 1, figsize=(7.0, 6.0), sharex=True)
+        top.plot([1, 2, 3], [0.2, 0.5, 0.9])
+        bottom.plot([1, 2, 3], [20, 50, 90])
+        if with_label:
+            y_axis_label(bottom, "monitor score", unit="0–100")
+        finalize(top, title=TITLE, descriptor=DESCRIPTOR, zero_rule=False)
+        desc = _bboxes(fig, _texts(fig, "One CRC"))[0]
+        gap = desc.y0 - top.get_position().y1
+        plt.close(fig)
+        return gap
+
+    assert abs(descriptor_gap(True) - descriptor_gap(False)) <= 1e-3, (
+        "a lower-row label grew the top margin"
+    )
 
 
 def test_wrapped_label_keeps_its_unit_line_out_of_the_axes():
