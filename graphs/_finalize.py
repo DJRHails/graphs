@@ -185,6 +185,9 @@ AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT = 4.0  # gap above a y_axis_label (label↔descr
 LEGEND_LABEL_CLEARANCE_PT = (
     8.0  # top_legend↔y_axis_label gap that lets them share a strip
 )
+COLUMN_TOP_CLEARANCE_PT = (
+    2.0  # air between a y_axis_label block and the tick label under it
+)
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -684,16 +687,32 @@ def _tick_column_protrusion_fig(fig, ax, side: str, renderer) -> float:
     once they exist; before that, predicted from the native labels with the
     on-grid geometry (label bottom ``ON_GRID_LABEL_LIFT_PT`` above its gridline),
     so the band reserved pre-layout matches the lift applied post-layout.
+    ``COLUMN_TOP_CLEARANCE_PT`` of air is kept between the label text and the
+    block, so a column whose top label sits within that of the axes top lifts
+    the block too.
+    """
+    top = _tick_column_top_fig(fig, ax, side, renderer)
+    if top is None:
+        return 0.0
+    clearance = COLUMN_TOP_CLEARANCE_PT / 72.0 / fig.get_figheight()
+    return max(0.0, top + clearance - ax.get_position().y1)
+
+
+def _tick_column_top_fig(fig, ax, side: str, renderer) -> float | None:
+    """Figure-y of the top of ``ax``'s y tick-label column on ``side``.
+
+    The frozen on-grid artists' top once :func:`~graphs.y_labels_on_grid` has
+    run; before that, the top the on-grid form of the native labels will have
+    (label bottom ``ON_GRID_LABEL_LIFT_PT`` above its gridline). ``None`` when
+    no label measures on that side.
     """
     bboxes, frozen = _y_tick_column(fig, ax, side, renderer)
     if not bboxes:
-        return 0.0
+        return None
     if frozen:
-        top = max(b.y1 for b in bboxes)
-    else:
-        lift = ON_GRID_LABEL_LIFT_PT / 72.0 / fig.get_figheight()
-        top = max((b.y0 + b.y1) / 2.0 + lift + b.height for b in bboxes)
-    return max(0.0, top - ax.get_position().y1)
+        return max(b.y1 for b in bboxes)
+    lift = ON_GRID_LABEL_LIFT_PT / 72.0 / fig.get_figheight()
+    return max((b.y0 + b.y1) / 2.0 + lift + b.height for b in bboxes)
 
 
 def _reanchor_y_axis_labels(fig) -> None:
@@ -1041,6 +1060,53 @@ def _compute_side_margins(fig) -> tuple[float, float]:
     return left, right
 
 
+def _hold_tick_columns(fig, tops_before) -> None:
+    """Lower each labelled panel's top so its y tick-label column's top stays put.
+
+    ``tops_before`` maps ``id(ax)`` to ``(ax, side, top_fig)`` measured before
+    the panels shrank. Raising a panel's bottom edge compresses its data range,
+    so the top tick's label climbs toward the axes top — into the
+    ``y_axis_label`` block heading the column. Lowering the top by the rise
+    puts the column back where the block was seated for; the lowering itself
+    moves the column a little, so two passes converge.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return
+    for _ in range(2):
+        for ax, side, top_before in tops_before.values():
+            top_after = _tick_column_top_fig(fig, ax, side, renderer)
+            if top_after is None:
+                continue
+            rise = top_after - top_before
+            if rise <= 1e-6:
+                continue
+            pos = ax.get_position()
+            ax._set_position((pos.x0, pos.y0, pos.width, pos.height - rise))
+        fig.canvas.draw()
+
+
+def _reseat_top_legend(fig) -> None:
+    """Put the auto ``top_legend`` back at the figure y ``finalize`` gave it.
+
+    Its anchor is bound in axes fraction so a tight save crops it in step with
+    the axes; a later change to the axes' height therefore moves it. ``finalize``
+    stashes the seat's figure y and its axes on the legend for this re-seat.
+    """
+    legend = _top_legend(fig)
+    if legend is None:
+        return
+    fig_y = getattr(legend, "_graphs_anchor_fig_y", None)
+    ax = getattr(legend, "_graphs_anchor_axes", None)
+    if fig_y is None or ax is None:
+        return
+    pos = ax.get_position()
+    blended = mtransforms.blended_transform_factory(fig.transFigure, ax.transAxes)
+    legend.set_bbox_to_anchor(
+        (legend._graphs_top_legend.x, (fig_y - pos.y0) / pos.height), transform=blended
+    )
+
+
 def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     """Raise the panels so a band ``depth_below_panels`` deep stays on-figure.
 
@@ -1089,11 +1155,26 @@ def _ensure_bottom_clearance(fig, *, depth_below_panels: float) -> bool:
     # public ``set_position`` would also flip ``in_layout`` off and drop the
     # axes from tight-bbox saves.
     grow = needed_y0 - lowest_panel_y0
+    renderer = _get_renderer(fig)
+    tops_before = {}
+    if renderer is not None:
+        for spec in _y_axis_label_specs(fig):
+            top = _tick_column_top_fig(fig, spec.ax, spec.side, renderer)
+            if top is not None:
+                tops_before[id(spec.ax)] = (spec.ax, spec.side, top)
     for panel in panels:
         pos = panel.get_position()
         panel._set_position((pos.x0, pos.y0 + grow, pos.width, pos.height - grow))
     fig.subplotpars.update(bottom=fig.subplotpars.bottom + grow)
     fig.canvas.draw()
+    # The shrink compressed each panel's data range: data-anchored tick labels
+    # climbed toward the axes top and the legend's axes-fraction anchor slid.
+    # Hold the tick columns so the ``y_axis_label`` blocks heading them stay
+    # clear, re-anchor the blocks, and put the legend back at its figure y.
+    if tops_before:
+        _hold_tick_columns(fig, tops_before)
+        _reanchor_y_axis_labels(fig)
+    _reseat_top_legend(fig)
     return True
 
 
@@ -2322,6 +2403,10 @@ def finalize(
         anchor_axes_y = (anchor_fig_y - bbox.y0) / bbox.height
         blended = mtransforms.blended_transform_factory(fig.transFigure, ax.transAxes)
         top_legend.set_bbox_to_anchor((spec.x, anchor_axes_y), transform=blended)
+        # Stash the figure-y seat and its axes so a later change to the axes'
+        # height (``footnotes`` growing the bottom band) can put it back.
+        top_legend._graphs_anchor_axes = ax
+        top_legend._graphs_anchor_fig_y = anchor_fig_y
 
     if descriptor:
         n_texts_before_descriptor = len(fig.texts)
