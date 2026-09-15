@@ -19,6 +19,12 @@ from graphs._fonts import _get_font
 # stay readable when they cross gridlines.
 _HALO = "#FFFFFF"
 
+# ``y_labels_on_grid`` seats each label this far above its gridline. ``finalize``
+# reads it to predict, before the column is frozen, how far a ceiling tick's
+# label will overshoot the axes top — so a ``y_axis_label`` block heading the
+# column reserves the same lift it is later given.
+ON_GRID_LABEL_LIFT_PT = 2.5
+
 
 def label_lines(
     ax,
@@ -253,10 +259,14 @@ def _ticks_are_numeric(labels: Iterable[str]) -> bool:
     A single non-numeric or multi-line label marks the axis categorical —
     ``y_labels_on_grid`` styling only suits numeric scale labels.
     """
-    return all("\n" not in text and _NUMERIC_TICK.match(text.strip()) for text in labels)
+    return all(
+        "\n" not in text and _NUMERIC_TICK.match(text.strip()) for text in labels
+    )
 
 
-def y_labels_on_grid(ax, *, pad_pt: float = 4.0, label_lift_pt: float = 2.5) -> None:
+def y_labels_on_grid(
+    ax, *, pad_pt: float = 4.0, label_lift_pt: float = ON_GRID_LABEL_LIFT_PT
+) -> None:
     """Sit y tick labels on top of gridlines that extend under them.
 
     Standard Economist daily-chart convention: each gridline continues past
