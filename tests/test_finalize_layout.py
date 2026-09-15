@@ -383,8 +383,8 @@ def test_panel_labels_widen_hspace():
     for ax in axes:
         ax.plot(np.arange(5), [1, 3, 2, 5, 4])
     fig.canvas.draw()
-    h_plain = _compute_hspace(fig, has_panel_labels=False)
-    h_labelled = _compute_hspace(fig, has_panel_labels=True)
+    h_plain = _compute_hspace(fig, has_panel_labels=False, axes_span=0.75)
+    h_labelled = _compute_hspace(fig, has_panel_labels=True, axes_span=0.75)
     plt.close(fig)
 
     assert h_plain is not None and h_labelled is not None
