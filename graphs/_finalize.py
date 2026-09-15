@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
 from graphs._fonts import _get_font, _get_font_condensed
+from graphs._labels import ON_GRID_LABEL_LIFT_PT
 from graphs._links import strip_links
 from graphs._palette import C_LABEL_MUTED, C_RED, C_SOURCE, C_SPINE, C_TEXT
 from graphs._superscript import _has_marker, render_text_with_superscripts
@@ -181,6 +182,9 @@ AUTO_LAYOUT_PANEL_LABEL_PT = 22.0  # rule + bold panel_label height between rows
 AUTO_LAYOUT_HSPACE_GUTTER_PT = 6.0  # breathing room between stacked-row bands
 AUTO_LAYOUT_TOP_LEGEND_GAP_PT = 5.0  # gap above an auto top_legend (legend↔descriptor)
 AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT = 4.0  # gap above a y_axis_label (label↔descriptor)
+LEGEND_LABEL_CLEARANCE_PT = (
+    8.0  # top_legend↔y_axis_label gap that lets them share a strip
+)
 
 
 # Favicon triangle geometry (hails.info/favicon.svg) — outer red outline,
@@ -485,9 +489,11 @@ class _YAxisLabelSpec:
             block plus the optional unit line — and each superscript chunk when
             markers split the render).
         axes_top: ``ax.get_position().y1`` when the label was rendered.
-        anchor_x: The x edge the label is flush against at render time
-            (``bbox.x1`` for ``side="right"``, ``bbox.x0`` for ``"left"``).
-        side: ``"right"`` or ``"left"`` — which axes edge ``anchor_x`` tracks.
+        anchor_x: The x edge the label is flush against — the outer edge of the
+            y tick-label column on its side (the block heads the column, so its
+            edge meets the "100%" below it), falling back to the axes edge when
+            no tick labels sit on that side.
+        side: ``"right"`` or ``"left"`` — which side's column ``anchor_x`` tracks.
     """
 
     ax: object
@@ -547,6 +553,9 @@ def _axes_top_protrusion_fig(fig, spec) -> float:
         if bb.x1 < span_x0 or bb.x0 > span_x1:
             continue
         protrusion = max(protrusion, bb.y1 - axes_top)
+    protrusion = max(
+        protrusion, _tick_column_protrusion_fig(fig, spec.ax, spec.side, renderer)
+    )
     return max(0.0, protrusion)
 
 
@@ -581,19 +590,129 @@ def _y_axis_label_band_fig(fig, specs: list[_YAxisLabelSpec]) -> float:
     return band
 
 
-def _reanchor_y_axis_labels(fig) -> None:
-    """Shift each ``y_axis_label`` block to its axes' final position.
+def _legend_clears_y_axis_labels(fig, legend, specs) -> bool:
+    """True when ``legend`` and every ``y_axis_label`` block are horizontally disjoint.
 
-    The label artists were rendered flush against the axes edge *before*
-    ``finalize`` moved it; shift every artist by the axes-edge delta so the
-    block seats just above the final axes top again (the reserved band above it
-    keeps the title stack clear). Pure translation in figure coords — the
-    per-chunk superscript layout inside the block is preserved. Updates each
-    spec's stored anchors so a repeated ``finalize`` is a no-op shift.
+    Measured pre-layout in figure fraction with ``LEGEND_LABEL_CLEARANCE_PT`` of
+    daylight. The blocks later slide *outward* onto their tick column while the
+    legend keeps its figure-x anchor, so a pre-layout clearance can only grow.
+    False when nothing measures, which keeps the stacked layout.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return False
+    inv = fig.transFigure.inverted()
+    try:
+        legend_bb = legend.get_window_extent(renderer=renderer).transformed(inv)
+    except Exception:
+        return False
+    clearance = LEGEND_LABEL_CLEARANCE_PT / 72.0 / fig.get_figwidth()
+    for spec in specs:
+        for artist in spec.artists:
+            try:
+                bb = artist.get_window_extent(renderer=renderer).transformed(inv)
+            except Exception:
+                continue
+            if bb.x0 < legend_bb.x1 + clearance and bb.x1 > legend_bb.x0 - clearance:
+                return False
+    return True
+
+
+def _y_tick_column(fig, ax, side: str, renderer) -> tuple[list, bool]:
+    """``(bboxes, frozen)`` — figure-fraction bboxes of the y tick labels on ``side``.
+
+    ``frozen`` is True when the bboxes are the on-grid text artists
+    (:func:`~graphs.y_labels_on_grid` has run and hidden the native labels),
+    False when they are the native tick labels. A label is "on" a side when its
+    centre lies past the axes' horizontal midpoint on that side, so a block
+    mounted opposite the ticks measures an empty column.
+    """
+    inv = fig.transFigure.inverted()
+    pos = ax.get_position()
+    mid_x = (pos.x0 + pos.x1) / 2.0
+    frozen = [t for t in ax.texts if t.get_gid() == "y-labels-on-grid"]
+    if frozen:
+        labels = frozen
+    else:
+        # The locator runs past the view limits (a "120%" tick above a 1.05
+        # ceiling); its label is never drawn, so measure only ticks in range —
+        # the same filter ``y_labels_on_grid`` applies when it freezes them.
+        y_lo, y_hi = sorted(ax.get_ylim())
+        labels = [
+            label
+            for tick in ax.yaxis.get_major_ticks()
+            if y_lo <= tick.get_loc() <= y_hi
+            for label in (tick.label1, tick.label2)
+            if label.get_visible() and label.get_text()
+        ]
+    bboxes = []
+    for label in labels:
+        try:
+            bb = label.get_window_extent(renderer=renderer).transformed(inv)
+        except Exception:
+            continue
+        on_right = (bb.x0 + bb.x1) / 2.0 > mid_x
+        if on_right == (side == "right"):
+            bboxes.append(bb)
+    return bboxes, bool(frozen)
+
+
+def _y_tick_column_edge_fig(fig, ax, side: str) -> float | None:
+    """Outer x edge of ``ax``'s y tick-label column on ``side``, in figure fraction.
+
+    A ``y_axis_label`` block reads as the column's heading only when it is flush
+    with the labels under it — the "100%" at the top of a right-hand axis, not
+    the axes spine a gutter's width to its left. Returns ``None`` when nothing
+    measures (no renderer, or no tick labels on that side), and the caller falls
+    back to the axes edge.
+    """
+    renderer = _get_renderer(fig)
+    if renderer is None:
+        return None
+    bboxes, _ = _y_tick_column(fig, ax, side, renderer)
+    if not bboxes:
+        return None
+    return max(b.x1 for b in bboxes) if side == "right" else min(b.x0 for b in bboxes)
+
+
+def _tick_column_protrusion_fig(fig, ax, side: str, renderer) -> float:
+    """How far the top of ``ax``'s y tick-label column pokes above the axes top.
+
+    The ``y_axis_label`` block heads the column, so it seats above the column's
+    top label — which overshoots the axes when the top tick sits at the ceiling
+    (``ylim(0, 100)`` with a 100 tick). Measured from the frozen on-grid artists
+    once they exist; before that, predicted from the native labels with the
+    on-grid geometry (label bottom ``ON_GRID_LABEL_LIFT_PT`` above its gridline),
+    so the band reserved pre-layout matches the lift applied post-layout.
+    """
+    bboxes, frozen = _y_tick_column(fig, ax, side, renderer)
+    if not bboxes:
+        return 0.0
+    if frozen:
+        top = max(b.y1 for b in bboxes)
+    else:
+        lift = ON_GRID_LABEL_LIFT_PT / 72.0 / fig.get_figheight()
+        top = max((b.y0 + b.y1) / 2.0 + lift + b.height for b in bboxes)
+    return max(0.0, top - ax.get_position().y1)
+
+
+def _reanchor_y_axis_labels(fig) -> None:
+    """Shift each ``y_axis_label`` block onto its axes' final position.
+
+    The label artists were rendered *before* ``finalize`` moved the axes; shift
+    every artist so the block seats just above the final axes top again (the
+    reserved band above it keeps the title stack clear), flush with the outer
+    edge of the y tick-label column on its side — falling back to the axes edge
+    when no labels sit there. Pure translation in figure coords — the per-chunk
+    superscript layout inside the block is preserved. Updates each spec's stored
+    anchors so a repeated call (``finalize`` runs it again once the on-grid
+    labels are frozen) is a no-op shift.
     """
     for spec in _y_axis_label_specs(fig):
         pos = spec.ax.get_position()
-        new_anchor_x = pos.x1 if spec.side == "right" else pos.x0
+        axes_edge = pos.x1 if spec.side == "right" else pos.x0
+        column_edge = _y_tick_column_edge_fig(fig, spec.ax, spec.side)
+        new_anchor_x = axes_edge if column_edge is None else column_edge
         # Seat the block above any in-axes text that pokes past the axes top
         # (fanned annotations, direct labels) and, for LEFT-side blocks, above
         # the panel_label band (the heading shares the left anchor) — the
@@ -1091,7 +1210,9 @@ def _compute_auto_pads(
     fig_h_in = fig.get_figheight()
     pt2fig = 1.0 / 72.0 / fig_h_in
 
-    bottom_pad = _compute_bottom_pad(fig, ax, source=source, footnote_lines=footnote_lines)
+    bottom_pad = _compute_bottom_pad(
+        fig, ax, source=source, footnote_lines=footnote_lines
+    )
 
     title_block_pt = 0.0
     if title:
@@ -1200,7 +1321,9 @@ def _compute_bottom_pad(fig, ax, *, source: str, footnote_lines: int) -> float:
     # One line box per *wrapped* source row. Reserving a single row while the renderer wraps to
     # two drops the tail off the bottom of the figure, which is the same silent truncation the
     # wrap exists to prevent — just on the other axis.
-    source_rows = _source_row_count(fig, source, x=_content_left_x(fig, ax, ax.get_position()))
+    source_rows = _source_row_count(
+        fig, source, x=_content_left_x(fig, ax, ax.get_position())
+    )
     return source_depth + source_h_fig * source_rows + AUTO_LAYOUT_BOTTOM_MARGIN
 
 
@@ -2026,6 +2149,24 @@ def finalize(
                 label_block + AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT / 72.0 / fig_h_in
             )
 
+    # A top legend and a y_axis_label block that clear each other horizontally
+    # (legend at the left, label heading the right-hand tick column) share ONE
+    # strip above the axes instead of stacking. Stacked, both bands were
+    # reserved and the descriptor floated a blank legend-height above the row
+    # (the touchstone precision ladder). The shared strip is the taller band.
+    legend_shares_label_strip = (
+        top_legend is not None
+        and top_legend_band > 0.0
+        and y_axis_label_band > 0.0
+        and _legend_clears_y_axis_labels(fig, top_legend, y_label_specs)
+    )
+    if legend_shares_label_strip:
+        reserved_legend_band = 0.0
+        reserved_label_band = max(top_legend_band, y_axis_label_band)
+    else:
+        reserved_legend_band = top_legend_band
+        reserved_label_band = y_axis_label_band
+
     # Auto-layout always runs — size every margin and the inter-panel spacing
     # from the renderer. Top/bottom fit the title-stack and source band;
     # left/right are measured from the actual y-axis text; wspace/hspace size a
@@ -2039,9 +2180,9 @@ def finalize(
         marker=marker,
         y_start=y_start,
         footnote_lines=footnote_lines,
-        top_legend_band=top_legend_band,
+        top_legend_band=reserved_legend_band,
         top_panel_label_band=top_panel_label_band,
-        y_axis_label_band=y_axis_label_band,
+        y_axis_label_band=reserved_label_band,
         top_tick_band=top_tick_band,
     )
     left, right = _compute_side_margins(fig)
@@ -2129,13 +2270,13 @@ def finalize(
     # and an auto top legend — seat above the label instead of on top of it.
     # A LEFT-side label block additionally sits above the panel_label band
     # (the heading shares its left anchor), so the two bands stack, not share.
-    if y_axis_label_band > 0.0:
+    if reserved_label_band > 0.0:
         label_base = bbox.y1
         if top_panel_label_band > 0.0 and any(
             spec.side == "left" for spec in y_label_specs
         ):
             label_base += top_panel_label_band
-        y_cursor = max(y_cursor, label_base + y_axis_label_band)
+        y_cursor = max(y_cursor, label_base + reserved_label_band)
 
     # A top-row ``panel_label`` occupies the band immediately above the axes top
     # (rule + bold heading, drawn after ``finalize``). Advance the title-stack
@@ -2158,14 +2299,20 @@ def finalize(
     # (re-anchoring it against the cropped figure box), which re-opens the very
     # collision this reserves against. An axes-relative y crops in lockstep with
     # the axes and the descriptor, so the gap survives the tight save.
+    #
+    # Sharing a strip with a y_axis_label block, the legend's bottom sits on the
+    # label's own seat instead — level with it, under the same cursor advance.
     if top_legend is not None and top_legend_band > 0.0:
         spec = top_legend._graphs_top_legend
         legend_h = top_legend_band - legend_gap
-        anchor_fig_y = y_cursor + legend_h
+        if legend_shares_label_strip:
+            anchor_fig_y = bbox.y1 + Y_AXIS_LABEL_MARGIN + legend_h
+        else:
+            anchor_fig_y = y_cursor + legend_h
+            y_cursor += top_legend_band
         anchor_axes_y = (anchor_fig_y - bbox.y0) / bbox.height
         blended = mtransforms.blended_transform_factory(fig.transFigure, ax.transAxes)
         top_legend.set_bbox_to_anchor((spec.x, anchor_axes_y), transform=blended)
-        y_cursor += top_legend_band
 
     if descriptor:
         n_texts_before_descriptor = len(fig.texts)
@@ -2356,6 +2503,11 @@ def finalize(
         from graphs._labels import y_labels_on_grid
 
         y_labels_on_grid(ax)
+        # The frozen column can sit a hair wider (its own pad) and taller (its
+        # lift) than the native labels it replaced; slide the label blocks onto
+        # the final column edge and above its top label.
+        if y_label_specs:
+            _reanchor_y_axis_labels(fig)
 
     # Post-process legend entry texts so footnote markers ("Self-attributed*")
     # render as superscripts, exactly as they do in the title, descriptor,
@@ -2573,9 +2725,11 @@ def y_axis_label(
 ) -> None:
     """Economist-style horizontal y-axis title above the axis.
 
-    Renders ``text`` word-wrapped to ~``width_frac`` of the axes width, aligned
-    flush with the appropriate side of the chart, sitting just above
-    ``bbox.y1``. Use instead of ``ax.set_ylabel`` for the Economist look.
+    Renders ``text`` word-wrapped to ~``width_frac`` of the axes width, flush
+    with the outer edge of the y tick-label column on that side (it heads the
+    column, so its edge meets the "100%" below it; the axes edge when no labels
+    sit there), seated just above the axes top and above the column's top label.
+    Use instead of ``ax.set_ylabel`` for the Economist look.
 
     When ``unit`` is provided, it is rendered on a second line below ``text``
     in a lighter colour (``C_LABEL_MUTED`` by default) — the Economist
@@ -2614,7 +2768,20 @@ def y_axis_label(
 
     wrapped = textwrap.fill(text, width=n_chars, max_lines=2, placeholder="…")
 
-    x = bbox.x1 if side == "right" else bbox.x0
+    # Head the tick column: flush with its outer edge, seated above its top label
+    # (a ceiling tick's label overshoots the axes top). Before ``finalize`` the
+    # column may still sit on the other side — then the axes edge stands in and
+    # the re-anchor after auto-layout slides the block onto the final column.
+    axes_edge = bbox.x1 if side == "right" else bbox.x0
+    column_edge = _y_tick_column_edge_fig(fig, ax, side)
+    x = axes_edge if column_edge is None else column_edge
+    renderer = _get_renderer(fig)
+    column_lift = (
+        0.0
+        if renderer is None
+        else _tick_column_protrusion_fig(fig, ax, side, renderer)
+    )
+    seat_top = bbox.y1 + column_lift
     ha = "right" if side == "right" else "left"
     fp = fm.FontProperties(family=_get_font_condensed(), weight="medium")
     n_texts_before = len(fig.texts)
@@ -2625,7 +2792,7 @@ def y_axis_label(
     # wrapped text line so the unit sits just below the main label.
     line_h = fontsize * Y_AXIS_LABEL_LINESPACING * pt2fig
     n_text_lines = wrapped.count("\n") + 1
-    y_text = bbox.y1 + Y_AXIS_LABEL_MARGIN
+    y_text = seat_top + Y_AXIS_LABEL_MARGIN
     if unit:
         y_text += line_h  # leave room below for the unit line
 
@@ -2670,7 +2837,7 @@ def y_axis_label(
         _YAxisLabelSpec(
             ax=ax,
             artists=list(fig.texts[n_texts_before:]),
-            axes_top=bbox.y1,
+            axes_top=seat_top,
             anchor_x=x,
             side=side,
         )
@@ -2678,7 +2845,12 @@ def y_axis_label(
 
 
 def save_chart(
-    script_file, *, dpi: int = 150, close: bool = True, verbose: bool = True, deck: bool = False
+    script_file,
+    *,
+    dpi: int = 150,
+    close: bool = True,
+    verbose: bool = True,
+    deck: bool = False,
 ):
     """Save the current figure next to ``script_file`` as ``<stem>.png``.
 
@@ -3052,7 +3224,9 @@ def graph_area_fraction(fig) -> float:
     return float(union.width * union.height / full_area)
 
 
-def verify_graph_share(fig=None, *, min_fraction: float = GRAPH_SHARE_MIN) -> str | None:
+def verify_graph_share(
+    fig=None, *, min_fraction: float = GRAPH_SHARE_MIN
+) -> str | None:
     """Warn when the graph fills less than ``min_fraction`` of the figure.
 
     A rendered chart should be mostly chart: when the title stack, legend
