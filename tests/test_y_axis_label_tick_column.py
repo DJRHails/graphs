@@ -201,3 +201,50 @@ def test_shared_strip_legend_clears_the_panel_label_band():
     descriptor = next(t for t in fig.texts if t.get_text().startswith("Recall"))
     desc_bb = _fig_bboxes(fig, [descriptor])[0]
     assert desc_bb.y0 >= legend_bb.y1, "descriptor overlaps the legend"
+
+
+@pytest.mark.parametrize("ceiling", [1.05, 1.0])
+def test_footnotes_after_finalize_keeps_the_block_clear(ceiling):
+    """``footnotes`` grows the bottom band afterwards by raising the panel bottoms,
+    compressing the data range: the top tick's label climbs toward the axes top
+    and the legend's axes-fraction anchor slides. The block must stay above the
+    column with air, below the descriptor, and level with the legend."""
+    from graphs import footnotes
+    from graphs._finalize import COLUMN_TOP_CLEARANCE_PT
+
+    fig, ax = _bar_fig(ceiling=ceiling)
+    handles = [Patch(facecolor="C0") for _ in range(2)]
+    top_legend(fig, handles, ["no lever", "label competition"])
+    y_axis_label(ax, LABEL, unit=UNIT)
+    finalize(ax, title=TITLE, descriptor=DESCRIPTOR, source="", zero_rule=False)
+    footnotes(
+        fig,
+        "Colour is what the lever does, not how well it does it, spelled out at length "
+        "so that this note wraps onto a second row of the footnote band.",
+        "Claude Opus 4.8 and Claude Opus 5 averaged, each at its own 95%-recall "
+        "threshold; rungs are each lever family's best deployable arm.",
+        "Added after the pool's rows were published, so it reads on its own scored rows.",
+        source="Source: ShareTrawl bycatch pool (N=3,608); precision_ladder.py",
+    )
+
+    column_top = max(bb.y1 for bb in _tick_column_bboxes(fig, ax))
+    label = _label_bboxes(fig)
+    label_bottom = min(bb.y0 for bb in label)
+    label_top = max(bb.y1 for bb in label)
+    air = COLUMN_TOP_CLEARANCE_PT * PT / 5.0
+    assert label_bottom >= column_top + air - 1e-4, (
+        f"label bottom {label_bottom:.4f} sits on the tick column (top {column_top:.4f})"
+    )
+    descriptor = next(t for t in fig.texts if t.get_text().startswith("Recall"))
+    desc_bb = _fig_bboxes(fig, [descriptor])[0]
+    assert desc_bb.y0 >= label_top - 1e-4, "label pushed into the descriptor"
+    # The legend seats on the axes top (a ceiling tick lifts the block alone, so
+    # the two need not be level); it must not have slid below that seat.
+    from graphs._finalize import Y_AXIS_LABEL_MARGIN
+
+    legend_bb = _fig_bboxes(fig, [fig.legends[0]])[0]
+    seat = ax.get_position().y1 + Y_AXIS_LABEL_MARGIN
+    assert legend_bb.y0 >= seat - 1e-3, (
+        f"legend bottom {legend_bb.y0:.4f} slid below its seat {seat:.4f}"
+    )
+    assert legend_bb.y0 < label_top, "legend no longer shares the strip"
