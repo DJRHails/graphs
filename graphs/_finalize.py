@@ -931,6 +931,12 @@ def _compute_wspace(fig) -> float | None:
     return max_gap / avg_w
 
 
+def _grid_row_start(ax) -> int:
+    """Index of the gridspec row ``ax`` starts on; ``0`` for an off-grid axes."""
+    subplotspec = ax.get_subplotspec() if hasattr(ax, "get_subplotspec") else None
+    return 0 if subplotspec is None else subplotspec.rowspan.start
+
+
 def _lower_row_label_band_fig(fig) -> float:
     """Band of the tallest ``y_axis_label`` block on a row below the top one.
 
@@ -939,28 +945,29 @@ def _lower_row_label_band_fig(fig) -> float:
     measures them), so the gap must hold it — the top row's block is budgeted
     by the top margin instead. ``0.0`` when no lower row carries a block.
     """
-    lower = []
-    for spec in _y_axis_label_specs(fig):
-        subplotspec = (
-            spec.ax.get_subplotspec() if hasattr(spec.ax, "get_subplotspec") else None
-        )
-        if subplotspec is not None and subplotspec.rowspan.start > 0:
-            lower.append(spec)
+    lower = [s for s in _y_axis_label_specs(fig) if _grid_row_start(s.ax) > 0]
     if not lower:
         return 0.0
     return _y_axis_label_band_fig(fig, lower)
 
 
-def _compute_hspace(fig, *, has_panel_labels: bool) -> float | None:
+def _compute_hspace(fig, *, has_panel_labels: bool, axes_span: float) -> float | None:
     """Inter-row ``hspace`` so a row's x-ticks (and panel label) clear the next.
 
+    A row boundary must hold the upper row's bottom x-tick band plus, when
+    panels carry ``panel_label`` headings, the rule-and-label height that sits
+    above the lower row, plus a lower row's ``y_axis_label`` block (it seats
+    above its own axes, i.e. inside this gap; a left-side block under
+    ``panel_labels`` lifts over the heading band too, so the two add).
+
     ``hspace`` is matplotlib's inter-row gap as a fraction of the *average axes
-    height*. A row boundary must hold the upper row's bottom x-tick band plus,
-    when panels carry ``panel_label`` headings, the rule-and-label height that
-    sits above the lower row, plus a lower row's ``y_axis_label`` block (it
-    seats above its own axes, i.e. inside this gap; a left-side block under
-    ``panel_labels`` lifts over the heading band too, so the two add). Returns
-    ``None`` for a single row or a non-Agg backend (caller leaves ``hspace``
+    height* — the height the grid will have *after* ``subplots_adjust``, not
+    the one it has now. The grid lays ``nrows`` cells of average height ``h``
+    with ``hspace * h`` between them inside ``axes_span`` (the vertical extent
+    between the final ``bottom`` and ``top`` pads), so ``h = axes_span /
+    (nrows + hspace * (nrows - 1))``; this solves that for the ``hspace`` that
+    yields exactly the required gap. Returns ``None`` for a single row, a
+    non-Agg backend, or a gap the span cannot hold (caller leaves ``hspace``
     untouched).
     """
     nrows, _ = _gridspec_shape(fig)
@@ -971,25 +978,25 @@ def _compute_hspace(fig, *, has_panel_labels: bool) -> float | None:
     pt2fig_h = 1.0 / 72.0 / fig_h_in
 
     band = 0.0
-    avg_h = 0.0
     n_axes = 0
     for axes in fig.axes:
         if axes.get_subplotspec() is None:
             continue
-        avg_h += axes.get_position().height
         n_axes += 1
         measured = _xtick_band_height_fig(fig, axes)
         if measured is not None:
             band = max(band, measured)
-    if n_axes == 0 or avg_h <= 0:
+    if n_axes == 0:
         return None
-    avg_h /= n_axes
 
     gap = band + AUTO_LAYOUT_HSPACE_GUTTER_PT * pt2fig_h
     if has_panel_labels:
         gap += AUTO_LAYOUT_PANEL_LABEL_PT * pt2fig_h
     gap += _lower_row_label_band_fig(fig)
-    return gap / avg_h
+    cells_span = axes_span - gap * (nrows - 1)
+    if cells_span <= 0:
+        return None
+    return gap * nrows / cells_span
 
 
 def _lowest_row_axes(fig) -> list:
@@ -2245,11 +2252,14 @@ def finalize(
     # occupies a strip just above the axes top. Measure the tallest block and
     # reserve a band for it so the descriptor — and the whole title stack —
     # seats above the label instead of overlapping it; the label artists are
-    # re-anchored to the final axes top after auto-layout below.
+    # re-anchored to the final axes top after auto-layout below. Only a top-row
+    # block eats the top margin: a lower row's seats in the inter-row gap,
+    # which ``_compute_hspace`` budgets.
     y_label_specs = _y_axis_label_specs(fig)
+    top_row_label_specs = [s for s in y_label_specs if _grid_row_start(s.ax) == 0]
     y_axis_label_band = 0.0
-    if y_label_specs:
-        label_block = _y_axis_label_band_fig(fig, y_label_specs)
+    if top_row_label_specs:
+        label_block = _y_axis_label_band_fig(fig, top_row_label_specs)
         if label_block:
             y_axis_label_band = (
                 label_block + AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT / 72.0 / fig_h_in
@@ -2264,7 +2274,7 @@ def finalize(
         top_legend is not None
         and top_legend_band > 0.0
         and y_axis_label_band > 0.0
-        and _legend_clears_y_axis_labels(fig, top_legend, y_label_specs)
+        and _legend_clears_y_axis_labels(fig, top_legend, top_row_label_specs)
     )
     if legend_shares_label_strip:
         reserved_legend_band = 0.0
@@ -2301,7 +2311,9 @@ def finalize(
     wspace = _compute_wspace(fig)
     if wspace is not None:
         adjust_kwargs["wspace"] = wspace
-    hspace = _compute_hspace(fig, has_panel_labels=panel_labels)
+    hspace = _compute_hspace(
+        fig, has_panel_labels=panel_labels, axes_span=1.0 - top_pad - bottom_pad
+    )
     if hspace is not None:
         adjust_kwargs["hspace"] = hspace
     fig.subplots_adjust(**adjust_kwargs)
