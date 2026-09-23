@@ -9,6 +9,7 @@ import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
 
 from graphs._fonts import _get_font, _get_font_condensed
@@ -3079,18 +3080,29 @@ def year_axis(ax, *, abbreviate: bool = True, set_locator: bool = True) -> None:
     """
     if set_locator:
         ax.xaxis.set_major_locator(mdates.YearLocator())
+    ax.xaxis.set_major_formatter(_YearTickFormatter(ax, abbreviate=abbreviate))
 
-    def _fmt(x: float, _pos) -> str:
+
+class _YearTickFormatter(mticker.Formatter):
+    """The :func:`year_axis` tick labels: the leftmost visible year in full, the rest ``'YY``.
+
+    A module-level class rather than a closure in a ``FuncFormatter``, so a figure carrying it
+    pickles — deck variants are fitted on a pickled clone of the figure.
+    """
+
+    def __init__(self, ax, *, abbreviate: bool) -> None:
+        self.ax = ax
+        self.abbreviate = abbreviate
+
+    def __call__(self, x: float, pos=None) -> str:
         year = mdates.num2date(x).year
-        if not abbreviate:
+        if not self.abbreviate:
             return str(year)
-        x_lo, x_hi = ax.get_xlim()
-        ticks = [t for t in ax.get_xticks() if x_lo <= t <= x_hi]
+        x_lo, x_hi = self.ax.get_xlim()
+        ticks = [t for t in self.ax.get_xticks() if x_lo <= t <= x_hi]
         if ticks and abs(x - min(ticks)) < 1e-6:
             return str(year)
         return f"’{year % 100:02d}"
-
-    ax.xaxis.set_major_formatter(plt.FuncFormatter(_fmt))
 
 
 def _text_width_fig(
