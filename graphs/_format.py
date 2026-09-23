@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import Formatter
 
 _UNITS = ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "k"))
 _MAGNITUDE_WORD = {1e3: "thousand", 1e6: "million", 1e9: "billion", 1e12: "trillion"}
@@ -77,4 +77,18 @@ def scale_axis(ax, *, axis: str = "y", by: float = 1000.0) -> None:
     if axis not in ("x", "y"):
         raise ValueError(f"axis must be 'x' or 'y', got {axis!r}")
     target = ax.yaxis if axis == "y" else ax.xaxis
-    target.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value / by:g}"))
+    target.set_major_formatter(_ScaledTickFormatter(by))
+
+
+class _ScaledTickFormatter(Formatter):
+    """The :func:`scale_axis` tick labels: each value divided by ``by``, in ``:g`` form.
+
+    A module-level class rather than a lambda in a ``FuncFormatter``, so a figure carrying it
+    pickles — deck variants are fitted on a pickled clone of the figure.
+    """
+
+    def __init__(self, by: float) -> None:
+        self.by = by
+
+    def __call__(self, x: float, pos=None) -> str:
+        return f"{x / self.by:g}"
