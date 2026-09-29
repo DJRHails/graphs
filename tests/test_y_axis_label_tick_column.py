@@ -21,6 +21,18 @@ TITLE = "Which prompting strategy buys the most precision at 95% recall?"
 DESCRIPTOR = "Recall measured against the jury's labels for the watched harm"
 LABEL = "precision at 95% recall"
 UNIT = "% of fires that are the watched harm"
+NOTES = (
+    (
+        "Colour is what the lever does, not how well it does it, spelled out at length "
+        "so that this note wraps onto a second row of the footnote band."
+    ),
+    (
+        "Claude Opus 4.8 and Claude Opus 5 averaged, each at its own 95%-recall "
+        "threshold; rungs are each lever family's best deployable arm."
+    ),
+    "Added after the pool's rows were published, so it reads on its own scored rows.",
+)
+SOURCE = "Source: ShareTrawl bycatch pool (N=3,608); precision_ladder.py"
 PT = 1.0 / 72.0
 
 
@@ -217,15 +229,8 @@ def test_footnotes_after_finalize_keeps_the_block_clear(ceiling):
     top_legend(fig, handles, ["no lever", "label competition"])
     y_axis_label(ax, LABEL, unit=UNIT)
     finalize(ax, title=TITLE, descriptor=DESCRIPTOR, source="", zero_rule=False)
-    footnotes(
-        fig,
-        "Colour is what the lever does, not how well it does it, spelled out at length "
-        "so that this note wraps onto a second row of the footnote band.",
-        "Claude Opus 4.8 and Claude Opus 5 averaged, each at its own 95%-recall "
-        "threshold; rungs are each lever family's best deployable arm.",
-        "Added after the pool's rows were published, so it reads on its own scored rows.",
-        source="Source: ShareTrawl bycatch pool (N=3,608); precision_ladder.py",
-    )
+    seated_bottom = min(bb.y0 for bb in _label_bboxes(fig))
+    footnotes(fig, *NOTES, source=SOURCE)
 
     column_top = max(bb.y1 for bb in _tick_column_bboxes(fig, ax))
     label = _label_bboxes(fig)
@@ -234,6 +239,10 @@ def test_footnotes_after_finalize_keeps_the_block_clear(ceiling):
     air = COLUMN_TOP_CLEARANCE_PT * PT / 5.0
     assert label_bottom >= column_top + air - 1e-4, (
         f"label bottom {label_bottom:.4f} sits on the tick column (top {column_top:.4f})"
+    )
+    assert label_bottom == pytest.approx(seated_bottom, abs=1e-4), (
+        f"block bottom moved {seated_bottom:.4f} -> {label_bottom:.4f}: the column "
+        "was not held, so the block lifted off its seat"
     )
     descriptor = next(t for t in fig.texts if t.get_text().startswith("Recall"))
     desc_bb = _fig_bboxes(fig, [descriptor])[0]
@@ -248,3 +257,47 @@ def test_footnotes_after_finalize_keeps_the_block_clear(ceiling):
         f"legend bottom {legend_bb.y0:.4f} slid below its seat {seat:.4f}"
     )
     assert legend_bb.y0 < label_top, "legend no longer shares the strip"
+
+
+def test_footnotes_leaves_the_axes_top_alone_when_the_column_has_air():
+    """A column whose top label sits well under the axes top can climb into that
+    air without lifting the block, so the hold must not shorten the panel."""
+    from graphs import footnotes
+
+    fig, ax = _bar_fig(ceiling=1.19)  # top tick 100% at 84% of the axes height
+    y_axis_label(ax, LABEL, unit=UNIT)
+    finalize(ax, title=TITLE, descriptor=DESCRIPTOR, source="", zero_rule=False)
+    axes_top = ax.get_position().y1
+    seated_bottom = min(bb.y0 for bb in _label_bboxes(fig))
+    column_top = max(bb.y1 for bb in _tick_column_bboxes(fig, ax))
+    assert column_top < axes_top - 0.02, "fixture must leave air above the column"
+    footnotes(fig, *NOTES, source=SOURCE)
+
+    assert ax.get_position().y1 == pytest.approx(axes_top, abs=1e-6), (
+        "the panel top was lowered although the column had air under the block"
+    )
+    label_bottom = min(bb.y0 for bb in _label_bboxes(fig))
+    assert label_bottom == pytest.approx(seated_bottom, abs=1e-4)
+
+
+def test_footnotes_hold_keeps_facet_tops_level():
+    """On a faceted row the hold lowers every panel by the same amount: the
+    labelled panel's top must not drop below its unlabelled siblings'."""
+    from graphs import footnotes
+
+    fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.5), sharey=True)
+    for ax in axes:
+        ax.bar(range(4), [0.55, 0.78, 0.86, 0.95], width=0.68)
+        ax.set_ylim(0, 1.05)  # the 100% label sits just under the axes top
+    axes[0].yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
+    y_axis_label(axes[0], LABEL, unit=UNIT)
+    finalize(axes[0], title=TITLE, descriptor=DESCRIPTOR, source="", zero_rule=False)
+    tops_before = [ax.get_position().y1 for ax in axes]
+    assert tops_before[0] == pytest.approx(tops_before[1], abs=1e-9)
+    footnotes(fig, *NOTES, source=SOURCE)
+
+    tops_after = [ax.get_position().y1 for ax in axes]
+    assert tops_after[0] < tops_before[0] - 1e-4, "fixture must engage the hold"
+    assert tops_after[0] == pytest.approx(tops_after[1], abs=1e-9), (
+        f"facet tops diverged after footnotes: {tops_after[0]:.4f} vs {tops_after[1]:.4f}"
+    )
