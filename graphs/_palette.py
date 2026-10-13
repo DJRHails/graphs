@@ -9,6 +9,7 @@ Adapted from The Economist's web chart style guide, with two project overrides:
    title rule and the highlighted data element share one accent.
 """
 
+import re
 from collections.abc import Iterator, Mapping
 
 # ----------------------------------------------------------------------------
@@ -138,11 +139,25 @@ class ConceptColors(Mapping[str, str]):
         return f"ConceptColors({self._colors!r})"
 
 
+_HEX_COLOR = re.compile(
+    r"""(?x)                    # verbose mode
+    \#                          # leading hash
+    (?:
+        (?P<short>[0-9a-fA-F]{3})   # #rgb shorthand
+      | (?P<full>[0-9a-fA-F]{6})    # #rrggbb
+    )
+    """
+)
+
+
 def _resolve_color(concept: str, color: str) -> str:
+    """Canonical lowercase ``#rrggbb`` so the duplicate check sees ``#fff`` == ``#ffffff``."""
     if color in PALETTE:
         return PALETTE[color].lower()
-    if color.startswith("#") and len(color) in (4, 7):
-        return color.lower()
+    match = _HEX_COLOR.fullmatch(color)
+    if match is not None:
+        digits = match["full"] or "".join(c * 2 for c in match["short"])
+        return f"#{digits.lower()}"
     raise ValueError(
         f"concept {concept!r}: colour {color!r} is neither a PALETTE name "
         f"({', '.join(PALETTE)}) nor a #rgb / #rrggbb hex"

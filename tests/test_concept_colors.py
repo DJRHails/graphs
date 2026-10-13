@@ -29,6 +29,17 @@ def test_two_concepts_one_colour_is_rejected():
         concept_colors({"Base": "grey", "Control": PALETTE["grey"]})
 
 
+def test_shorthand_hex_is_the_same_colour():
+    assert concept_colors({"Base": "#FA0"})["Base"] == "#ffaa00"
+    with pytest.raises(ValueError, match="'Base' and 'Control' share colour #ffffff"):
+        concept_colors({"Base": "#fff", "Control": "#ffffff"})
+
+
+def test_malformed_hex_fails_fast():
+    with pytest.raises(ValueError, match="'Cue'.*'#zzzzzz'"):
+        concept_colors({"Cue": "#zzzzzz"})
+
+
 def test_map_is_read_only():
     colors = concept_colors({"Base": "grey"})
     with pytest.raises(TypeError):
