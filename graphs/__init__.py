@@ -52,11 +52,13 @@ from graphs._charts import (
 )
 from graphs._deck import save_deck_variant
 from graphs._finalize import (
+    column_emphasis,
     dark_zero_line,
     finalize,
     footnotes,
     graph_area_fraction,
     panel_label,
+    row_emphasis,
     save_chart,
     verify_graph_share,
     verify_layout,
@@ -68,6 +70,7 @@ from graphs._finalize import (
 )
 from graphs._fonts import _get_font as get_font
 from graphs._fonts import _get_font_condensed as get_font_condensed
+from graphs._fonts import _get_font_mono as get_font_mono
 from graphs._format import format_count, magnitude_word, scale_axis
 from graphs._labels import (
     inset_tick_labels,
@@ -96,7 +99,9 @@ from graphs._palette import (
     C_SPINE,
     C_TEXT,
     PALETTE,
+    ConceptColors,
     colors,
+    concept_colors,
     cycle_for,
     snapshot_palette,
 )
@@ -113,6 +118,8 @@ __all__ = [
     "dark_zero_line",
     "footnotes",
     "panel_label",
+    "row_emphasis",
+    "column_emphasis",
     "graph_area_fraction",
     "save_chart",
     "save_deck_variant",
@@ -125,7 +132,9 @@ __all__ = [
     "year_ticks",
     # palette
     "PALETTE",
+    "ConceptColors",
     "colors",
+    "concept_colors",
     "cycle_for",
     "snapshot_palette",
     "C_BG",
@@ -184,6 +193,7 @@ __all__ = [
     # fonts
     "get_font",
     "get_font_condensed",
+    "get_font_mono",
     # formatting
     "format_count",
     "magnitude_word",

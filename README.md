@@ -43,7 +43,7 @@ delta marker (titles auto-wrap to the figure width), numeric y labels seated
 on gridlines that extend under them, source line, right-hand y-axis.
 
 **[SKILL.md](./SKILL.md) is the full manual** — design principles, headline
-conventions, the complete API table, and a when-to-use index of 39 worked
+conventions, the complete API table, and a when-to-use index of 43 worked
 examples in [`examples/`](./examples/).
 
 ### Palette

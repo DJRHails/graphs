@@ -11,3 +11,6 @@ examples/comparisons/
 
 # CSV cache for the example scripts.
 examples/.data/
+
+# Vector variants of the paper examples are regenerated, not tracked.
+examples/*.pdf

@@ -9,7 +9,7 @@ documented in ``_palette``:
 
 import matplotlib.pyplot as plt
 
-from graphs._fonts import _get_font, _get_font_condensed
+from graphs._fonts import _get_font, _get_font_condensed, _get_font_mono
 from graphs._palette import (
     C_BG,
     C_GRID,
@@ -48,6 +48,12 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
             "savefig.facecolor": bg,
             "savefig.edgecolor": bg,
             "savefig.transparent": transparent,
+            # Vector output keeps text as text: embed TrueType (42) instead of
+            # matplotlib's default Type 3 glyph outlines, so PDF/SVG labels stay
+            # selectable, searchable and sharp under a journal's PDF pipeline.
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
             # Axes
             "axes.facecolor": bg,
             "axes.edgecolor": C_SPINE,
@@ -88,6 +94,8 @@ def set_theme(*, bg: str | None = None, transparent: bool = False) -> None:
             # ``finalize``.
             "font.family": "sans-serif",
             "font.sans-serif": cond_chain,
+            # Literal tokens, code and prompts: ``fontfamily="monospace"``.
+            "font.monospace": [_get_font_mono(), "Menlo", "DejaVu Sans Mono"],
             "text.color": C_TEXT,
             # Regular (not light): keeps the tick/label characters from reading
             # too thin against the axis rule — matches the Economist's
