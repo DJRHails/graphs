@@ -1,0 +1,42 @@
+name: Notify dotfiles
+
+# DJRHails/dotfiles vendors this repo as the graph-design skill submodule. On every
+# push to main, ask dotfiles to bump its pin (its bump-graph-design.yml does the
+# work and also runs daily, so a missed dispatch only delays the bump).
+#
+# DOTFILES_DISPATCH_TOKEN: fine-grained PAT scoped to DJRHails/dotfiles only,
+# Contents: read and write (the minimum repository_dispatch accepts).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  dispatch:
+    name: Dispatch graph-design bump to dotfiles
+    # No pull_request trigger, so only pushes to main by writers reach the pool.
+    runs-on: >-
+      ${{ vars.CI_FALLBACK == 'true'
+      && 'ubuntu-latest'
+      || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
+    timeout-minutes: 5
+    steps:
+      - name: Send repository_dispatch
+        env:
+          GH_TOKEN: ${{ secrets.DOTFILES_DISPATCH_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::DOTFILES_DISPATCH_TOKEN is not set on DJRHails/graphs — create a" \
+              "fine-grained PAT for DJRHails/dotfiles (Contents: read and write) and" \
+              "add it with: gh secret set DOTFILES_DISPATCH_TOKEN --repo DJRHails/graphs"
+            exit 1
+          fi
+          gh api repos/DJRHails/dotfiles/dispatches \
+            -f event_type=graphs-main-updated \
+            -f "client_payload[sha]=${SHA}"
+          echo "dispatched graphs-main-updated for ${SHA}"
