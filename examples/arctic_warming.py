@@ -48,7 +48,7 @@ AVG = [3.05, 2.20, 1.40, 1.10, 0.95, 0.85, 0.85, 0.75, 0.80, 0.45, 0.65, 0.70]
 LO = [2.15, 0.55, -0.25, 0.20, 0.30, 0.40, 0.35, 0.15, 0.25, -0.25, -0.25, 0.15]
 HI = [4.80, 3.60, 2.35, 1.90, 1.75, 1.55, 1.60, 1.45, 1.30, 1.15, 1.95, 1.15]
 
-fig, ax = subplots("daily", height=3.8)
+fig, ax = subplots("daily", height=5.6)
 
 # Pale blue Arctic / Antarctic panels, run across the full figure width like
 # the original (under the latitude labels in the left margin).
@@ -132,7 +132,7 @@ finalize(
     source="Source: [Carbon Brief](https://www.carbonbrief.org/)",
     y_axis_right=False,
     title_x=0.02,
-    y_start=0.17,
+    y_start=0.115,
     autoscale_y=False,
     zero_rule=False,  # y is latitude; the value baseline is the x=0 vertical
 )
@@ -142,11 +142,22 @@ finalize(
 # track the auto axes top and sit cleanly above the top-mounted x-ticks.
 
 
+# Offsets above the axes top are in inches, so they hold at any figure height.
+LATITUDE_RISE_IN = 0.133  # "Latitude" header, level with the x tick labels
+LEGEND_RISE_IN = 0.589  # legend, level with the descriptor's first line
+
 # "Latitude" column header, level with the x tick labels.
 fig.canvas.draw()
 bbox = ax.get_position()
+fig_h_in = fig.get_figheight()
 fig.text(
-    0.02, bbox.y1 + 0.035, "Latitude", fontsize=9, color=C_LABEL, ha="left", va="bottom"
+    0.02,
+    bbox.y1 + LATITUDE_RISE_IN / fig_h_in,
+    "Latitude",
+    fontsize=9,
+    color=C_LABEL,
+    ha="left",
+    va="bottom",
 )
 
 handles = [
@@ -159,7 +170,7 @@ top_legend(
     ["Average", "Range‡"],
     align="right",
     x=bbox.x1,
-    y=bbox.y1 + 0.155,
+    y=bbox.y1 + LEGEND_RISE_IN / fig_h_in,
     fontsize=9,
 )
 

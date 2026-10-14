@@ -34,7 +34,7 @@ rows.sort(key=lambda r: r[1])
 labels = [r[0] for r in rows]
 values = [r[1] for r in rows]
 
-fig, ax = subplots("wide", height=3.6)
+fig, ax = subplots("wide", height=4.1)
 
 bar_h(ax, labels, [v / 1000 for v in values], highlight_max=True)
 

@@ -47,7 +47,7 @@ values = [
     [60, 90, 115],    # Communication
 ]
 
-fig, ax = subplots("wide", height=5.0)
+fig, ax = subplots("wide", height=5.6)
 
 thermometer(
     ax,
@@ -64,6 +64,13 @@ ax.xaxis.set_ticks_position("top")
 ax.xaxis.set_label_position("top")
 ax.tick_params(axis="x", which="both", top=True, bottom=False, labeltop=True, labelbottom=False)
 
+# Hands-off: tag the colour key BEFORE finalize so it reserves a band for it
+# between the descriptor and the top-mounted x-ticks (0/100/200/300/400).
+handles, labels = ax.get_legend_handles_labels()
+top_legend(fig, handles, labels, ncol=3)
+
+# finalize auto-layouts the wide left margin from the measured category names
+# and pins the title stack above the top-mounted ticks.
 finalize(
     ax,
     title="The horrible science",
@@ -71,19 +78,6 @@ finalize(
     source="Source: [Ben Schmidt](https://benschmidt.org/), Northeastern University",
     y_axis_right=False,
     title_x=0.02,
-    y_start=0.16,
 )
-# finalize auto-layouts the wide left margin from the measured category names.
-# The x-ticks are top-mounted, so finalize pins the title-stack directly above
-# them; lower only the axes top to open a band for the legend row between the
-# descriptor and the top x-ticks (the title anchors to the ticks, so it tracks
-# down with them rather than detaching).
-fig.subplots_adjust(top=0.62)
-
-# Single inline legend top-left, aligned with title-stack — same pattern as
-# the EU-balance chart. Frameless, compact. It sits between the descriptor and
-# the top-mounted x-ticks (0/100/200/300/400).
-handles, labels = ax.get_legend_handles_labels()
-top_legend(fig, handles, labels, y=0.74, ncol=3)
 
 save_chart(__file__)

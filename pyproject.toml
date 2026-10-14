@@ -45,3 +45,11 @@ push = true
 "SKILL.md" = [
     'version: {version}',
 ]
+
+[dependency-groups]
+# `uv sync` installs the dev group by default. scipy is example-only (brexit.py,
+# bump_chart.py and generational_politics.py smooth with it); examples need 3.12+.
+dev = [
+    "pytest==9.1.1",
+    "scipy==1.18.1; python_version >= '3.12'",
+]

@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.font_manager as fm
-import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 from graphs import (
@@ -50,17 +49,22 @@ PANELS = [
 ]
 
 fig, axes = subplots("daily", height=4.7, nrows=4)
-# Pre-size the panel band (wide left margin) so value_label's data-unit pad is
-# computed against roughly the final axes width; finalize re-applies the auto
-# outer margins, and the bespoke margins are restored after it (below).
-fig.subplots_adjust(top=0.76, bottom=0.165, left=0.245, right=0.945, hspace=0.38)
+# Each panel spans the full band, category-label column included, so the label
+# gutter counts as graph; LABEL_COLUMN is its share of the panel width.
+LABEL_COLUMN = 0.243
+PANEL_GRID = dict(top=0.85, bottom=0.11, left=0.02, right=0.945, hspace=0.38)
+# Pre-size the panel band so value_label's data-unit pad is computed against
+# roughly the final axes width; finalize re-applies the auto outer margins, and
+# the bespoke margins are restored after it (below).
+fig.subplots_adjust(**PANEL_GRID)
 
 
 def value_label(ax, value: float, text: str, y: float, span: float) -> None:
     """Label a bar: white inside at the zero end, or tinted outside the tip."""
     pos = ax.get_position()
     axis_width_in = ax.figure.get_figwidth() * pos.width
-    pad = 3.5 * span / (axis_width_in * 72)  # 3.5pt converted to data units
+    x_lo, x_hi = ax.get_xlim()
+    pad = 3.5 * (x_hi - x_lo) / (axis_width_in * 72)  # 3.5pt converted to data units
     if abs(value) / span >= 0.15:
         x, ha = (pad, "left") if value >= 0 else (-pad, "right")
         color = "white"
@@ -86,7 +90,7 @@ for ax, (label, ww, iwg, ww_text, iwg_text) in zip(axes, PANELS, strict=True):
     lo = min(0.0, ww, iwg)
     hi = max(0.0, ww, iwg)
     ax.barh([1, 0], [ww, iwg], color=[C_RED_BRAND, C_IWG], height=0.92, zorder=2)
-    ax.set_xlim(lo, hi)
+    ax.set_xlim(lo - LABEL_COLUMN / (1 - LABEL_COLUMN) * (hi - lo), hi)
     ax.set_ylim(Y_LO, Y_HI)
     ax.set_facecolor(C_BAND)
     ax.set_xticks([])
@@ -112,33 +116,28 @@ finalize(
     autoscale_y=False,
 )
 # REMAINING EDGE CASE — a manual subplots_adjust survives here on purpose.
-# This chart hangs its category labels in a hand-sized left gutter and writes
-# the bar value labels in data coords (value_label), both AFTER finalize, so
-# finalize can't measure them: there are no y-tick labels to widen the left
+# This chart writes its category labels and bar value labels AFTER finalize,
+# so finalize can't measure them: there are no y-tick labels to size the grid
 # from, and the value labels don't exist yet when the right is measured. Pin
-# the bespoke wide-left band + hspace so those post-finalize artists land right.
-fig.subplots_adjust(top=0.76, bottom=0.165, left=0.245, right=0.945, hspace=0.38)
+# the bespoke band + hspace so those post-finalize artists land right.
+fig.subplots_adjust(**PANEL_GRID)
 
-# Category labels sit on the pale band, which extends left of each bar pair.
-BAND_X0 = 0.02  # flush with the title's left edge
+# Category labels sit in each panel's left column, on the pale band.
 for ax, (label, *_rest) in zip(axes, PANELS, strict=True):
-    pos = ax.get_position()
-    fig.add_artist(plt.Rectangle(
-        (BAND_X0, pos.y0), pos.x0 - BAND_X0, pos.height,
-        transform=fig.transFigure, facecolor=C_BAND, edgecolor="none", zorder=0.5,
-    ))
     render_text_with_superscripts(
         fig,
-        BAND_X0 + 0.01,
-        (pos.y0 + pos.y1) / 2,
+        0.012,
+        0.5,
         label,
         fontsize=9,
         fontproperties=FP_LABEL,
         color=C_SPINE,
         va="center",
         ha="left",
+        transform=ax.transAxes,
     )
 
+# Colour key top-right, level with the title stack.
 handles = [Patch(facecolor=C_RED_BRAND), Patch(facecolor=C_IWG)]
 top_legend(
     fig,
@@ -146,7 +145,7 @@ top_legend(
     ["WeWork", "IWG"],
     align="right",
     x=axes[0].get_position().x1,
-    y=0.90,
+    y=0.94,
     ncol=1,
     fontsize=8,
     handlelength=0.9,
@@ -154,9 +153,7 @@ top_legend(
 
 footnotes(
     fig,
-    "*End June 2019",
-    "†Latest",
-    "‡Estimate",
+    "*End June 2019; †Latest; ‡Estimate",
     source="Sources: Bloomberg; company reports",
 )
 

@@ -116,7 +116,7 @@ def lighten(color, frac=0.35):
     return "#" + "".join(f"{round(c + (255 - c) * frac):02x}" for c in rgb)
 
 
-fig, ax = subplots("daily", height=4.3)
+fig, ax = subplots("daily", height=5.0)
 
 line_specs = [
     ("genx", C_GENX, 1.9),

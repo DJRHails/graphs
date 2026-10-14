@@ -22,7 +22,7 @@ set_theme()
 categories = ["Don’t care", "Yes", "No", "Not sure"][::-1]
 values = [34, 28, 27, 11][::-1]
 
-FIG_H_IN = 6.0
+FIG_H_IN = 6.2
 fig, ax = subplots("daily", height=FIG_H_IN)
 
 # Graph-design colour scheme rather than the original's flat brand red: the

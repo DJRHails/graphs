@@ -4,8 +4,10 @@ How the house style adapts when the figure goes into a paper rather than an
 article or a deck. Distilled in part from Sophie Wang's
 [notes on writing a paper](https://www.sophielwang.com/blog/paper-writing)
 (figure tips credited there to Phillip Isola); the worked references are
-[`paper_cue_bars.py`](../examples/paper_cue_bars.py) and
-[`paper_benchmark_grid.py`](../examples/paper_benchmark_grid.py).
+[`paper_cue_bars.py`](../examples/paper_cue_bars.py),
+[`paper_benchmark_grid.py`](../examples/paper_benchmark_grid.py) (`row_emphasis`) and
+[`paper_training_curves.py`](../examples/paper_training_curves.py) (`column_emphasis`) —
+all three share one `concept_colors` map, as a paper's figures would.
 
 ## The caption carries the headline
 

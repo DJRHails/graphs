@@ -40,7 +40,7 @@ additions = [
     945, 1470,                               # Trump, 2017-18
 ]
 
-fig, ax = subplots("daily", height=3.6)
+fig, ax = subplots("daily", height=3.9)
 
 # Presidential-era bands — thin white gaps act as the era dividers.
 # Band colour sampled from the original's pale-blue plot panel.

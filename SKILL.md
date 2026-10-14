@@ -3,7 +3,7 @@ name: graph-design
 description: >
   Economist-style data-visualisation system for matplotlib/seaborn — theme,
   finalize() title-stack, direct labels, and 20+ chart helpers with a
-  when-to-load index of 43 worked examples. Use whenever creating, restyling
+  when-to-load index of 44 worked examples. Use whenever creating, restyling
   or reviewing charts/plots/figures in Python — including figures for a paper
   (caption variant, vector PDF, concept colours across a figure set): it owns
   figure sizing, typography, titles/descriptors/sources, layout spacing,
@@ -659,3 +659,4 @@ pattern.
 - [`european_warming.py`](./examples/european_warming.py) — **Load when:** many same-unit time series where one entity is the story and the rest are context — highlight two lines against a faded backdrop of the others, no legend. A wink title carried by a y-axis-labelling descriptor; direct labels on the two highlighted lines; real Berkeley Earth decadal anomalies.
 - [`paper_cue_bars.py`](./examples/paper_cue_bars.py) — **Load when:** a figure for a paper comparing a few conditions across groups, where the same conditions recur in other figures and some conditions are literal strings (tokens, prompts). `concept_colors` carried into value labels and group labels (no legend), monospace token chips on the ticks, a two-level x-axis (bars on major ticks, bracketed groups on minor ticks), `save_chart(deck=True, formats=("png", "pdf"))` for the caption variant.
 - [`paper_benchmark_grid.py`](./examples/paper_benchmark_grid.py) — **Load when:** a grid of small multiples where the reader should compare along one direction first (one model across benchmarks) — spacing, not rules or boxes, does the grouping. `row_emphasis`, shared-y right axis on the last column, `panel_label` headings, `top_legend` keyed by the shared `concept_colors` map.
+- [`paper_training_curves.py`](./examples/paper_training_curves.py) — **Load when:** training or sweep curves per model where each model's story reads top-to-bottom (the curves, then a derived gap) — one column per entity. `column_emphasis`, `height_ratios` for a shorter derived panel, direct labels in each concept's darkened ink where the curves diverge, model names inside the panels instead of `panel_label` (a heading band would split every column).
