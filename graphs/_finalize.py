@@ -1043,7 +1043,7 @@ def _apply_emphasis(fig, adjust: dict) -> None:
     cells_span = span - gap * (n - 1)
     if cells_span <= 0:
         raise ValueError(
-            f"{emphasis}_emphasis: a {target_in:.2f}in gap between {n} {emphasis} "
+            f"{_EMPHASIS_HELPERS[emphasis]}: a {target_in:.2f}in gap between {n} {emphasis} "
             "leaves no room for the panels — enlarge the figure (height= for rows)"
         )
     adjust[key] = gap * n / cells_span
@@ -2761,18 +2761,23 @@ def panel_label(ax, label: str, *, fontsize: int = PANEL_LABEL_SIZE_PT) -> None:
     )
 
 
-def _set_emphasis(fig, emphasis: str, *, needs: str) -> None:
+_EMPHASIS_HELPERS = {"rows": "row_emphasis", "columns": "column_emphasis"}
+
+
+def _set_emphasis(fig, emphasis: str) -> None:
+    helper = _EMPHASIS_HELPERS[emphasis]
     nrows, ncols = _gridspec_shape(fig)
-    count = nrows if needs == "rows" else ncols
+    count = nrows if emphasis == "rows" else ncols
     if count < 2:
         raise ValueError(
-            f"{emphasis}_emphasis needs at least two {needs} to separate, got a "
+            f"{helper} needs at least two {emphasis} to separate, got a "
             f"{nrows}x{ncols} grid"
         )
     previous = getattr(fig, "_graphs_emphasis", None)
     if previous not in (None, emphasis):
         raise ValueError(
-            f"figure already has {previous}_emphasis; a grid groups one way only"
+            f"{helper}: figure already has {_EMPHASIS_HELPERS[previous]}(); "
+            "a grid groups one way only"
         )
     fig._graphs_emphasis = emphasis
 
@@ -2790,7 +2795,7 @@ def row_emphasis(fig) -> None:
         ValueError: For a grid with fewer than two rows, or one already set
             to :func:`column_emphasis`.
     """
-    _set_emphasis(fig, "rows", needs="rows")
+    _set_emphasis(fig, "rows")
 
 
 def column_emphasis(fig) -> None:
@@ -2803,7 +2808,7 @@ def column_emphasis(fig) -> None:
         ValueError: For a grid with fewer than two columns, or one already
             set to :func:`row_emphasis`.
     """
-    _set_emphasis(fig, "columns", needs="columns")
+    _set_emphasis(fig, "columns")
 
 
 def _drop_xlabel_unit(ax) -> None:
@@ -3148,8 +3153,8 @@ def save_chart(
     if deck:
         from graphs._deck import save_deck_variant
 
-        for out in outs:
-            save_deck_variant(plt.gcf(), out, dpi=dpi)
+        extra = tuple(out.suffix.lstrip(".") for out in outs[1:])
+        save_deck_variant(plt.gcf(), outs[0], dpi=dpi, extra_formats=extra)
     if close:
         plt.close()
     if verbose:

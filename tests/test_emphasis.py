@@ -51,7 +51,7 @@ def test_column_emphasis_widens_only_the_column_gap():
 def test_emphasis_needs_something_to_separate():
     set_theme()
     fig, _ = subplots("wide", ncols=3)
-    with pytest.raises(ValueError, match="at least two rows.*1x3"):
+    with pytest.raises(ValueError, match=r"row_emphasis needs at least two rows.*1x3"):
         row_emphasis(fig)
     column_emphasis(fig)
     plt.close("all")
@@ -61,7 +61,7 @@ def test_too_short_a_figure_fails_loudly():
     set_theme()
     fig, axes = subplots("wide", height=1.4, nrows=4, ncols=2)
     row_emphasis(fig)
-    with pytest.raises(ValueError, match="no room for the panels"):
+    with pytest.raises(ValueError, match=r"row_emphasis: .*no room for the panels"):
         finalize(axes[0, 0], title="Grid", descriptor="Value", source="Source: test")
     plt.close("all")
 
@@ -70,6 +70,6 @@ def test_one_grouping_per_grid():
     set_theme()
     fig, _ = subplots("wide", nrows=2, ncols=2)
     row_emphasis(fig)
-    with pytest.raises(ValueError, match="already has rows_emphasis"):
+    with pytest.raises(ValueError, match=r"column_emphasis: figure already has row_emphasis\("):
         column_emphasis(fig)
     plt.close("all")
