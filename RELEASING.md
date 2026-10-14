@@ -31,13 +31,11 @@ automatically. So "the version in code" is the single source of truth.
 ## Sync the consumers after a release
 
 - **The agent skill** is vendored as a git submodule in `~/.files` at
-  `modules/agents/skills/graph-design`. Point it at the new release and commit the
-  bump in the `.files` superproject:
-
-  ```bash
-  git -C ~/.files submodule update --remote --recursive modules/agents/skills/graph-design
-  git -C ~/.files commit -am "graph-design: bump to vY"
-  ```
+  `modules/agents/skills/graph-design`. Nothing to do: every push to `main` runs
+  [`notify-dotfiles.yml`](.github/workflows/notify-dotfiles.yml), which dispatches
+  dotfiles' `bump-graph-design.yml` to fast-forward the pin (it also runs daily, so a
+  missed dispatch only delays it). If the notify job fails on a missing or expired
+  `DOTFILES_DISPATCH_TOKEN`, its error says how to replace the token.
 
 - **Downstream pins** (any repo that pins `djrhails-graphs` to a tag, e.g.
   touchstone's `pyproject.toml` `{ git = "…graphs.git", tag = "vX" }`) bump the tag
