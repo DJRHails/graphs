@@ -1,11 +1,13 @@
-"""IBM Plex Sans + Condensed font management for matplotlib.
+"""IBM Plex font management for matplotlib.
 
 Downloads font files from github.com/IBM/plex only when the fonts are not
-already registered. We load two families:
+already registered. We load three families of the one superfamily:
 
 * **IBM Plex Sans** — used for the chart headline (Bold).
 * **IBM Plex Sans Condensed** — used for subtitle, ticks, labels, and source
   (styleguide rule: everything except the headline is condensed).
+* **IBM Plex Mono** — literal tokens, code and prompts
+  (``fontfamily="monospace"``), so a literal reads as a literal.
 """
 
 import logging
@@ -38,16 +40,28 @@ _IBM_COND_FILES = [
     "IBMPlexSansCondensed-Light.ttf",
 ]
 
+_IBM_MONO_BASE = (
+    "https://github.com/IBM/plex/raw/master/"
+    "packages/plex-mono/fonts/complete/ttf/"
+)
+_IBM_MONO_FILES = [
+    "IBMPlexMono-Regular.ttf",
+    "IBMPlexMono-Medium.ttf",
+    "IBMPlexMono-Bold.ttf",
+]
+
 _SANS_NAME = "IBM Plex Sans"
 _COND_NAME = "IBM Plex Sans Condensed"
+_MONO_NAME = "IBM Plex Mono"
 _FALLBACK = "DejaVu Sans"
+_FALLBACK_MONO = "DejaVu Sans Mono"
 
 
 def _is_registered(name: str) -> bool:
     return any(f.name == name for f in fm.fontManager.ttflist)
 
 
-def _ensure(name: str, base_url: str, files: list[str]) -> str:
+def _ensure(name: str, base_url: str, files: list[str], fallback: str = _FALLBACK) -> str:
     if _is_registered(name):
         return name
 
@@ -67,7 +81,7 @@ def _ensure(name: str, base_url: str, files: list[str]) -> str:
         except Exception:
             _log.debug("Failed to register font %s", fname, exc_info=True)
 
-    return name if _is_registered(name) else _FALLBACK
+    return name if _is_registered(name) else fallback
 
 
 def ensure_ibm_plex() -> str:
@@ -80,8 +94,14 @@ def ensure_ibm_plex_condensed() -> str:
     return _ensure(_COND_NAME, _IBM_COND_BASE, _IBM_COND_FILES)
 
 
+def ensure_ibm_plex_mono() -> str:
+    """Return the IBM Plex Mono family name (download if missing)."""
+    return _ensure(_MONO_NAME, _IBM_MONO_BASE, _IBM_MONO_FILES, _FALLBACK_MONO)
+
+
 _FONT_SANS: str = ""
 _FONT_COND: str = ""
+_FONT_MONO: str = ""
 
 
 def _get_font() -> str:
@@ -96,3 +116,10 @@ def _get_font_condensed() -> str:
     if not _FONT_COND:
         _FONT_COND = ensure_ibm_plex_condensed()
     return _FONT_COND
+
+
+def _get_font_mono() -> str:
+    global _FONT_MONO  # noqa: PLW0603
+    if not _FONT_MONO:
+        _FONT_MONO = ensure_ibm_plex_mono()
+    return _FONT_MONO

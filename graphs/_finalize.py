@@ -181,6 +181,7 @@ AUTO_LAYOUT_SIDE_GUTTER_PT = 4.0  # gutter between a measured side label and the
 AUTO_LAYOUT_WSPACE_GUTTER_PT = 10.0  # gutter added to inter-column label width
 AUTO_LAYOUT_PANEL_LABEL_PT = 22.0  # rule + bold panel_label height between rows
 AUTO_LAYOUT_HSPACE_GUTTER_PT = 6.0  # breathing room between stacked-row bands
+EMPHASIS_GAP_PT = 18.0  # extra gap between groups under row_/column_emphasis (~3x the gutter)
 AUTO_LAYOUT_TOP_LEGEND_GAP_PT = 5.0  # gap above an auto top_legend (legend↔descriptor)
 AUTO_LAYOUT_Y_AXIS_LABEL_GAP_PT = 4.0  # gap above a y_axis_label (label↔descriptor)
 LEGEND_LABEL_CLEARANCE_PT = (
@@ -322,7 +323,9 @@ def _xtick_band_height_fig(fig, ax) -> float | None:
     baseline_y0 = ax.get_position().y0
     inv = fig.transFigure.inverted()
     lowest_y0 = baseline_y0
-    for tl in ax.get_xticklabels():
+    # Minor labels count too: a two-level axis (per-bar labels on major ticks,
+    # group labels on minor ticks a pad lower) hangs its lower row there.
+    for tl in ax.get_xticklabels(which="both"):
         if not tl.get_text() or not tl.get_visible():
             continue
         tl_bb = tl.get_window_extent(renderer=renderer).transformed(inv)
@@ -1003,6 +1006,49 @@ def _compute_hspace(fig, *, has_panel_labels: bool, axes_span: float) -> float |
     return gap * nrows / cells_span
 
 
+def _grid_gaps_in(fig, adjust: dict) -> tuple[float, float]:
+    """``(column gap, row gap)`` in inches that ``adjust`` would lay out."""
+    nrows, ncols = _gridspec_shape(fig)
+    wspace = adjust.get("wspace", fig.subplotpars.wspace)
+    hspace = adjust.get("hspace", fig.subplotpars.hspace)
+    col_gap = row_gap = 0.0
+    if ncols > 1:
+        cell_w = (adjust["right"] - adjust["left"]) / (ncols + wspace * (ncols - 1))
+        col_gap = wspace * cell_w * fig.get_figwidth()
+    if nrows > 1:
+        cell_h = (adjust["top"] - adjust["bottom"]) / (nrows + hspace * (nrows - 1))
+        row_gap = hspace * cell_h * fig.get_figheight()
+    return col_gap, row_gap
+
+
+def _apply_emphasis(fig, adjust: dict) -> None:
+    """Widen the between-group gap set by :func:`row_emphasis`/:func:`column_emphasis`.
+
+    The between-group gap becomes the larger of the two measured gaps plus
+    ``EMPHASIS_GAP_PT``, so it out-spaces the within-group gap even when the
+    latter already holds tick labels. Mutates ``adjust`` in place.
+    """
+    emphasis = getattr(fig, "_graphs_emphasis", None)
+    if emphasis is None:
+        return
+    nrows, ncols = _gridspec_shape(fig)
+    col_gap, row_gap = _grid_gaps_in(fig, adjust)
+    target_in = max(col_gap, row_gap) + EMPHASIS_GAP_PT / 72.0
+    if emphasis == "rows":
+        key, n, span = "hspace", nrows, adjust["top"] - adjust["bottom"]
+        gap = target_in / fig.get_figheight()
+    else:
+        key, n, span = "wspace", ncols, adjust["right"] - adjust["left"]
+        gap = target_in / fig.get_figwidth()
+    cells_span = span - gap * (n - 1)
+    if cells_span <= 0:
+        raise ValueError(
+            f"{_EMPHASIS_HELPERS[emphasis]}: a {target_in:.2f}in gap between {n} {emphasis} "
+            "leaves no room for the panels — enlarge the figure (height= for rows)"
+        )
+    adjust[key] = gap * n / cells_span
+
+
 def _lowest_row_axes(fig) -> list:
     """Return the gridspec axes on the bottom row (highest ``rowspan.stop``).
 
@@ -1485,17 +1531,20 @@ def _source_line_y(fig, ax) -> float:
     the lowest gridspec row, not just ``ax``: the reservation
     (:func:`_compute_bottom_pad`) measures the whole row, and a source that
     ignored a sibling panel's deeper band overlapped it (faceted charts
-    whose non-anchor panel carries the x-axis label). Falls back to the
+    whose non-anchor panel carries the x-axis label). The baseline is that
+    row's too: on a multi-row grid ``ax`` is usually the top row, and
+    anchoring there seated the source between the rows. Falls back to the
     plain offset when the renderer can't measure (non-Agg backend).
     """
-    bbox = ax.get_position()
-    source_y = bbox.y0 - SOURCE_Y_OFFSET
+    bottom_row = _lowest_row_axes(fig) or [ax]
+    baseline_y0 = min(row_ax.get_position().y0 for row_ax in bottom_row)
+    source_y = baseline_y0 - SOURCE_Y_OFFSET
     renderer = _get_renderer(fig)
     if renderer is None:
         return source_y
     inv = fig.transFigure.inverted()
-    lowest_fig_y = bbox.y0
-    for row_ax in _lowest_row_axes(fig) or [ax]:
+    lowest_fig_y = baseline_y0
+    for row_ax in bottom_row:
         xlabel = row_ax.xaxis.label
         if xlabel.get_text() and xlabel.get_visible():
             lowest_fig_y = min(
@@ -1508,7 +1557,7 @@ def _source_line_y(fig, ax) -> float:
                 lowest_fig_y,
                 unit.get_window_extent(renderer=renderer).transformed(inv).y0,
             )
-        for tl in row_ax.get_xticklabels():
+        for tl in row_ax.get_xticklabels(which="both"):
             if not tl.get_text() or not tl.get_visible():
                 continue
             lowest_fig_y = min(
@@ -2341,6 +2390,7 @@ def finalize(
     )
     if hspace is not None:
         adjust_kwargs["hspace"] = hspace
+    _apply_emphasis(fig, adjust_kwargs)
     fig.subplots_adjust(**adjust_kwargs)
     fig.canvas.draw()
 
@@ -2711,6 +2761,56 @@ def panel_label(ax, label: str, *, fontsize: int = PANEL_LABEL_SIZE_PT) -> None:
     )
 
 
+_EMPHASIS_HELPERS = {"rows": "row_emphasis", "columns": "column_emphasis"}
+
+
+def _set_emphasis(fig, emphasis: str) -> None:
+    helper = _EMPHASIS_HELPERS[emphasis]
+    nrows, ncols = _gridspec_shape(fig)
+    count = nrows if emphasis == "rows" else ncols
+    if count < 2:
+        raise ValueError(
+            f"{helper} needs at least two {emphasis} to separate, got a "
+            f"{nrows}x{ncols} grid"
+        )
+    previous = getattr(fig, "_graphs_emphasis", None)
+    if previous not in (None, emphasis):
+        raise ValueError(
+            f"{helper}: figure already has {_EMPHASIS_HELPERS[previous]}(); "
+            "a grid groups one way only"
+        )
+    fig._graphs_emphasis = emphasis
+
+
+def row_emphasis(fig) -> None:
+    """Make a panel grid read as rows: tight gaps within a row, wide between rows.
+
+    Spacing is grouping — the reader compares panels that sit close. Use
+    this when each row is one entity (a model) under several conditions, so
+    the eye compares conditions within the row. ``finalize`` keeps the
+    within-row gap at its measured minimum and adds ``EMPHASIS_GAP_PT``
+    between rows. Call BEFORE ``finalize``.
+
+    Raises:
+        ValueError: For a grid with fewer than two rows, or one already set
+            to :func:`column_emphasis`.
+    """
+    _set_emphasis(fig, "rows")
+
+
+def column_emphasis(fig) -> None:
+    """Make a panel grid read as columns: tight gaps within a column, wide between.
+
+    The transpose of :func:`row_emphasis`: use it when each column is one
+    entity and the comparison runs down the column. Call BEFORE ``finalize``.
+
+    Raises:
+        ValueError: For a grid with fewer than two columns, or one already
+            set to :func:`row_emphasis`.
+    """
+    _set_emphasis(fig, "columns")
+
+
 def _drop_xlabel_unit(ax) -> None:
     """Remove a previous ``x_axis_label(unit=…)`` rendering from ``ax``.
 
@@ -3009,41 +3109,57 @@ def save_chart(
     close: bool = True,
     verbose: bool = True,
     deck: bool = False,
+    formats: tuple[str, ...] = ("png",),
 ):
-    """Save the current figure next to ``script_file`` as ``<stem>.png``.
+    """Save the current figure next to ``script_file`` as ``<stem>.<format>``.
 
     The standard example-script epilogue (``bbox_inches="tight"``, 150 dpi,
     close, confirmation print) as one call::
 
         save_chart(__file__)
+        save_chart(__file__, deck=True, formats=("png", "pdf"))  # paper figure
 
     Runs :func:`verify_graph_share` first — a figure whose graph fills less
     than 75% of the rendered image warns before it is written.
 
+    ``"pdf"`` and ``"svg"`` are vector with text kept as text (``set_theme``
+    embeds TrueType rather than glyph outlines) — the format for a paper,
+    where readers zoom and copy labels.
+
     Args:
         script_file: Almost always ``__file__`` — the output lands beside
             the script, named after it.
-        dpi: Raster resolution.
+        dpi: Raster resolution (PNG; vector formats only use it for any
+            rasterised artists).
         close: Close the current figure after saving.
         verbose: Print a one-line confirmation.
+        deck: Also write the ``<stem>_deck`` variant — the chart without its
+            headline, for a slide or a paper whose caption carries the title
+            (see :func:`~graphs.save_deck_variant`) — in every format.
+        formats: File extensions to write, e.g. ``("png", "pdf")``.
 
     Returns:
-        Path of the written PNG.
+        Path of the first written format.
     """
     from pathlib import Path
 
+    if not formats:
+        raise ValueError("save_chart: formats is empty — pass e.g. ('png', 'pdf')")
     verify_graph_share(plt.gcf())
-    out = Path(script_file).resolve().with_suffix(".png")
-    plt.savefig(out, bbox_inches="tight", dpi=dpi)
+    stem = Path(script_file).resolve()
+    outs = [stem.with_suffix(f".{fmt.lstrip('.')}") for fmt in formats]
+    for out in outs:
+        plt.savefig(out, bbox_inches="tight", dpi=dpi)
     if deck:
         from graphs._deck import save_deck_variant
 
-        save_deck_variant(plt.gcf(), out, dpi=dpi)
+        extra = tuple(out.suffix.lstrip(".") for out in outs[1:])
+        save_deck_variant(plt.gcf(), outs[0], dpi=dpi, extra_formats=extra)
     if close:
         plt.close()
     if verbose:
-        print(f"Saved {out.name}")
-    return out
+        print(f"Saved {', '.join(out.name for out in outs)}")
+    return outs[0]
 
 
 def year_ticks(ax, years, *, inset: bool = True) -> None:
@@ -3312,7 +3428,7 @@ def verify_layout(fig, *, tolerance: float = 0.005) -> list[str]:
                 yield axes.xaxis.label
             if axes.yaxis.label.get_text():
                 yield axes.yaxis.label
-            for tl in axes.get_xticklabels() + axes.get_yticklabels():
+            for tl in axes.get_xticklabels(which="both") + axes.get_yticklabels():
                 if tl.get_text():
                     yield tl
         for leg in fig.legends:
@@ -3509,7 +3625,7 @@ def _bottom_band_top(fig) -> float:
             lowest = min(
                 lowest, unit.get_window_extent(renderer=renderer).transformed(inv).y0
             )
-        for tl in a.get_xticklabels():
+        for tl in a.get_xticklabels(which="both"):
             if not tl.get_text() or not tl.get_visible():
                 continue
             lowest = min(
@@ -3829,7 +3945,7 @@ def footnotes(
                     lowest_fig_y,
                     unit_bb.transformed(fig.transFigure.inverted()).y0,
                 )
-            for tl in a.get_xticklabels():
+            for tl in a.get_xticklabels(which="both"):
                 if not tl.get_text() or not tl.get_visible():
                     continue
                 tl_bb = tl.get_window_extent(renderer=renderer)

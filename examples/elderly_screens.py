@@ -53,7 +53,7 @@ PANELS = [
     ),
 ]
 
-fig, axes = subplots("daily", height=4.3, ncols=2, sharey=True)
+fig, axes = subplots("daily", height=5.3, ncols=2, sharey=True)
 
 for ax, (heading, tv, phone, computer) in zip(axes, PANELS):
     ax.stackplot(
@@ -99,7 +99,7 @@ finalize(
     descriptor="Daily hours spent consuming media\nBy age group, in the first quarter of the year",
     source="",
     title_x=0.03,
-    y_start=0.075,  # leave room for the panel headings
+    y_start=0.058,  # leave room for the panel headings
     autoscale_y=False,
 )
 footnotes(fig, source="Source: Nielsen")

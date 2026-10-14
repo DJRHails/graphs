@@ -45,7 +45,7 @@ COMPONENTS = [
 ]
 PANELS = ["Privacy & surveillance", "Harassment"]
 
-fig, axes = subplots("wide", height=3.9, ncols=2, sharey=True)
+fig, axes = subplots("wide", height=5.0, ncols=2, sharey=True)
 
 idx = np.arange(len(REGIMES))
 for panel_i, ax in enumerate(axes):
@@ -70,11 +70,11 @@ top_legend(fig, handles, labels, ncol=len(handles))
 finalize(
     axes[0],
     title="Where an over-firing monitor's false flags come from",
-    descriptor="Composition of flagged benign transcripts, by regime\n% of sampled traffic",
+    descriptor="Flagged benign transcripts by cause, % of sampled traffic",
     source="",
     y_axis_right=False,
     title_x=0.04,
-    y_start=0.075,
+    y_start=0.058,
     autoscale_y=False,
 )
 

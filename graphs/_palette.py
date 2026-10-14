@@ -9,6 +9,9 @@ Adapted from The Economist's web chart style guide, with two project overrides:
    title rule and the highlighted data element share one accent.
 """
 
+import re
+from collections.abc import Iterator, Mapping
+
 # ----------------------------------------------------------------------------
 # Background and structural colours
 # ----------------------------------------------------------------------------
@@ -105,6 +108,98 @@ def cycle_for(chart_type: str) -> list[str]:
 C_OTHER = PALETTE["grey"]  # "Other" / "Don't know" buckets
 C_HIGHLIGHT_PANEL = "#E9EDF0"  # subtle event-period band (web)
 C_HIGHLIGHT_PANEL_RED = "#f5c5b8"  # red-tinted event band (rare emphasis)
+
+
+# ----------------------------------------------------------------------------
+# Concept colours — one meaning per hue across a figure set
+# ----------------------------------------------------------------------------
+class ConceptColors(Mapping[str, str]):
+    """Read-only concept → hex map; see :func:`concept_colors`."""
+
+    def __init__(self, resolved: dict[str, str]) -> None:
+        self._colors = dict(resolved)
+
+    def __getitem__(self, concept: str) -> str:
+        try:
+            return self._colors[concept]
+        except KeyError:
+            raise KeyError(
+                f"no colour for concept {concept!r}; known concepts: "
+                f"{sorted(self._colors)}. Add it to the concept_colors() map "
+                "shared by the figure set rather than picking a one-off colour."
+            ) from None
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._colors)
+
+    def __len__(self) -> int:
+        return len(self._colors)
+
+    def __repr__(self) -> str:
+        return f"ConceptColors({self._colors!r})"
+
+
+_HEX_COLOR = re.compile(
+    r"""(?x)                    # verbose mode
+    \#                          # leading hash
+    (?:
+        (?P<short>[0-9a-fA-F]{3})   # #rgb shorthand
+      | (?P<full>[0-9a-fA-F]{6})    # #rrggbb
+    )
+    """
+)
+
+
+def _resolve_color(concept: str, color: str) -> str:
+    """Canonical lowercase ``#rrggbb`` so the duplicate check sees ``#fff`` == ``#ffffff``."""
+    if color in PALETTE:
+        return PALETTE[color].lower()
+    match = _HEX_COLOR.fullmatch(color)
+    if match is not None:
+        digits = match["full"] or "".join(c * 2 for c in match["short"])
+        return f"#{digits.lower()}"
+    raise ValueError(
+        f"concept {concept!r}: colour {color!r} is neither a PALETTE name "
+        f"({', '.join(PALETTE)}) nor a #rgb / #rrggbb hex"
+    )
+
+
+def concept_colors(mapping: Mapping[str, str]) -> ConceptColors:
+    """Fix one colour per concept for a whole figure set.
+
+    Define the map once in a module every figure script imports, then
+    colour each concept through it everywhere it appears — its line or bar,
+    its direct label, value labels, group labels and token chips — so a
+    reader who learns "blue = after RL" on the first figure reads every
+    later figure without a legend. The deck/paper variants inherit the
+    colours unchanged.
+
+        COLORS = concept_colors({"Base model": "grey", "Cue": "yellow",
+                                 "After RL": "blue"})
+        ax.bar(x, y, color=COLORS["After RL"])
+
+    Args:
+        mapping: Concept name → ``PALETTE`` name (``"blue"``) or hex string.
+
+    Returns:
+        A read-only mapping of concept → hex. Looking up an unmapped concept
+        raises ``KeyError`` naming the known concepts.
+
+    Raises:
+        ValueError: On an unknown colour name, or when two concepts share a
+            colour — a shared hue makes the two concepts indistinguishable,
+            which is the ambiguity the map exists to prevent.
+    """
+    resolved = {concept: _resolve_color(concept, color) for concept, color in mapping.items()}
+    owners: dict[str, str] = {}
+    for concept, hex_color in resolved.items():
+        if hex_color in owners:
+            raise ValueError(
+                f"concepts {owners[hex_color]!r} and {concept!r} share colour "
+                f"{hex_color}; give each concept its own hue"
+            )
+        owners[hex_color] = concept
+    return ConceptColors(resolved)
 
 
 # ----------------------------------------------------------------------------

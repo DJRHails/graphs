@@ -75,7 +75,9 @@ def _strip_headline(fig, *, keep_descriptor: bool = False) -> int:
     return found
 
 
-def save_deck_variant(fig, path, *, dpi: int = 150) -> Path:
+def save_deck_variant(
+    fig, path, *, dpi: int = 150, extra_formats: tuple[str, ...] = ()
+) -> Path:
     """Save ``<stem>_deck<suffix>`` beside ``path`` — the chart without its
     marker, title, source line and footnotes.
 
@@ -97,6 +99,9 @@ def save_deck_variant(fig, path, *, dpi: int = 150) -> Path:
         path: Path the full chart was saved to; the deck path derives from
             it (``figures/foo.png`` → ``figures/foo_deck.png``).
         dpi: Raster resolution; matches ``save_chart``'s 150 default.
+        extra_formats: Further extensions (``("pdf",)``) to write the same
+            stripped figure to. One strip serves every format, so the
+            in-place fallback for an unpicklable figure never strips twice.
 
     Returns:
         The path of the written deck variant.
@@ -118,6 +123,10 @@ def save_deck_variant(fig, path, *, dpi: int = 150) -> Path:
             stacklevel=2,
         )
     target.savefig(deck_path, dpi=dpi, bbox_inches="tight")
+    for fmt in extra_formats:
+        target.savefig(
+            path.with_name(f"{path.stem}_deck.{fmt.lstrip('.')}"), dpi=dpi, bbox_inches="tight"
+        )
     if cloned:
         plt.close(target)
     return deck_path

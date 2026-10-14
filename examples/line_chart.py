@@ -66,7 +66,7 @@ deaths_trend = 0.34 * (1 - np.exp(-2.4 * t))
 y_deaths = deaths_trend + np.random.normal(0, 0.025, n_points)
 y_deaths = np.clip(y_deaths, 0, None)
 
-fig, ax = subplots("wide", height=4.2)
+fig, ax = subplots("wide", height=4.4)
 
 smoothed_line(
     ax, xs, y_casualties,

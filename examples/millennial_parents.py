@@ -44,7 +44,7 @@ colors = dict(zip([name for name, _, _ in series], snapshot_palette(len(series))
 colors["Silent"] = "#63615b"
 colors["Baby-boomer"] = "#c0bfb6"
 
-fig, ax = subplots("daily", height=6.0)
+fig, ax = subplots("daily", height=6.4)
 
 for name, ages, minutes in series:
     is_accent = name == "Millennial"

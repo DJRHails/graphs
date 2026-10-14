@@ -3,10 +3,12 @@ name: graph-design
 description: >
   Economist-style data-visualisation system for matplotlib/seaborn — theme,
   finalize() title-stack, direct labels, and 20+ chart helpers with a
-  when-to-load index of 39 worked examples. Use whenever creating, restyling
-  or reviewing charts/plots/figures in Python: it owns figure sizing,
-  typography, titles/descriptors/sources, annotation conventions and chart-type
-  selection. Not for non-matplotlib charting (d3, plotly, spreadsheets).
+  when-to-load index of 44 worked examples. Use whenever creating, restyling
+  or reviewing charts/plots/figures in Python — including figures for a paper
+  (caption variant, vector PDF, concept colours across a figure set): it owns
+  figure sizing, typography, titles/descriptors/sources, layout spacing,
+  annotation conventions and chart-type selection. Not for non-matplotlib
+  charting (d3, plotly, spreadsheets).
 license: MIT
 version: 0.18.3
 author: Daniel Hails <graphs@hails.info>
@@ -108,6 +110,10 @@ treatment below; the ✗ is the mistake the rule prevents.
 - **Call `finalize(ax, title, descriptor, source)` last** — it auto-sizes every
   margin, seats numeric y-labels on the grid, and draws the delta marker. Don't
   hand-set `subplots_adjust` before it.
+- **A paper figure ships as `_deck` + PDF.** `save_chart(__file__, deck=True,
+  formats=("png", "pdf"))` — the caption carries the headline, the PDF keeps
+  text as text. ✗ a 150-dpi PNG with its own title pasted under a caption
+  that repeats it. → [Paper figures](#paper-figures)
 - **Read the rendered PNG back** and check it tells its story at a glance, every
   element earns its place, and it's the right chart type. → [Review](#review)
 - **The rendered figure is ≥75% graph.** The plot region (axes + tick labels +
@@ -195,6 +201,13 @@ Behaviour that's automatic unless you override it:
   `color=` per line on a multi-series chart so each band matches its line.
 - **Frameless legends are default** for both `smart_legend()` and
   `top_legend()`. Boxed legends are opt-in.
+- **Vector output keeps text as text.** `set_theme()` embeds TrueType in
+  PDF and keeps SVG labels as `<text>`, so `save_chart(__file__,
+  formats=("png", "pdf"))` gives a PDF whose labels stay sharp at any zoom
+  and can be selected and searched.
+- **Literals are monospace.** `fontfamily="monospace"` resolves to IBM Plex
+  Mono (same superfamily as the labels) — use it for tokens, prompts, code
+  and file names so a literal reads as a literal.
 - **Source + footnotes use `C_SOURCE`** (`#404040`, the styleguide's
   75% black) — darker than the muted `C_LABEL_MUTED` grey, so
   attribution stays legible while reading as metadata.
@@ -257,14 +270,22 @@ Rules the helpers were built to enforce. When in doubt, satisfy the most.
 - **Title does the talking** — pose the exact question the chart answers,
   not a vague topic. Subtitle carries units, geography, time range.
 - **Every element earns its place** — if removing it doesn't hurt
-  comprehension, remove it.
+  comprehension, remove it. That holds for whole series too: one figure,
+  one idea — a series answering a different question (pass@16 beside a
+  pass@1 comparison) leaves even when it's accurate, for its own figure.
 - **Put information where the reader's eye is already going** — labels next
   to what they label.
 - **Direct labelling beats legends.** (See `label_lines`.)
 - **Each chart type has its own conventions.** Pick the type first, then
   apply its rules. (See `cycle_for`.)
 - **Hue communicates kind; saturation communicates importance.** Same-kind
-  differentiation uses saturation or opacity, not a new hue.
+  differentiation uses saturation or opacity, not a new hue. Size and line
+  weight are the other two levers — big points put the samples first, a
+  heavy line puts the fit first — so decide which the figure emphasises
+  rather than inheriting it from draw order.
+- **A hue means one concept across the whole figure set**, not just one
+  chart: fix the map once with `concept_colors` and colour every appearance
+  of the concept through it. → [Concept colours](#concept-colours)
 - **Brand colour and data colour are separated** — `C_RED` is reserved for
   emphasis, not as the default fill.
 - **Four categories is a working ceiling** for thermometer / bubble / pie /
@@ -282,7 +303,8 @@ Rules the helpers were built to enforce. When in doubt, satisfy the most.
   event markers have their own typography and geometry.
 - **Mobile is a redesign, not a resize.**
 - **Negative space is engineered** — the paddings and axis ends are
-  deliberate.
+  deliberate, and spacing groups: panels that sit closer are compared
+  first. → [Layout](#layout--spacing-groups)
 - **Sometimes the right answer is less data** — cut or show an average.
 - **The chart is responsible to the reader, not to the data.** Misleading,
   confusing, pointless — three failure modes every chart has to pass.
@@ -363,6 +385,67 @@ Style overrides to apply on top:
 - **"Other" / "Don't know"** → `C_OTHER` (slate grey).
 - **Positive vs. negative** → only differentiate by colour for *meaningful*
   pairs (imports/exports, gain/loss).
+- **A number encoded as colour** → a perceptually even colormap: sequential
+  (`viridis`) for an ordered quantity, diverging (`RdBu`) centred on the
+  meaningful midpoint (zero change) — an uneven ramp makes small
+  differences look large.
+
+### Concept colours
+
+When the same conditions recur across figures — a paper, a report, a deck —
+give each concept one colour for the whole set and never reuse that hue for
+anything else:
+
+```python
+# figures/colors.py — imported by every figure script
+COLORS = concept_colors({"Base model": "grey", "Cue": "yellow", "After RL": "blue"})
+ax.bar(x, y, color=COLORS["After RL"])
+```
+
+Colour **every** appearance through the map — mark, value label, group
+label, token chip — so the reader learns the code once and later figures
+need no legend. The control is grey; the paper's own concept may take
+`C_RED`. `concept_colors` rejects two concepts sharing a colour, and an
+unmapped lookup raises naming the known concepts: extend the shared map,
+never pick a one-off colour in one figure. Read
+[references/paper-figures.md](./references/paper-figures.md) for the full
+rules (text shades, chips, shade levels).
+
+## Layout — spacing groups
+
+Whitespace decides which panels the reader compares: the closest ones,
+first. `finalize` sizes every gap to its measured minimum; tell it which way
+the grid reads and it opens the gaps between groups instead.
+
+- `row_emphasis(fig)` — each **row** is one entity (a model) across
+  conditions; the eye compares along the row.
+- `column_emphasis(fig)` — the transpose; each **column** is one entity.
+
+Call either BEFORE `finalize`. The between-group gap becomes the larger
+measured gap plus 18pt, so it out-spaces the within-group gap even when that
+gap already holds tick labels; a figure too short to fit it raises. And
+**order panels the way the explanation runs** — what changed first, its
+consequence last — not the order the experiments ran in.
+
+## Paper figures
+
+A paper's caption carries the question, so the figure ships without its
+headline — the same strip as a deck slide. Build the full chart (title,
+descriptor, source), then:
+
+```python
+fig, ax = subplots("manuscript")   # the paper's text width, so 9pt reads as 9pt
+...
+save_chart(__file__, deck=True, formats=("png", "pdf"))
+# fig.png / fig.pdf (full), fig_deck.png / fig_deck.pdf (caption variant)
+```
+
+Use `concept_colors` across the paper's figures, monospace chips for literal
+tokens, and a two-level x-axis (bars on major ticks, bracketed groups on
+minor ticks — `finalize` reserves both rows). Read
+[references/paper-figures.md](./references/paper-figures.md) before making a
+paper figure; [`paper_cue_bars.py`](./examples/paper_cue_bars.py) is the
+worked reference.
 
 ## API
 
@@ -381,8 +464,10 @@ Style overrides to apply on top:
 | `year_axis(ax, *, abbreviate=True)`                                 | Date x-axis formatter: first year full, subsequent two-digit. |
 | `year_ticks(ax, years, *, inset=True)`                              | Same convention for numeric year axes: full first/century years, two-digit otherwise, inset ends. |
 | `x_axis_top(ax)`                                                    | Move the value axis to the top (horizontal-chart convention); call after `finalize()` when a legend row intervenes. |
-| `save_chart(__file__, *, deck=False)`                               | Standard save epilogue: `<script>.png` beside the script, tight bbox, 150 dpi, close. Runs `verify_graph_share` first (warns when the graph is <75% of the image). `deck=True` also writes `<script>_deck.png`. |
-| `save_deck_variant(fig, path, *, dpi=150)`                          | Deck variant beside the full chart: strips the tagged headline (marker, title, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings — and keeps the descriptor when the chart has no `y_axis_label` block and no axes ylabel, since the descriptor is the house y-axis label; writes `<stem>_deck.png`. Call after saving the full chart. |
+| `save_chart(__file__, *, deck=False, formats=("png",))`             | Standard save epilogue: `<script>.<fmt>` beside the script for each format, tight bbox, 150 dpi, close. Runs `verify_graph_share` first (warns when the graph is <75% of the image). `formats=("png", "pdf")` adds a vector PDF with selectable text; `deck=True` also writes `<script>_deck.<fmt>` — the deck / paper-caption variant — per format. |
+| `row_emphasis(fig)` / `column_emphasis(fig)`                        | Spacing groups a panel grid: tight gaps within a row (column), the between-group gap widened to the larger measured gap + 18pt. Call BEFORE `finalize`; raises on a grid with nothing to separate. |
+| `concept_colors(mapping) → ConceptColors`                           | Read-only concept → hex map shared by a figure set (`PALETTE` names or hex). Rejects two concepts on one colour; an unmapped lookup raises naming the known concepts. |
+| `save_deck_variant(fig, path, *, dpi=150, extra_formats=())`        | Deck variant beside the full chart: strips the tagged headline (marker, title, source, footnotes, any `suptitle`), keeps `y_axis_label` blocks / legends / `panel_label` headings — and keeps the descriptor when the chart has no `y_axis_label` block and no axes ylabel, since the descriptor is the house y-axis label; writes `<stem>_deck.png`. Call after saving the full chart. |
 
 ### Chart helpers
 
@@ -511,6 +596,9 @@ For each rendered figure, answer three questions before moving on:
      not raw scatter.
    - Long-form ranking change over time? → **`bump_chart`**, not stacked
      bars.
+   - Training curves when the point is which condition ends ahead? →
+     **grouped bars** of the final values: the axis of variation should
+     carry the comparison you care about, not the one the data arrived in.
 
    The chart-type table in `cycle_for()` and the per-type rules in the
    core design principles are the reference.
@@ -569,3 +657,6 @@ pattern.
 - [`gold_rally.py`](./examples/gold_rally.py) — **Load when:** comparing returns over a sub-year window — rebased to 100 (as `index_chart.py`) but with dense daily data and month-resolution ticks. `index_marker` + month-letter ticks, direct line labels.
 - [`nuclear_warheads.py`](./examples/nuclear_warheads.py) — **Load when:** ranked totals per entity with an internal status breakdown, plus a forecast for one entity that must read as projection. Stacked `barh` inventories, top axis + `top_legend`, dashed forecast box.
 - [`european_warming.py`](./examples/european_warming.py) — **Load when:** many same-unit time series where one entity is the story and the rest are context — highlight two lines against a faded backdrop of the others, no legend. A wink title carried by a y-axis-labelling descriptor; direct labels on the two highlighted lines; real Berkeley Earth decadal anomalies.
+- [`paper_cue_bars.py`](./examples/paper_cue_bars.py) — **Load when:** a figure for a paper comparing a few conditions across groups, where the same conditions recur in other figures and some conditions are literal strings (tokens, prompts). `concept_colors` carried into value labels and group labels (no legend), monospace token chips on the ticks, a two-level x-axis (bars on major ticks, bracketed groups on minor ticks), `save_chart(deck=True, formats=("png", "pdf"))` for the caption variant.
+- [`paper_benchmark_grid.py`](./examples/paper_benchmark_grid.py) — **Load when:** a grid of small multiples where the reader should compare along one direction first (one model across benchmarks) — spacing, not rules or boxes, does the grouping. `row_emphasis`, shared-y right axis on the last column, `panel_label` headings, `top_legend` keyed by the shared `concept_colors` map.
+- [`paper_training_curves.py`](./examples/paper_training_curves.py) — **Load when:** training or sweep curves per model where each model's story reads top-to-bottom (the curves, then a derived gap) — one column per entity. `column_emphasis`, `height_ratios` for a shorter derived panel, direct labels in each concept's darkened ink where the curves diverge, model names inside the panels instead of `panel_label` (a heading band would split every column).

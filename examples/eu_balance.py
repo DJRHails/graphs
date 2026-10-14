@@ -100,7 +100,7 @@ def stacked(ax, d: dict[str, list[float]]) -> None:
     ax.set_xticks(years)
 
 
-fig, (ax_bb, ax_ca) = subplots("wide", height=3.7, ncols=2, sharey=False)
+fig, (ax_bb, ax_ca) = subplots("wide", height=4.4, ncols=2, sharey=False)
 
 stacked(ax_bb, bb)
 stacked(ax_ca, ca)
@@ -109,25 +109,26 @@ stacked(ax_ca, ca)
 for axis in (ax_bb, ax_ca):
     right_axis(axis)
 
+# Single legend just below the title/descriptor, above both panels. Tagged
+# BEFORE finalize, which reserves its band and re-anchors it to the final axes.
+handles, labels = ax_bb.get_legend_handles_labels()
+top_legend(fig, handles, labels, ncol=len(handles))
+
 # finalize auto-layouts every margin plus the inter-panel wspace (measured from
-# the per-panel right-axis labels); y_start reserves the title-stack + legend
-# band. The panel labels and legend are then drawn against the final positions.
+# the per-panel right-axis labels); y_start leaves room for the panel labels,
+# which are then drawn against the final positions.
 finalize(
     ax_bb,
     title="Surfeit of surpluses",
-    descriptor="Euro-area, €bn",
+    descriptor="",  # the panel labels carry the unit; the legend names the area
     source="",
     title_x=0.02,
-    y_start=0.24,
+    y_start=0.065,
     autoscale_y=False,
 )
 
 panel_label(ax_bb, "Budget balance, € bn")
 panel_label(ax_ca, "Current-account balance, € bn")
-
-# Single legend just below the title/descriptor, above both panels.
-handles, labels = ax_bb.get_legend_handles_labels()
-top_legend(fig, handles, labels, y=0.82, ncol=len(handles))
 
 footnotes(fig, source="Source: [Eurostat](https://ec.europa.eu/eurostat)")
 

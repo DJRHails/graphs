@@ -40,7 +40,7 @@ for row in reader:
 # Axis ranges: 1% of the midpoint occupies the same vertical pixel distance
 # on both axes. Midpoints ≈ 19.3 kg and 43.4 cm → ratio 2.25, so neck range
 # must be 2.25× the weight range.
-fig, ax_left = subplots("wide", height=4.2)
+fig, ax_left = subplots("wide", height=5.1)
 
 ax_right = ax_left.twinx()
 
