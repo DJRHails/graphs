@@ -5,6 +5,41 @@ finaliser with renderer-measured wrapping, on-grid axis labels, direct line labe
 CI bands, and a catalogue of chart helpers (bars, dumbbells, thermometers, bump
 charts, lollipops). IBM Plex Sans typography and a curated palette.
 
+It exists so that charts in the author's research and writing come out in one
+consistent, publication-ready house style without hand-tuning each figure. The
+same tree is both the `djrhails-graphs` PyPI package and the `graph-design` agent
+skill ([`SKILL.md`](./SKILL.md)). **Status: active** — version 0.19.0 on PyPI,
+95 commits since the May 2026 extraction from the author's dotfiles, last change
+October 2026.
+
+## Key takeaways
+
+- **One call, `finalize()`, turns a plain matplotlib axes into a finished chart** —
+  margins, title stack, on-grid y labels, source line. See [Quick start](#quick-start).
+- **The layout engine is covered by a local test suite, not by CI.** 217 tests pass
+  on a fresh `uv sync` (Python 3.13, 2026-10-17); no workflow runs them on push.
+  [confidence: ~90% that the tested layout rules hold at this commit] See
+  [What is verified](#what-is-verified-and-how).
+- **Visual quality is checked by eye**, through 44 worked examples in
+  [`examples/`](./examples/) and a side-by-side comparison harness against Economist
+  originals. There are no automated image-diff tests.
+  See [What is verified](#what-is-verified-and-how).
+- **Conventions are enforced, not just documented**: `finalize()` raises on a
+  hardcoded y-axis label, and two ast-grep rules lint chart code.
+  See [Load-bearing design decisions](#load-bearing-design-decisions).
+- **Main limitations**: matplotlib only; first use downloads fonts over the network;
+  examples need Python 3.12+; the comparison reference images are not shipped.
+  See [Scope and limitations](#scope-and-limitations).
+
+Confidence tags are an assessment of the evidence in this repo (sample sizes, seeds,
+intervals), added in a 2026-10 README audit; they are not new measurements.
+
+**Contents:** [Install](#install) · [Quick start](#quick-start) ·
+[Load-bearing design decisions](#load-bearing-design-decisions) ·
+[What is verified](#what-is-verified-and-how) ·
+[Scope and limitations](#scope-and-limitations) · [Provenance](#provenance) ·
+[Development](#development) · [License](#license)
+
 ## Install
 
 ```bash
@@ -65,7 +100,67 @@ first use and cached inside the installed package.
 Fallback chain: IBM Plex Sans Condensed → IBM Plex Sans → Verdana → Arial →
 DejaVu Sans.
 
+## Load-bearing design decisions
+
+The library's value rests on two things more than on any single helper:
+
+- **Layout is measured, not guessed.** `finalize()` sizes margins and wraps titles
+  from renderer-measured text extents (`graphs/_finalize.py`), and `verify_layout()`
+  warns when any text crosses the figure edge — because `savefig(bbox_inches="tight")`
+  would otherwise silently widen the canvas instead of failing. Most of the test
+  files in [`tests/`](./tests/) exercise this engine.
+- **The style rules are enforced in code.** `finalize()` raises `ValueError` on a
+  non-empty `ax.set_ylabel(...)` (opt out with `allow_ylabel=True` for twin axes or
+  coordinate plots), and [`enforcement/`](./enforcement/README.md) ships ast-grep
+  rules for the same convention plus a warning against captioning CI machinery.
+  The rationale for the conventions themselves is in [SKILL.md](./SKILL.md) and
+  [`references/`](./references/); it is a style judgement, not a measured result.
+
+## What is verified and how
+
+| Claim | Support | Confidence |
+| --- | --- | --- |
+| The test suite passes at this commit | `uv sync && uv run pytest -q`: 217 passed, 12 warnings, 2026-10-17, Python 3.13. The warnings are `verify_layout` `UserWarning`s raised by tests that exercise overflow paths. | high (~95%) |
+| Tests run automatically on every change | Not true: [`.github/workflows/`](./.github/workflows/) holds LFS integrity, PyPI release and a dotfiles notifier, none of which runs `pytest`. | — |
+| Releases reach PyPI | [`release.yml`](./.github/workflows/release.yml) publishes on a version tag or an untagged version on `main`; PyPI lists 0.19.0. | high (~95%) |
+| Charts look right | 44 example scripts with committed PNGs, reviewed by eye; `examples/build_comparisons.py` stacks Economist originals above the replicas. No pixel-diff tests. | moderate — a reviewer's judgement |
+| Used downstream | [RELEASING.md](./RELEASING.md) describes the dotfiles skill submodule and repos that pin a release tag. | high that it is consumed; usage breadth not measured |
+
+## Scope and limitations
+
+- **matplotlib/seaborn only.** Not for d3, plotly or spreadsheets.
+- **Network on first use** unless IBM Plex is already installed: fonts are fetched
+  from GitHub and cached in `graphs/_fonts_cache/`. If the download fails, the
+  failure is logged only at `DEBUG` level and rendering silently falls back to
+  DejaVu Sans (`graphs/_fonts.py`), so text metrics and layout will differ.
+- **Python versions.** The package declares `>=3.10`; the examples need 3.12+ because
+  `scipy` (example-only) is pinned for 3.12+ in `pyproject.toml`. Only 3.13 was run
+  for this audit.
+- **Loose runtime pins.** `requirements.txt` sets lower bounds only (matplotlib ≥ 3.7,
+  numpy ≥ 1.24); only the versions in `uv.lock` were tested, and a different
+  matplotlib could plausibly shift measured layout.
+- **Example PNGs are in Git LFS**, so a clone without `git-lfs` gets pointer files.
+- **Comparison images are not redistributed** — the harness downloads them.
+- The most important missing piece is **CI that runs the tests**: today a regression
+  is caught only if someone runs `pytest` locally before merging.
+
+## Provenance
+
+The code was extracted from the author's dotfiles in May 2026 (first commit,
+`feat: initial release of graphs (extracted from dotfiles)`) and has grown through
+small PRs, several followed by a code-review fix-up PR (the
+`fix: resolve code review findings` commits). The chart conventions follow the
+Economist's published style and its "Mistakes, we've drawn a few" redesigns, which
+the examples replicate. This README section and the verification table were written
+from the repo's code, workflows and history plus one local test run; no other
+measurements were taken.
+
 ## Development
+
+```bash
+uv sync               # installs the dev group (pytest, scipy for the examples)
+uv run pytest -q      # the test suite
+```
 
 Hot reload during chart iteration:
 
@@ -78,6 +173,8 @@ by path:
 - `graphs/**/*.py` or `examples/_data.py` → regen all examples + comparisons
 - `examples/build_comparisons.py` → comparisons only
 - `examples/<name>.py` → that one example + comparisons
+
+Releases are cut with `bumpver`; see [RELEASING.md](./RELEASING.md).
 
 ### Comparison harness
 
