@@ -140,7 +140,11 @@ The library's value rests on two things more than on any single helper:
   numpy ≥ 1.24); only the versions in `uv.lock` were tested, and a different
   matplotlib could plausibly shift measured layout.
 - **Example PNGs are in Git LFS**, so a clone without `git-lfs` gets pointer files.
-- **Comparison images are not redistributed** — the harness downloads them.
+- **Comparison images are not redistributed.** The harness downloads the Medium-hosted
+  references, and `examples/fetch_refs.py` downloads the 2019 daily-chart grid, but the
+  other `local_ref` entries must be supplied by hand under
+  `examples/comparisons/_originals/`. `build_comparisons.py` stops at the first one
+  that is missing.
 - The most important missing piece is **CI that runs the tests**: today a regression
   is caught only if someone runs `pytest` locally before merging.
 
