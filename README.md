@@ -31,8 +31,8 @@ October 2026.
   examples need Python 3.12+; the comparison reference images are not shipped.
   See [Scope and limitations](#scope-and-limitations).
 
-Confidence tags are an assessment of the evidence in this repo (sample sizes, seeds,
-intervals), added in a 2026-10 README audit; they are not new measurements.
+Confidence tags are an assessment of the evidence in this repo (the test suite, the
+worked examples, git history), added in a 2026-10 README audit; they are not new measurements.
 
 **Contents:** [Install](#install) · [Quick start](#quick-start) ·
 [Load-bearing design decisions](#load-bearing-design-decisions) ·
