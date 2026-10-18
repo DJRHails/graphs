@@ -16,8 +16,9 @@ October 2026.
 
 - **One call, `finalize()`, turns a plain matplotlib axes into a finished chart** —
   margins, title stack, on-grid y labels, source line. See [Quick start](#quick-start).
-- **The layout engine is covered by a local test suite, not by CI.** 217 tests pass
-  on a fresh `uv sync` (Python 3.13, 2026-10-17); no workflow runs them on push.
+- **The layout engine is covered by a test suite that CI runs.** 217 tests pass
+  on a fresh `uv sync` (Python 3.13, 2026-10-17); [`ci.yml`](./.github/workflows/ci.yml)
+  runs them on every pull request and push to `main`, and a PyPI release waits for them.
   [confidence: ~90% that the tested layout rules hold at this commit] See
   [What is verified](#what-is-verified-and-how).
 - **Visual quality is checked by eye**, through 44 worked examples in
@@ -121,8 +122,8 @@ The library's value rests on two things more than on any single helper:
 | Claim | Support | Confidence |
 | --- | --- | --- |
 | The test suite passes at this commit | `uv sync && uv run pytest -q`: 217 passed, 12 warnings, 2026-10-17, Python 3.13. The warnings are `verify_layout` `UserWarning`s raised by tests that exercise overflow paths. | high (~95%) |
-| Tests run automatically on every change | Not true: [`.github/workflows/`](./.github/workflows/) holds LFS integrity, PyPI release and a dotfiles notifier, none of which runs `pytest`. | — |
-| Releases reach PyPI | [`release.yml`](./.github/workflows/release.yml) publishes on a version tag or an untagged version on `main`; PyPI lists 0.19.0. | high (~95%) |
+| Tests run automatically on every change | [`ci.yml`](./.github/workflows/ci.yml) runs `pytest` on Python 3.13 on every pull request and push to `main`, with the IBM Plex fonts required (the job fails rather than test against the DejaVu fallback). | high (~95%) |
+| Releases reach PyPI | [`release.yml`](./.github/workflows/release.yml) publishes on a version tag or an untagged version on `main`, only after the test suite passes; PyPI lists 0.19.0. | high (~95%) |
 | Charts look right | 44 example scripts with committed PNGs, reviewed by eye; `examples/build_comparisons.py` stacks Economist originals above the replicas. No pixel-diff tests. | moderate — a reviewer's judgement |
 | Used downstream | [RELEASING.md](./RELEASING.md) describes the dotfiles skill submodule and repos that pin a release tag. | high that it is consumed; usage breadth not measured |
 
@@ -134,8 +135,8 @@ The library's value rests on two things more than on any single helper:
   failure is logged only at `DEBUG` level and rendering silently falls back to
   DejaVu Sans (`graphs/_fonts.py`), so text metrics and layout will differ.
 - **Python versions.** The package declares `>=3.10`; the examples need 3.12+ because
-  `scipy` (example-only) is pinned for 3.12+ in `pyproject.toml`. Only 3.13 was run
-  for this audit.
+  `scipy` (example-only) is pinned for 3.12+ in `pyproject.toml`. CI and this audit
+  run 3.13 only.
 - **Loose runtime pins.** `requirements.txt` sets lower bounds only (matplotlib ≥ 3.7,
   numpy ≥ 1.24); only the versions in `uv.lock` were tested, and a different
   matplotlib could plausibly shift measured layout.
@@ -145,8 +146,6 @@ The library's value rests on two things more than on any single helper:
   other `local_ref` entries must be supplied by hand under
   `examples/comparisons/_originals/`. `build_comparisons.py` stops at the first one
   that is missing.
-- The most important missing piece is **CI that runs the tests**: today a regression
-  is caught only if someone runs `pytest` locally before merging.
 
 ## Provenance
 

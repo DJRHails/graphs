@@ -1,0 +1,92 @@
+name: Tests
+
+# Runs the pytest suite on every pull request and every push to main. release.yml
+# calls this same workflow (workflow_call) and makes publishing wait on it, so a
+# version cannot reach PyPI with a failing suite.
+#
+# Example PNGs live in Git LFS but no test reads them, so the checkout skips LFS.
+# The tests DO depend on the IBM Plex fonts: graphs/_fonts.py downloads them from
+# github.com/IBM/plex on first use and silently falls back to DejaVu Sans when the
+# download fails, which shifts measured text extents and breaks layout tests in
+# confusing ways. So the fonts are cached across runs, and a step fails the job
+# loudly if any Plex family did not register before pytest runs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: pytest
+    # taffy's self-hosted pool — GitHub-hosted minutes are billed. This repo is
+    # PUBLIC and this workflow runs on pull_request, so a pull request from a FORK
+    # stays on GitHub-hosted runners: a fork PR runs arbitrary code, which must
+    # never reach taffy. The enforcing control is the repo's fork-PR approval
+    # policy (all_external_contributors); see lfs-integrity.yml for the full
+    # rationale. Escape hatch: set the CI_FALLBACK repo variable to 'true'.
+    runs-on: >-
+      ${{ ((github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name != github.repository)
+      || vars.CI_FALLBACK == 'true')
+      && 'ubuntu-latest'
+      || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (no LFS, no creds)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          lfs: false
+
+      - name: Set up uv and Python 3.13
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.1"
+          python-version: "3.13"
+          enable-cache: false
+
+      - name: Restore IBM Plex font cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: graphs/_fonts_cache
+          key: ibm-plex-${{ hashFiles('graphs/_fonts.py') }}
+
+      # --frozen installs exactly what uv.lock pins without re-resolving: the lock
+      # carries the author's exclude-newer window, so a re-resolve check (--locked)
+      # fails on any runner without that uv config.
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Require IBM Plex fonts (no DejaVu fallback)
+        run: |
+          set -euo pipefail
+          uv run --no-sync python - <<'PY'
+          from graphs._fonts import (
+              ensure_ibm_plex,
+              ensure_ibm_plex_condensed,
+              ensure_ibm_plex_mono,
+          )
+
+          resolved = {
+              "IBM Plex Sans": ensure_ibm_plex(),
+              "IBM Plex Sans Condensed": ensure_ibm_plex_condensed(),
+              "IBM Plex Mono": ensure_ibm_plex_mono(),
+          }
+          missing = {want: got for want, got in resolved.items() if want != got}
+          if missing:
+              raise SystemExit(
+                  f"IBM Plex fonts did not register (expected -> fell back to): {missing}. "
+                  "The download from github.com/IBM/plex failed; re-run the job, or check "
+                  "the runner's egress to github.com."
+              )
+          print("fonts:", ", ".join(resolved.values()))
+          PY
+
+      - name: Run pytest
+        run: uv run --no-sync pytest -q

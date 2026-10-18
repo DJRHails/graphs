@@ -14,6 +14,9 @@ name: Release to PyPI
 #
 # So "the version in code" is the single source of truth: whatever version reaches
 # main gets exactly one tag and one PyPI release, however the commit got there.
+#
+# Both paths first run the test suite (ci.yml via workflow_call); a failing suite
+# blocks the tag and the publish.
 
 on:
   push:
@@ -25,8 +28,16 @@ permissions:
   contents: read
 
 jobs:
+  tests:
+    name: Tests
+    # The same suite ci.yml runs on PRs; tagging and publishing wait for it.
+    # zizmor's self-repository audit prefers `$/...`, but actionlint 1.7.12 rejects
+    # that syntax; a job-level `./` call resolves from this commit, not the workspace.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+
   release:
     name: Tag (if needed) + publish to PyPI
+    needs: tests
     # DELIBERATELY GitHub-hosted, unlike lfs-integrity.yml. This job mints an
     # OIDC token that PyPI exchanges for publish rights to `djrhails-graphs`.
     # taffy is a persistent host running 18 other repos' CI as the same `actions`
