@@ -7,6 +7,7 @@ an empty one so registration starts from nothing.
 
 import logging
 import shutil
+import stat
 import urllib.error
 from pathlib import Path
 
@@ -61,6 +62,7 @@ def test_successful_download_is_cached_and_registered(font_dir, monkeypatch, cap
 
     assert calls == [_BASE_URL + _FNAME]
     assert (font_dir / _FNAME).read_bytes() == _REAL_FONT.read_bytes()
+    assert stat.S_IMODE((font_dir / _FNAME).stat().st_mode) == 0o644
     assert caplog.records == []
 
 

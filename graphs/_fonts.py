@@ -98,6 +98,8 @@ def _download(url: str, path: str) -> None:
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".part")
     os.close(fd)
     try:
+        # mkstemp creates 0600; the cache is shared by every user of this install.
+        os.chmod(tmp, 0o644)
         urllib.request.urlretrieve(url, tmp)
         if not _is_complete_font(tmp):
             raise ValueError(f"{url} did not return a complete TrueType font")
