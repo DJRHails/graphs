@@ -88,5 +88,7 @@ jobs:
           print("fonts:", ", ".join(resolved.values()))
           PY
 
+      # basetemp under RUNNER_TEMP: the default /tmp/pytest-of-<user> is shared by
+      # every repo's CI on the persistent pool, and its cleanup warns on others' dirs.
       - name: Run pytest
-        run: uv run --no-sync pytest -q
+        run: uv run --no-sync pytest -q --basetemp "$RUNNER_TEMP/pytest"
