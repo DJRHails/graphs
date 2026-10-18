@@ -53,13 +53,15 @@ jobs:
       id-token: write # OIDC trusted publishing
     steps:
       - name: Checkout (no creds)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Resolve version, tag, and whether to release
         id: ver
+        env:
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           set -euo pipefail
           version="$(sed -nE 's/^__version__ = "([^"]+)".*/\1/p' graphs/__init__.py)"
@@ -69,7 +71,7 @@ jobs:
           git rev-parse -q --verify "refs/tags/${tag}" >/dev/null && exists=true
           # Publish on any tag push, or on a main push whose version is not yet tagged.
           should_release=false
-          if [ "${{ github.ref_type }}" = "tag" ] || [ "$exists" = "false" ]; then
+          if [ "$REF_TYPE" = "tag" ] || [ "$exists" = "false" ]; then
             should_release=true
           fi
           {
@@ -84,16 +86,19 @@ jobs:
         if: steps.ver.outputs.should_release == 'true' && steps.ver.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          gh api "repos/${{ github.repository }}/git/refs" \
-            -f ref="refs/tags/${{ steps.ver.outputs.tag }}" \
-            -f sha="${{ github.sha }}"
-          echo "created ${{ steps.ver.outputs.tag }} at ${{ github.sha }}"
+          gh api "repos/${REPO}/git/refs" \
+            -f ref="refs/tags/${TAG}" \
+            -f sha="${SHA}"
+          echo "created ${TAG} at ${SHA}"
 
       - name: Set up Python
         if: steps.ver.outputs.should_release == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
 
@@ -111,7 +116,7 @@ jobs:
 
       - name: Publish to PyPI
         if: steps.ver.outputs.should_release == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           # Idempotent: a re-run (or the redundant main-push run that pairs with a
           # tag push) is a no-op once the version is on PyPI.
