@@ -12,6 +12,8 @@ already registered. We load three families of the one superfamily:
 
 import logging
 import os
+import struct
+import tempfile
 import urllib.request
 
 import matplotlib.font_manager as fm
@@ -57,31 +59,90 @@ _FALLBACK = "DejaVu Sans"
 _FALLBACK_MONO = "DejaVu Sans Mono"
 
 
+_FONT_DIR = os.path.join(os.path.dirname(__file__), "_fonts_cache")
+
+# sfnt (TrueType/OpenType) layout: a 12-byte header, then a 16-byte record per table.
+_SFNT_HEADER = struct.Struct(">4sH6x")  # sfntVersion, numTables, (search fields)
+_SFNT_TABLE = struct.Struct(">4x4xII")  # (tag), (checksum), offset, length
+_SFNT_VERSIONS = (b"\x00\x01\x00\x00", b"true", b"OTTO")
+
+
 def _is_registered(name: str) -> bool:
     return any(f.name == name for f in fm.fontManager.ttflist)
+
+
+def _is_complete_font(path: str) -> bool:
+    """Whether *path* is an sfnt font whose every declared table lies inside the file.
+
+    FreeType (and so matplotlib) opens a truncated TTF without complaint as long as
+    its header survived, so loading the font cannot detect an interrupted download.
+    """
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if len(data) < _SFNT_HEADER.size:
+        return False
+    version, num_tables = _SFNT_HEADER.unpack_from(data)
+    directory_end = _SFNT_HEADER.size + num_tables * _SFNT_TABLE.size
+    if version not in _SFNT_VERSIONS or num_tables == 0 or len(data) < directory_end:
+        return False
+    for i in range(num_tables):
+        record_start = _SFNT_HEADER.size + i * _SFNT_TABLE.size
+        offset, length = _SFNT_TABLE.unpack_from(data, record_start)
+        if offset + length > len(data):
+            return False
+    return True
+
+
+def _download(url: str, path: str) -> None:
+    """Fetch *url* to *path* atomically: a partial or non-font body never lands."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".part")
+    os.close(fd)
+    try:
+        # mkstemp creates 0600; the cache is shared by every user of this install.
+        os.chmod(tmp, 0o644)
+        urllib.request.urlretrieve(url, tmp)
+        if not _is_complete_font(tmp):
+            raise ValueError(f"{url} did not return a complete TrueType font")
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def _cached_font(base_url: str, fname: str) -> str:
+    """Return the path to a complete cached copy of *fname*, downloading if needed."""
+    path = os.path.join(_FONT_DIR, fname)
+    if os.path.exists(path):
+        if _is_complete_font(path):
+            return path
+        _log.warning("Cached font %s is incomplete or corrupt; re-downloading", path)
+    _download(base_url + fname, path)
+    return path
 
 
 def _ensure(name: str, base_url: str, files: list[str], fallback: str = _FALLBACK) -> str:
     if _is_registered(name):
         return name
 
-    font_dir = os.path.join(os.path.dirname(__file__), "_fonts_cache")
-    os.makedirs(font_dir, exist_ok=True)
-
+    os.makedirs(_FONT_DIR, exist_ok=True)
+    failures: list[str] = []
     for fname in files:
-        path = os.path.join(font_dir, fname)
-        if not os.path.exists(path):
-            try:
-                urllib.request.urlretrieve(base_url + fname, path)
-            except Exception:
-                _log.debug("Failed to download %s", fname, exc_info=True)
-                continue
         try:
-            fm.fontManager.addfont(path)
-        except Exception:
-            _log.debug("Failed to register font %s", fname, exc_info=True)
+            fm.fontManager.addfont(_cached_font(base_url, fname))
+        except Exception as exc:  # noqa: BLE001 - every failure is reported below
+            failures.append(f"{fname}: {exc}")
 
-    return name if _is_registered(name) else fallback
+    resolved = name if _is_registered(name) else fallback
+    if failures or resolved != name:
+        _log.warning(
+            "Could not load %d of %d %s font files (%s); using %s",
+            len(failures),
+            len(files),
+            name,
+            "; ".join(failures) or "family not registered",
+            resolved,
+        )
+    return resolved
 
 
 def ensure_ibm_plex() -> str:
