@@ -108,7 +108,8 @@ uv run pytest -q      # the test suite
 [`ci.yml`](./.github/workflows/ci.yml) runs the tests on Python 3.13 on every pull
 request and push to `main`, and fails if the IBM Plex fonts don't load rather than
 testing against the DejaVu fallback. A few `verify_layout` warnings in the test
-output are expected: they come from tests that exercise the overflow paths.
+output are expected: edge tick labels overhang the small figures some tests
+build, and those tests check other layout properties.
 
 Hot reload during chart iteration:
 
